@@ -21,7 +21,7 @@ from .helpers import (
 
 logger = logging.getLogger(__name__)
 
-MAX_WARNINGS = 2
+MAX_WARNINGS = 3
 
 
 # ── /start /help ───────────────────────────────────────────────────────────────
@@ -557,24 +557,7 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(update.effective_user.id, update.effective_chat.id)
 
 
-# ── Expired ban auto-unban job ────────────────────────────────────────────────
+# ── Banned words ─────────────────────────────────────────────────────────────
 
-async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
-    expired = await db.get_expired_bans()
-    for ban in expired:
-        user_id = ban["user_id"]
-        chat_id = ban["chat_id"]
-        logger.info("انتهت مدة حظر المستخدم %s في المجموعة %s — جارٍ رفع الحظر", user_id, chat_id)
-        await db.remove_ban(user_id, chat_id)
-        try:
-            await context.bot.unban_chat_member(chat_id, user_id, only_if_banned=True)
-            await context.bot.send_message(
-                chat_id,
-                f"انتهت مدة حظر المستخدم {user_id}. يمكنه الانضمام إلى المجموعة مجددًا."
-            )
-        except Exception as e:
-            logger.warning("خطأ في رفع حظر المستخدم %s في المجموعة %s: %s", user_id, chat_id, e)
-        await db.log_event(
-            chat_id, "ban_expired", target_id=user_id,
-            detail=f"السبب كان: {ban.get('reason', 'غير محدد')}"
-        )
+async def cmd_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
+  
