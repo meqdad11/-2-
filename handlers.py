@@ -943,3 +943,31 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
                 logger.warning("فشل إرسال التقرير اليومي للمجموعة %s: %s", chat_id, e)
     except Exception as e:
         logger.error("خطأ في إرسال التقارير اليومية: %s", e)
+
+# ── ردود تلقائية وتفاعل ──────────────────────────────────────────
+
+AUTO_REPLIES = {
+    "صباح الخير": ["صباح النور ☀️", "صباح الورد 🌹", "صباحك أجمل"],
+    "مساء الخير": ["مساء النور 🌙", "مساء الورد"],
+    "هلا": ["هلا والله", "أهلين", "مرحباً"],
+    "شلونك": ["بخير الحمدلله", "تمام وأنت؟"],
+}
+
+async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.text:
+        return
+    
+    text = msg.text.strip().lower()
+    
+    # ردود تلقائية بناءً على الكلمات المفتاحية
+    for keyword, replies in AUTO_REPLIES.items():
+        if keyword in text:
+            import random
+            await msg.reply_text(random.choice(replies))
+            return
+    
+    # رد ذكي بسيط عند ذكر اسم البوت (Tag)
+    bot_user = await context.bot.get_me()
+    if bot_user.username and f"@{bot_user.username.lower()}" in text:
+        await msg.reply_text("هلا! كيف أقدر أساعدك؟ 😊")

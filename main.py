@@ -47,6 +47,7 @@ from handlers import (
     cmd_focus,
     check_focus_answer,
     cmd_gamescore,
+    auto_reply,
 )
 from music import (
     cmd_download,
@@ -247,6 +248,9 @@ def main():
 
     # ── Auto media URL detection (group=3) ────────────────────────────────────
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_media_url), group=3)
+
+    # ── Auto replies (group=4) ────────────────────────────────────────────────
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, auto_reply), group=4)
 
     # ── All text messages (Arabic slash-commands + message counting) ───────────
     app.add_handler(MessageHandler(filters.TEXT, all_messages_handler))
