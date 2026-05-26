@@ -560,4 +560,15 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── Banned words ─────────────────────────────────────────────────────────────
 
 async def cmd_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not
+    if not await require_admin(update, context):
+        return
+    if not context.args:
+        await update.message.reply_text("الاستخدام: أضف كلمة <الكلمة>")
+        return
+    word = " ".join(context.args).lower().strip()
+    chat_id = update.effective_chat.id
+    added = await db.add_banned_word(chat_id, word)
+    if added:
+        await update.message.reply_text(f"✅ تمت إضافة الكلمة المحظورة: {word}")
+    else:
+        await update.message.reply_text(f"الكلمة '{word}' موجودة مسبقاً في القائمة.")
