@@ -5,8 +5,8 @@ from telegram import Update, ChatMemberUpdated
 from telegram.ext import ContextTypes
 from telegram.constants import ChatMemberStatus
 
-from . import database as db
-from .helpers import (
+import database as db
+from helpers import (
     require_admin,
     is_admin,
     get_reply_user,
@@ -560,4 +560,4 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── Banned words ─────────────────────────────────────────────────────────────
 
 async def cmd_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
-  
+    if not
