@@ -1,6 +1,8 @@
 import sys
 import os
-sys.path.insert(0, os.path.dirname(__file__))
+
+# Add the bot folder to path so imports work without package structure
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "bot"))
 
 from main import main
 
