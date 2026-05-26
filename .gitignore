@@ -1,0 +1,86 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+bans.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+temp/
+tmp/
+
+# Media files (temp downloads)
+*.mp3
+*.mp4
+*.wav
+*.flv
+compressed_*
+
+# Compiled files
+*.pyc
+*.pyo
+*.pyd
+__init__.cpython-*.pyc
+
+# ZIP files
+*.zip
+updated_bot.zip
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node (if any)
+node_modules/
+package-lock.json
