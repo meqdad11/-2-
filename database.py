@@ -314,3 +314,10 @@ async def set_setting(chat_id: int, key: str, value: str):
             VALUES (?, ?, ?)
         """, (chat_id, key, value))
         await db.commit()
+async def get_all_active_chats() -> list:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "SELECT DISTINCT chat_id FROM user_stats"
+        )
+        rows = await cursor.fetchall()
+        return [row[0] for row in rows]
