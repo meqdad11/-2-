@@ -13,8 +13,8 @@ from telegram.ext import (
     ContextTypes,
 )
 
-from . import database as db
-from .handlers import (
+import database as db
+from handlers import (
     cmd_start,
     cmd_id,
     cmd_ban,
@@ -40,7 +40,7 @@ from .handlers import (
     cmd_lock,
     cmd_unlock,
 )
-from .music import (
+from music import (
     cmd_download,
     cmd_sc_search,
     cmd_yt_search,
