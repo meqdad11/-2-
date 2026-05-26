@@ -35,8 +35,20 @@ from .handlers import (
     cmd_remove_word,
     cmd_list_words,
     filter_banned_words,
+    cmd_mute,
+    cmd_unmute,
+    cmd_lock,
+    cmd_unlock,
 )
-from .music import cmd_download
+from .music import (
+    cmd_download,
+    cmd_sc_search,
+    cmd_yt_search,
+    handle_media_url,
+    callback_download,
+    callback_sc_download,
+    callback_yt_pick,
+)
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -46,18 +58,25 @@ logger = logging.getLogger(__name__)
 
 # Arabic slash-command keyword → handler mapping
 _ARABIC_CMDS = {
-    "ايدي":      cmd_id,
-    "حظر":       cmd_ban,
-    "رفع_الحظر": cmd_unban,
-    "تحذير":     cmd_warn,
-    "قائمة":     cmd_banlist,
-    "معلومات":   cmd_baninfo,
-    "تحقق":      cmd_checkban,
-    "سجل":       cmd_eventlog,
-    "تحميل":     cmd_download,
-    "أضف كلمة":  cmd_add_word,
-    "احذف كلمة": cmd_remove_word,
-    "الكلمات المحظورة": cmd_list_words,
+    "ايدي":              cmd_id,
+    "حظر":               cmd_ban,
+    "رفع الحظر":         cmd_unban,
+    "رفع_الحظر":         cmd_unban,
+    "تحذير":             cmd_warn,
+    "قائمة":             cmd_banlist,
+    "معلومات":           cmd_baninfo,
+    "تحقق":              cmd_checkban,
+    "سجل":               cmd_eventlog,
+    "تحميل":             cmd_download,
+    "أضف كلمة":          cmd_add_word,
+    "احذف كلمة":         cmd_remove_word,
+    "الكلمات المحظورة":  cmd_list_words,
+    "بحث":               cmd_sc_search,
+    "يوتيوب":            cmd_yt_search,
+    "كتم":               cmd_mute,
+    "رفع الكتم":         cmd_unmute,
+    "أغلق المجموعة":     cmd_lock,
+    "افتح المجموعة":     cmd_unlock,
 }
 
 
@@ -147,9 +166,24 @@ def main():
     app.add_handler(CommandHandler("addword",   cmd_add_word))
     app.add_handler(CommandHandler("removeword", cmd_remove_word))
     app.add_handler(CommandHandler("wordlist",  cmd_list_words))
+    app.add_handler(CommandHandler("mute",      cmd_mute))
+    app.add_handler(CommandHandler("unmute",    cmd_unmute))
+    app.add_handler(CommandHandler("lock",      cmd_lock))
+    app.add_handler(CommandHandler("unlock",    cmd_unlock))
+    app.add_handler(CommandHandler("scsearch",  cmd_sc_search))
+    app.add_handler(CommandHandler("ytsearch",  cmd_yt_search))
 
-    # ── Banned words filter (group=2 → runs after commands) ───────────────────
+    # ── Callback queries ──────────────────────────────────────────────────────
+    from telegram.ext import CallbackQueryHandler
+    app.add_handler(CallbackQueryHandler(callback_download,    pattern=r"^dl_(audio|video)\|"))
+    app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
+    app.add_handler(CallbackQueryHandler(callback_yt_pick,     pattern=r"^yt_pick\|"))
+
+    # ── Banned words filter (group=2) ─────────────────────────────────────────
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, filter_banned_words), group=2)
+
+    # ── Auto media URL detection (group=3) ────────────────────────────────────
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_media_url), group=3)
 
     # ── All text messages (Arabic slash-commands + message counting) ───────────
     app.add_handler(MessageHandler(filters.TEXT, all_messages_handler))
@@ -164,11 +198,10 @@ def main():
 
     logger.info("جارٍ تشغيل البوت...")
     app.run_polling(
-        allowed_updates=["message", "chat_member"],
+        allowed_updates=["message", "chat_member", "callback_query"],
         drop_pending_updates=True,
     )
 
 
 if __name__ == "__main__":
     main()
-    
