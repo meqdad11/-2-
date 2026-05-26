@@ -6,7 +6,6 @@ from telegram.ext import ContextTypes
 from telegram.constants import ChatMemberStatus
 
 import database as db
-
 from helpers import (
     require_admin,
     is_admin,
@@ -22,127 +21,79 @@ from helpers import (
 
 logger = logging.getLogger(__name__)
 
-MAX_WARNINGS = 2
+MAX_WARNINGS = 3
 
-
-# ── /start /help ───────────────────────────────────────────────────────────────
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "بوت حارس المجموعة نشط.\n\n"
         "أوامر المشرفين:\n"
-        "/ban أو /حظر [رد|معرف] [مدة] [سبب] — حظر مستخدم (مثال: /ban 7d مزعج)\n"
-        "/unban أو /رفع_الحظر [رد|معرف] — إلغاء الحظر\n"
-        "/warn أو /تحذير [رد|معرف] [سبب] — إصدار تحذير (التحذير الثاني = حظر تلقائي)\n"
-        "/clearwarn [رد|معرف] — مسح تحذيرات مستخدم\n"
-        "/warnings [رد|معرف] — عرض عدد التحذيرات\n"
-        "/banlist أو /قائمة — قائمة المحظورين\n"
-        "/baninfo أو /معلومات [رد|معرف] — تفاصيل الحظر\n"
-        "/checkban أو /تحقق [رد|معرف] — التحقق من الحظر\n"
-        "/eventlog أو /سجل [عدد] — سجل الأحداث الكامل\n"
-        "/setrules <النص> — تعيين قواعد المجموعة\n\n"
-        "للجميع:\n"
-        "/rules — عرض قواعد المجموعة\n"
-        "/id أو /ايدي — معلوماتك الشخصية\n"
-        "/id أو /ايدي [رد] — معلومات عضو آخر (للمشرفين فقط)"
+        "/ban — حظر\n/unban — رفع الحظر\n/warn — تحذير\n"
+        "/banlist — قائمة المحظورين\n/mute — كتم\n"
+        "/lock — إغلاق المجموعة\n/unlock — فتح المجموعة\n\n"
+        "للجميع:\n/id أو ايدي — معلوماتك"
     )
-
-
-# ── /id / /ايدي ───────────────────────────────────────────────────────────────
-
 async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     reply_user = get_reply_user(update)
 
-    # Private chat — always show own info
     from telegram import Chat as TGChat
     in_group = chat.type in (TGChat.GROUP, TGChat.SUPERGROUP)
 
     if reply_user and reply_user.id != user.id:
-        # Someone is replying to another member
         if not in_group or not await is_admin(update, context):
             await update.message.reply_text("لا يمكنك عرض بيانات عضو آخر.")
             return
-        # Admin looking up another member
         count      = await db.get_message_count(reply_user.id, chat.id) if in_group else 0
         first_seen = await db.get_user_first_seen(reply_user.id, chat.id) if in_group else None
         username   = f"@{reply_user.username}" if reply_user.username else "غير محدد"
         reg_date   = estimate_telegram_registration(reply_user.id)
-        seen_line  = f"\nأول رسالة في المجموعة: {first_seen[:10]}" if first_seen else ""
+        seen_line  = f"\nأول رسالة: {first_seen[:10]}" if first_seen else ""
         await update.message.reply_text(
-            f"معلومات العضو:\n"
-            f"الاسم الأول: {reply_user.first_name}\n"
-            f"اسم المستخدم: {username}\n"
-            f"المعرف: {reply_user.id}\n"
-            f"تاريخ تسجيل الحساب بتيليغرام: {reg_date}\n"
-            f"عدد الرسائل في المجموعة: {count}"
-            f"{seen_line}"
+            f"معلومات العضو:\nالاسم: {reply_user.first_name}\n"
+            f"اليوزر: {username}\nالمعرف: {reply_user.id}\n"
+            f"تاريخ التسجيل: {reg_date}\n"
+            f"عدد الرسائل: {count}{seen_line}"
         )
     else:
-        # Showing own info — available to everyone
         count      = await db.get_message_count(user.id, chat.id) if in_group else 0
         first_seen = await db.get_user_first_seen(user.id, chat.id) if in_group else None
         username   = f"@{user.username}" if user.username else "غير محدد"
         reg_date   = estimate_telegram_registration(user.id)
-        seen_line  = f"\nأول رسالة في المجموعة: {first_seen[:10]}" if first_seen else ""
+        seen_line  = f"\nأول رسالة: {first_seen[:10]}" if first_seen else ""
         await update.message.reply_text(
-            f"معلوماتك:\n"
-            f"الاسم الأول: {user.first_name}\n"
-            f"اسم المستخدم: {username}\n"
-            f"المعرف: {user.id}\n"
-            f"تاريخ تسجيل الحساب بتيليغرام: {reg_date}\n"
-            f"عدد الرسائل في المجموعة: {count}"
-            f"{seen_line}"
+            f"معلوماتك:\nالاسم: {user.first_name}\n"
+            f"اليوزر: {username}\nالمعرف: {user.id}\n"
+            f"تاريخ التسجيل: {reg_date}\n"
+            f"عدد الرسائل: {count}{seen_line}"
         )
-
-
-# ── /ban ──────────────────────────────────────────────────────────────────────
-
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-
     chat_id = update.effective_chat.id
     banner_id = update.effective_user.id
     reply_user = get_reply_user(update)
-
     user_id, duration, reason, err = parse_ban_args(context.args or [], reply_user)
     if err:
         await update.message.reply_text(err)
         return
-
     expires_at = expires_at_from_duration(duration)
     await db.add_ban(user_id, chat_id, reason, banner_id, expires_at)
-
     until_date = expires_at if expires_at else None
     try:
         await context.bot.ban_chat_member(chat_id, user_id, until_date=until_date)
     except Exception as e:
-        logger.warning("تعذّر حظر المستخدم %s في المجموعة %s: %s", user_id, chat_id, e)
-
+        logger.warning("تعذّر الحظر: %s", e)
     reason_text = f"\nالسبب: {reason}" if reason else ""
-    if duration:
-        duration_text = f"\nالمدة: {fmt_duration(duration)} (ينتهي {expires_at.strftime('%Y-%m-%d %H:%M UTC')})"
-    else:
-        duration_text = "\nالمدة: دائم"
+    duration_text = f"\nالمدة: {fmt_duration(duration)}" if duration else "\nالمدة: دائم"
+    await update.message.reply_text(f"تم حظر المستخدم {user_id}.{duration_text}{reason_text}")
+    await db.log_event(chat_id, "ban", user_id=banner_id, target_id=user_id)
 
-    await update.message.reply_text(
-        f"تم حظر المستخدم {user_id}.{duration_text}{reason_text}"
-    )
-
-    await db.log_event(
-        chat_id, "ban", user_id=banner_id, target_id=user_id,
-        detail=f"duration={fmt_duration(duration) if duration else 'دائم'} reason={reason}"
-    )
-
-
-# ── /unban ────────────────────────────────────────────────────────────────────
 
 async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-
     reply_user = get_reply_user(update)
     if reply_user:
         user_id = reply_user.id
@@ -150,38 +101,29 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user_id = int(context.args[0])
         except ValueError:
-            await update.message.reply_text("الاستخدام: /unban <معرف المستخدم>")
+            await update.message.reply_text("الاستخدام: رفع الحظر <معرف>")
             return
     else:
-        await update.message.reply_text("قم بالرد على رسالة المستخدم أو أرسل /unban <معرف>")
+        await update.message.reply_text("قم بالرد على رسالة المستخدم أو أرسل المعرف")
         return
-
     chat_id = update.effective_chat.id
     unbanner_id = update.effective_user.id
-
     removed = await db.remove_ban(user_id, chat_id, performed_by=unbanner_id)
     try:
         await context.bot.unban_chat_member(chat_id, user_id, only_if_banned=True)
     except Exception as e:
-        logger.warning("تعذّر رفع الحظر عن المستخدم %s في المجموعة %s: %s", user_id, chat_id, e)
-
+        logger.warning("تعذّر رفع الحظر: %s", e)
     if removed:
-        await update.message.reply_text(f"تم رفع الحظر عن المستخدم {user_id} وإزالته من القائمة.")
+        await update.message.reply_text(f"تم رفع الحظر عن المستخدم {user_id}.")
         await db.log_event(chat_id, "unban", user_id=unbanner_id, target_id=user_id)
     else:
         await update.message.reply_text(f"المستخدم {user_id} غير موجود في قائمة الحظر.")
-
-
-# ── /warn ─────────────────────────────────────────────────────────────────────
-
 async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-
     chat_id = update.effective_chat.id
     warner_id = update.effective_user.id
     reply_user = get_reply_user(update)
-
     if reply_user:
         user_id = reply_user.id
         reason = " ".join(context.args) if context.args else None
@@ -190,49 +132,33 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
             user_id = int(context.args[0])
             reason = " ".join(context.args[1:]) or None
         except ValueError:
-            await update.message.reply_text("قم بالرد على رسالة المستخدم أو أرسل /warn <معرف> [سبب]")
+            await update.message.reply_text("قم بالرد أو أرسل: تحذير <معرف> [سبب]")
             return
     else:
-        await update.message.reply_text("قم بالرد على رسالة المستخدم أو أرسل /warn <معرف> [سبب]")
+        await update.message.reply_text("قم بالرد على رسالة المستخدم")
         return
-
     count = await db.add_warning(user_id, chat_id)
     reason_text = f"\nالسبب: {reason}" if reason else ""
-
-    await db.log_event(
-        chat_id, "warn", user_id=warner_id, target_id=user_id,
-        detail=f"count={count} reason={reason}"
-    )
-
+    await db.log_event(chat_id, "warn", user_id=warner_id, target_id=user_id)
     if count >= MAX_WARNINGS:
         await db.add_ban(user_id, chat_id, f"حظر تلقائي بعد {MAX_WARNINGS} تحذيرات", warner_id)
         try:
             await context.bot.ban_chat_member(chat_id, user_id)
         except Exception as e:
-            logger.warning("تعذّر الحظر التلقائي للمستخدم %s في المجموعة %s: %s", user_id, chat_id, e)
+            logger.warning("تعذّر الحظر التلقائي: %s", e)
         await db.clear_warnings(user_id, chat_id)
         await update.message.reply_text(
-            f"تم إصدار تحذير {count}/{MAX_WARNINGS} للمستخدم {user_id}.{reason_text}\n"
-            f"وصل المستخدم إلى الحد الأقصى للتحذيرات وتم حظره تلقائيًا."
-        )
-        await db.log_event(
-            chat_id, "auto_ban", user_id=warner_id, target_id=user_id,
-            detail=f"حظر تلقائي بعد {MAX_WARNINGS} تحذيرات"
+            f"⛔ تم حظر المستخدم {user_id} تلقائياً بعد {MAX_WARNINGS} تحذيرات.{reason_text}"
         )
     else:
-        remaining = MAX_WARNINGS - count
         await update.message.reply_text(
-            f"تحذير {count}/{MAX_WARNINGS} للمستخدم {user_id}.{reason_text}\n"
-            f"تحذير {remaining} آخر سيؤدي إلى الحظر التلقائي."
+            f"⚠️ تحذير {count}/{MAX_WARNINGS} للمستخدم {user_id}.{reason_text}"
         )
 
-
-# ── /clearwarn ────────────────────────────────────────────────────────────────
 
 async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-
     reply_user = get_reply_user(update)
     if reply_user:
         user_id = reply_user.id
@@ -240,27 +166,19 @@ async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user_id = int(context.args[0])
         except ValueError:
-            await update.message.reply_text("الاستخدام: /clearwarn <معرف المستخدم>")
+            await update.message.reply_text("معرف غير صالح.")
             return
     else:
-        await update.message.reply_text("قم بالرد على رسالة المستخدم أو أرسل /clearwarn <معرف>")
+        await update.message.reply_text("قم بالرد أو أرسل المعرف.")
         return
-
     chat_id = update.effective_chat.id
-    cleared = await db.clear_warnings(user_id, chat_id)
-    if cleared:
-        await update.message.reply_text(f"تم مسح تحذيرات المستخدم {user_id}.")
-        await db.log_event(chat_id, "clearwarn", user_id=update.effective_user.id, target_id=user_id)
-    else:
-        await update.message.reply_text(f"لا توجد تحذيرات للمستخدم {user_id}.")
+    await db.clear_warnings(user_id, chat_id)
+    await update.message.reply_text(f"✅ تم مسح تحذيرات المستخدم {user_id}.")
 
-
-# ── /warnings ─────────────────────────────────────────────────────────────────
 
 async def cmd_warnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-
     reply_user = get_reply_user(update)
     if reply_user:
         user_id = reply_user.id
@@ -268,50 +186,32 @@ async def cmd_warnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user_id = int(context.args[0])
         except ValueError:
-            await update.message.reply_text("الاستخدام: /warnings <معرف المستخدم>")
+            await update.message.reply_text("معرف غير صالح.")
             return
     else:
-        await update.message.reply_text("قم بالرد على رسالة المستخدم أو أرسل /warnings <معرف>")
+        await update.message.reply_text("قم بالرد أو أرسل المعرف.")
         return
-
     chat_id = update.effective_chat.id
-    count = await db.get_warning_count(user_id, chat_id)
-    await update.message.reply_text(
-        f"المستخدم {user_id} لديه {count}/{MAX_WARNINGS} تحذير(ات)."
-    )
-
-
-# ── /banlist ──────────────────────────────────────────────────────────────────
-
+    count = await db.get_warnings(user_id, chat_id)
+    await update.message.reply_text(f"عدد تحذيرات المستخدم {user_id}: {count}/{MAX_WARNINGS}")
 async def cmd_banlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-
     chat_id = update.effective_chat.id
-    bans = await db.list_bans(chat_id)
-
+    bans = await db.get_ban_list(chat_id)
     if not bans:
-        await update.message.reply_text("لا يوجد مستخدمون محظورون في هذه المجموعة.")
+        await update.message.reply_text("لا يوجد محظورون حالياً.")
         return
+    lines = []
+    for b in bans[:20]:
+        exp = f" (ينتهي {b['expires_at'][:10]})" if b.get('expires_at') else " (دائم)"
+        lines.append(f"• {b['user_id']}{exp}")
+    await update.message.reply_text("المحظورون:\n" + "\n".join(lines))
 
-    lines = [f"المستخدمون المحظورون ({len(bans)} إجمالًا):\n"]
-    for ban in bans:
-        reason_part = f" — {ban['reason']}" if ban.get("reason") else ""
-        if ban.get("expires_at"):
-            expires_part = f" [ينتهي {ban['expires_at'][:10]}]"
-        else:
-            expires_part = " [دائم]"
-        lines.append(f"• {ban['user_id']}{expires_part}{reason_part}")
-
-    await update.message.reply_text("\n".join(lines))
-
-
-# ── /baninfo ──────────────────────────────────────────────────────────────────
 
 async def cmd_baninfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-
     reply_user = get_reply_user(update)
     if reply_user:
         user_id = reply_user.id
@@ -319,35 +219,27 @@ async def cmd_baninfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user_id = int(context.args[0])
         except ValueError:
-            await update.message.reply_text("الاستخدام: /baninfo <معرف المستخدم>")
+            await update.message.reply_text("معرف غير صالح.")
             return
     else:
-        await update.message.reply_text("قم بالرد على رسالة المستخدم أو أرسل /baninfo <معرف>")
+        await update.message.reply_text("قم بالرد أو أرسل المعرف.")
         return
-
     chat_id = update.effective_chat.id
-    info = await db.get_ban_info(user_id, chat_id)
-    if not info:
-        await update.message.reply_text(f"المستخدم {user_id} غير موجود في قائمة الحظر.")
+    ban = await db.get_ban(user_id, chat_id)
+    if not ban:
+        await update.message.reply_text(f"المستخدم {user_id} غير محظور.")
         return
-
-    expires = info.get("expires_at") or "لا ينتهي (دائم)"
-    reason = info.get("reason") or "لم يُذكر سبب"
+    exp = ban['expires_at'][:10] if ban.get('expires_at') else "دائم"
     await update.message.reply_text(
-        f"تفاصيل حظر المستخدم {user_id}:\n"
-        f"السبب: {reason}\n"
-        f"حُظر بواسطة: {info['banned_by']}\n"
-        f"تاريخ الحظر: {info['banned_at']}\n"
-        f"ينتهي: {expires}"
+        f"معلومات الحظر:\nالمعرف: {user_id}\n"
+        f"السبب: {ban.get('reason') or 'غير محدد'}\n"
+        f"ينتهي: {exp}"
     )
 
-
-# ── /checkban ─────────────────────────────────────────────────────────────────
 
 async def cmd_checkban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-
     reply_user = get_reply_user(update)
     if reply_user:
         user_id = reply_user.id
@@ -355,90 +247,40 @@ async def cmd_checkban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             user_id = int(context.args[0])
         except ValueError:
-            await update.message.reply_text("الاستخدام: /checkban <معرف المستخدم>")
+            await update.message.reply_text("معرف غير صالح.")
             return
     else:
-        await update.message.reply_text("قم بالرد على رسالة المستخدم أو أرسل /checkban <معرف>")
+        await update.message.reply_text("قم بالرد أو أرسل المعرف.")
         return
-
     chat_id = update.effective_chat.id
-    info = await db.get_ban_info(user_id, chat_id)
-
-    if info:
-        reason = info.get("reason") or "لم يُذكر سبب"
-        expires = info.get("expires_at") or "لا ينتهي"
-        await update.message.reply_text(
-            f"المستخدم {user_id} محظور.\n"
-            f"السبب: {reason}\n"
-            f"ينتهي: {expires}"
-        )
+    ban = await db.get_ban(user_id, chat_id)
+    if ban:
+        await update.message.reply_text(f"✅ المستخدم {user_id} محظور.")
     else:
-        await update.message.reply_text(f"المستخدم {user_id} غير محظور.")
-
-
-# ── /eventlog ─────────────────────────────────────────────────────────────────
-
-_EVENT_LABELS = {
-    "ban":            "حظر",
-    "unban":          "رفع حظر",
-    "warn":           "تحذير",
-    "auto_ban":       "حظر تلقائي",
-    "clearwarn":      "مسح تحذيرات",
-    "joined":         "انضم",
-    "left":           "غادر",
-    "rejoin_blocked": "محاولة إعادة انضمام",
-    "ban_expired":    "انتهاء مدة الحظر",
-    "setrules":       "تعيين قواعد",
-}
+        await update.message.reply_text(f"❌ المستخدم {user_id} غير محظور.")
 
 
 async def cmd_eventlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-
     chat_id = update.effective_chat.id
-    limit = 30
-    if context.args:
-        try:
-            limit = min(int(context.args[0]), 100)
-        except ValueError:
-            pass
-
-    events = await db.get_event_log(chat_id, limit=limit)
+    limit = int(context.args[0]) if context.args and context.args[0].isdigit() else 10
+    events = await db.get_event_log(chat_id, limit)
     if not events:
-        await update.message.reply_text("لا توجد أحداث مسجّلة بعد.")
+        await update.message.reply_text("لا توجد أحداث مسجلة.")
         return
-
-    lines = [f"سجل الأحداث (آخر {len(events)}):\n"]
-    for e in events:
-        ts = e["created_at"][:16]
-        label = _EVENT_LABELS.get(e["event_type"], e["event_type"])
-        actor = f" بواسطة {e['user_id']}" if e.get("user_id") else ""
-        target = f" ← {e['target_id']}" if e.get("target_id") else ""
-        detail = f" ({e['detail']})" if e.get("detail") else ""
-        lines.append(f"[{ts}] {label}{actor}{target}{detail}")
-
-    text = "\n".join(lines)
-    if len(text) > 4000:
-        text = text[:3990] + "\n...(مقتطع)"
-    await update.message.reply_text(text)
-
-
-# ── /setrules & /rules ────────────────────────────────────────────────────────
-
+    lines = [f"• {e['event_type']} — {e['created_at'][:16]}" for e in events]
+    await update.message.reply_text("سجل الأحداث:\n" + "\n".join(lines))
 async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-
     if not context.args:
-        await update.message.reply_text("الاستخدام: /setrules <نص القواعد>")
+        await update.message.reply_text("الاستخدام: /setrules <النص>")
         return
-
     rules = " ".join(context.args)
     chat_id = update.effective_chat.id
     await db.set_setting(chat_id, "rules", rules)
-    await update.message.reply_text("تم تحديث قواعد المجموعة.")
-    await db.log_event(chat_id, "setrules", user_id=update.effective_user.id, detail=rules[:100])
+    await update.message.reply_text("✅ تم تعيين قواعد المجموعة.")
 
 
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -447,109 +289,234 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     rules = await db.get_setting(chat_id, "rules")
     if rules:
-        await update.message.reply_text(f"قواعد المجموعة:\n\n{rules}")
+        await update.message.reply_text(f"قواعد المجموعة:\n{rules}")
     else:
-        await update.message.reply_text(
-            "لم يتم تعيين قواعد بعد. يمكن للمشرفين استخدام /setrules لإضافتها."
+        await update.message.reply_text("لم يتم تعيين قواعد بعد.")
+
+
+async def cmd_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        return
+    if not context.args:
+        await update.message.reply_text("الاستخدام: أضف كلمة <الكلمة>")
+        return
+    word = " ".join(context.args).lower().strip()
+    chat_id = update.effective_chat.id
+    added = await db.add_banned_word(chat_id, word)
+    if added:
+        await update.message.reply_text(f"✅ تمت إضافة الكلمة: {word}")
+    else:
+        await update.message.reply_text(f"الكلمة '{word}' موجودة مسبقاً.")
+
+
+async def cmd_remove_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        return
+    if not context.args:
+        await update.message.reply_text("الاستخدام: احذف كلمة <الكلمة>")
+        return
+    word = " ".join(context.args).lower().strip()
+    chat_id = update.effective_chat.id
+    removed = await db.remove_banned_word(chat_id, word)
+    if removed:
+        await update.message.reply_text(f"✅ تمت إزالة الكلمة: {word}")
+    else:
+        await update.message.reply_text(f"الكلمة '{word}' غير موجودة.")
+
+
+async def cmd_list_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        return
+    chat_id = update.effective_chat.id
+    words = await db.get_banned_words(chat_id)
+    if not words:
+        await update.message.reply_text("لا توجد كلمات محظورة.")
+        return
+    await update.message.reply_text("الكلمات المحظورة:\n" + "\n".join(f"• {w}" for w in words))
+async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.text:
+        return
+    from telegram import Chat as TGChat
+    if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
+        return
+    if await is_admin(update, context):
+        return
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    text = msg.text.lower()
+    words = await db.get_banned_words(chat_id)
+    for word in words:
+        if word in text:
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            count = await db.add_warning(user.id, chat_id)
+            if count >= MAX_WARNINGS:
+                await db.add_ban(user.id, chat_id, f"حظر تلقائي بعد {MAX_WARNINGS} تحذيرات", 0)
+                try:
+                    await context.bot.ban_chat_member(chat_id, user.id)
+                except Exception:
+                    pass
+                await db.clear_warnings(user.id, chat_id)
+                await context.bot.send_message(
+                    chat_id,
+                    f"⛔ تم حظر {user.full_name} بعد {MAX_WARNINGS} تحذيرات."
+                )
+            else:
+                await context.bot.send_message(
+                    chat_id,
+                    f"⚠️ {user.full_name}، رسالتك تحتوي كلمات غير لائقة.\n"
+                    f"التحذير {count}/{MAX_WARNINGS}"
+                )
+            return
+
+
+async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        return
+    from telegram import ChatPermissions
+    from helpers import parse_duration
+    reply_user = get_reply_user(update)
+    if not reply_user and not context.args:
+        await update.message.reply_text("قم بالرد أو: كتم <معرف> [مدة مثل 1h أو 1d]")
+        return
+    if reply_user:
+        user_id = reply_user.id
+        duration = parse_duration(context.args[0]) if context.args else None
+    else:
+        try:
+            user_id = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("معرف غير صالح.")
+            return
+        duration = parse_duration(context.args[1]) if len(context.args) > 1 else None
+    chat_id = update.effective_chat.id
+    until = expires_at_from_duration(duration)
+    try:
+        await context.bot.restrict_chat_member(
+            chat_id, user_id,
+            permissions=ChatPermissions(can_send_messages=False),
+            until_date=until,
         )
+        dur_text = f" لمدة {fmt_duration(duration)}" if duration else " بشكل دائم"
+        await update.message.reply_text(f"🔇 تم كتم المستخدم {user_id}{dur_text}.")
+        await db.log_event(chat_id, "mute", user_id=update.effective_user.id, target_id=user_id)
+    except Exception as e:
+        await update.message.reply_text(f"❌ تعذّر الكتم: {e}")
+async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        return
+    from telegram import ChatPermissions
+    reply_user = get_reply_user(update)
+    if reply_user:
+        user_id = reply_user.id
+    elif context.args:
+        try:
+            user_id = int(context.args[0])
+        except ValueError:
+            await update.message.reply_text("معرف غير صالح.")
+            return
+    else:
+        await update.message.reply_text("قم بالرد أو أرسل المعرف.")
+        return
+    chat_id = update.effective_chat.id
+    try:
+        await context.bot.restrict_chat_member(
+            chat_id, user_id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+            ),
+        )
+        await update.message.reply_text(f"🔊 تم رفع الكتم عن {user_id}.")
+        await db.log_event(chat_id, "unmute", user_id=update.effective_user.id, target_id=user_id)
+    except Exception as e:
+        await update.message.reply_text(f"❌ تعذّر رفع الكتم: {e}")
 
 
-# ── Chat member events ────────────────────────────────────────────────────────
+async def cmd_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        return
+    from telegram import ChatPermissions
+    chat_id = update.effective_chat.id
+    try:
+        await context.bot.set_chat_permissions(
+            chat_id, permissions=ChatPermissions(can_send_messages=False),
+        )
+        await update.message.reply_text("🔒 تم إغلاق المجموعة.")
+        await db.log_event(chat_id, "lock", user_id=update.effective_user.id)
+    except Exception as e:
+        await update.message.reply_text(f"❌ تعذّر الإغلاق: {e}")
+
+
+async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        return
+    from telegram import ChatPermissions
+    chat_id = update.effective_chat.id
+    try:
+        await context.bot.set_chat_permissions(
+            chat_id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+            ),
+        )
+        await update.message.reply_text("🔓 تم فتح المجموعة.")
+        await db.log_event(chat_id, "unlock", user_id=update.effective_user.id)
+    except Exception as e:
+        await update.message.reply_text(f"❌ تعذّر الفتح: {e}")
+
 
 async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    result: ChatMemberUpdated = update.chat_member
+    result = update.chat_member
     if not result:
         return
-
-    old_status = result.old_chat_member.status
-    new_status = result.new_chat_member.status
-    user = result.new_chat_member.user
+    new_member = result.new_chat_member
+    old_member = result.old_chat_member
     chat_id = result.chat.id
+    user = new_member.user
+    if new_member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED):
+        if old_member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED):
+            ban = await db.get_ban(user.id, chat_id)
+            if ban:
+                try:
+                    await context.bot.ban_chat_member(chat_id, user.id)
+                    await context.bot.send_message(
+                        chat_id,
+                        f"⚠️ محاولة دخول! تم طرد عضو محظور تلقائياً."
+                    )
+                    admin_ids = await get_admin_ids(context.bot, chat_id)
+                    for admin_id in admin_ids:
+                        try:
+                            await context.bot.send_message(
+                                admin_id,
+                                f"⚠️ المستخدم {user.id} ({user.full_name}) حاول الدخول وهو محظور."
+                            )
+                        except Exception:
+                            pass
+                except Exception as e:
+                    logger.warning("تعذّر طرد المستخدم المحظور: %s", e)
+            else:
+                welcome = (
+                    f"👋 أهلاً وسهلاً {user.first_name}!\n"
+                    f"نرحب بك في مجموعتنا. يرجى الالتزام بالقواعد واحترام الجميع. 😊"
+                )
+                try:
+                    await context.bot.send_message(chat_id, welcome)
+                except Exception:
+                    pass
 
-    joined = new_status in (
-        ChatMemberStatus.MEMBER,
-        ChatMemberStatus.ADMINISTRATOR,
-        ChatMemberStatus.OWNER,
-    ) and old_status not in (
-        ChatMemberStatus.MEMBER,
-        ChatMemberStatus.ADMINISTRATOR,
-        ChatMemberStatus.OWNER,
-    )
-
-    left = new_status in (
-        ChatMemberStatus.LEFT,
-        ChatMemberStatus.BANNED,
-    ) and old_status in (
-        ChatMemberStatus.MEMBER,
-        ChatMemberStatus.ADMINISTRATOR,
-        ChatMemberStatus.OWNER,
-    )
-
-    if left:
-        await db.log_event(chat_id, "left", user_id=user.id, detail=user.full_name)
-        return
-
-    if not joined:
-        return
-
-    await db.log_event(chat_id, "joined", user_id=user.id, detail=user.full_name)
-
-    # Check if this user is banned
-    banned = await db.is_banned(user.id, chat_id)
-    if banned:
-        logger.info("مستخدم محظور %s حاول الانضمام إلى المجموعة %s — جارٍ الحظر", user.id, chat_id)
-        info = await db.get_ban_info(user.id, chat_id)
-        reason = info.get("reason") or "لم يُذكر سبب"
-
-        try:
-            await context.bot.ban_chat_member(chat_id, user.id)
-        except Exception as e:
-            logger.error("فشل إعادة حظر المستخدم %s في المجموعة %s: %s", user.id, chat_id, e)
-
-        await db.log_event(chat_id, "rejoin_blocked", user_id=user.id,
-                           detail=f"أعيد حظره: {reason}")
-
-        # Public group notice
-        await context.bot.send_message(
-            chat_id,
-            f"المستخدم {user.full_name} (المعرف: {user.id}) حاول الانضمام للمجموعة لكنه محظور.\n"
-            f"سبب الحظر: {reason}\n"
-            f"تم إزالته مجددًا."
-        )
-
-        # Private DM to all admins
-        admin_msg = (
-            f"تنبيه: مستخدم محظور حاول الانضمام!\n\n"
-            f"المجموعة: {result.chat.title} (المعرف: {chat_id})\n"
-            f"المستخدم: {fmt_user(user)} (المعرف: {user.id})\n"
-            f"سبب الحظر: {reason}"
-        )
-        await notify_admins(context.bot, chat_id, admin_msg)
-        return
-
-    # New member — send welcome message
-    rules = await db.get_setting(chat_id, "rules")
-    name = user.full_name
-    if rules:
-        welcome = (
-            f"أهلًا وسهلًا بك يا {name}!\n\n"
-            f"يرجى قراءة قواعد المجموعة:\n\n"
-            f"{rules}\n\n"
-            f"نتمنى لك وقتًا ممتعًا!"
-        )
-    else:
-        welcome = f"أهلًا وسهلًا بك يا {name} في المجموعة! يرجى احترام الجميع."
-
-    try:
-        await context.bot.send_message(chat_id, welcome)
-    except Exception as e:
-        logger.warning("تعذّر إرسال رسالة الترحيب: %s", e)
-
-
-# ── Message count tracker ─────────────────────────────────────────────────────
 
 async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Silently count every group message per user."""
     if not update.message or not update.effective_user:
         return
     from telegram import Chat as TGChat
@@ -558,24 +525,17 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(update.effective_user.id, update.effective_chat.id)
 
 
-# ── Expired ban auto-unban job ────────────────────────────────────────────────
-
 async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
     expired = await db.get_expired_bans()
     for ban in expired:
         user_id = ban["user_id"]
         chat_id = ban["chat_id"]
-        logger.info("انتهت مدة حظر المستخدم %s في المجموعة %s — جارٍ رفع الحظر", user_id, chat_id)
         await db.remove_ban(user_id, chat_id)
         try:
             await context.bot.unban_chat_member(chat_id, user_id, only_if_banned=True)
             await context.bot.send_message(
                 chat_id,
-                f"انتهت مدة حظر المستخدم {user_id}. يمكنه الانضمام إلى المجموعة مجددًا."
+                f"انتهت مدة حظر المستخدم {user_id}. يمكنه الانضمام مجدداً."
             )
         except Exception as e:
-            logger.warning("خطأ في رفع حظر المستخدم %s في المجموعة %s: %s", user_id, chat_id, e)
-        await db.log_event(
-            chat_id, "ban_expired", target_id=user_id,
-            detail=f"السبب كان: {ban.get('reason', 'غير محدد')}"
-        )
+            logger.warning("خطأ في رفع حظر المستخدم %s: %s", user_id, e)
