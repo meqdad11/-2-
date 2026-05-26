@@ -31,6 +31,10 @@ from .handlers import (
     on_chat_member_updated,
     job_expire_bans,
     track_message,
+    cmd_add_word,
+    cmd_remove_word,
+    cmd_list_words,
+    filter_banned_words,
 )
 from .music import cmd_download
 
@@ -51,6 +55,9 @@ _ARABIC_CMDS = {
     "تحقق":      cmd_checkban,
     "سجل":       cmd_eventlog,
     "تحميل":     cmd_download,
+    "أضف كلمة":  cmd_add_word,
+    "احذف كلمة": cmd_remove_word,
+    "الكلمات المحظورة": cmd_list_words,
 }
 
 
@@ -137,6 +144,12 @@ def main():
     app.add_handler(CommandHandler("setrules",  cmd_setrules))
     app.add_handler(CommandHandler("rules",     cmd_rules))
     app.add_handler(CommandHandler("download",  cmd_download))
+    app.add_handler(CommandHandler("addword",   cmd_add_word))
+    app.add_handler(CommandHandler("removeword", cmd_remove_word))
+    app.add_handler(CommandHandler("wordlist",  cmd_list_words))
+
+    # ── Banned words filter (group=2 → runs after commands) ───────────────────
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, filter_banned_words), group=2)
 
     # ── All text messages (Arabic slash-commands + message counting) ───────────
     app.add_handler(MessageHandler(filters.TEXT, all_messages_handler))
@@ -158,3 +171,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
