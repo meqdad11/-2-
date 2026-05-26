@@ -149,6 +149,7 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error("خطأ تحميل: %s", e)
         await status.edit_text("❌ تعذّر التحميل.")
+
 async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("الاستخدام: بحث <اسم الأغنية>")
@@ -157,23 +158,29 @@ async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     status = await update.message.reply_text(f"🔍 جارٍ البحث عن: {query}")
     try:
         loop = asyncio.get_event_loop()
-        results = await loop.run_in_executor(None, _search_soundcloud, query)
+        yt_results = await loop.run_in_executor(None, _search_youtube, query)
+        sc_results = []
+        try:
+            sc_results = await loop.run_in_executor(None, _search_soundcloud, query)
+        except Exception:
+            pass
+        results = yt_results + sc_results
         if not results:
             await status.edit_text("❌ لم يُعثر على نتائج.")
             return
         buttons = []
-        for i, r in enumerate(results):
+        for i, r in enumerate(results[:8]):
             dur = fmt_dur(r["duration"])
-            label = f"{i+1}. {r['title'][:35]} — {dur}"
+            source = "🎵" if "soundcloud" in r["url"] else "▶️"
+            label = f"{source} {r['title'][:30]} — {dur}"
             buttons.append([InlineKeyboardButton(label, callback_data=f"sc_dl|{r['url']}")])
         await status.edit_text(
-            f"🎵 نتائج البحث: {query}\nاختر أغنية:",
+            f"نتائج البحث: {query}\nاختر:",
             reply_markup=InlineKeyboardMarkup(buttons),
         )
     except Exception as e:
-        logger.error("خطأ بحث ساوند كلاود: %s", e)
+        logger.error("خطأ بحث: %s", e)
         await status.edit_text("❌ حدث خطأ أثناء البحث.")
-
 
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
