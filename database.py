@@ -56,6 +56,13 @@ async def init_db():
                 PRIMARY KEY (user_id, chat_id)
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS banned_words (
+                chat_id INTEGER NOT NULL,
+                word    TEXT NOT NULL,
+                PRIMARY KEY (chat_id, word)
+            )
+        """)
         await db.commit()
 
     await _migrate_banned_users()
@@ -270,6 +277,38 @@ async def get_event_log(chat_id: int, limit: int = 30, event_type: str | None = 
 
 # ── Chat settings ──────────────────────────────────────────────────────────────
 
+async def add_banned_word(chat_id: int, word: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        try:
+            await db.execute(
+                "INSERT INTO banned_words (chat_id, word) VALUES (?, ?)",
+                (chat_id, word.lower()),
+            )
+            await db.commit()
+            return True
+        except aiosqlite.IntegrityError:
+            return False
+
+
+async def remove_banned_word(chat_id: int, word: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "DELETE FROM banned_words WHERE chat_id=? AND word=?",
+            (chat_id, word.lower()),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+async def get_banned_words(chat_id: int) -> list[str]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "SELECT word FROM banned_words WHERE chat_id=? ORDER BY word",
+            (chat_id,),
+        )
+        return [row[0] for row in await cursor.fetchall()]
+
+
 async def get_setting(chat_id: int, key: str) -> str | None:
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
@@ -288,3 +327,4 @@ async def set_setting(chat_id: int, key: str, value: str):
             (chat_id, key, value),
         )
         await db.commit()
+        
