@@ -213,7 +213,7 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
         InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
     ]])
-    await msg.reply_text("شو تبي أحمل؟", reply_markup=keyboard)
+    await msg.reply_text("ايش أحمل؟", reply_markup=keyboard)
 
 async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
