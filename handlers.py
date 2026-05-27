@@ -553,6 +553,7 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
+    from datetime import timedelta
     chat_id = update.effective_chat.id
     now = datetime.now(timezone.utc)
     day_ago = (now - timedelta(days=1)).isoformat()
@@ -568,7 +569,8 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     top_text = ""
     for i, m in enumerate(top, 1):
-        top_text += f"{i}. {m['user_id']} — {m['message_count']} رسالة\n"
+        name = await db.get_user_name(chat_id, m['user_id'])
+        top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
 
     report = (
         f"📊 التقرير\n"
@@ -580,12 +582,6 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"\n{'─'*20}\n"
         f"🏆 الأكثر نشاطاً:\n{top_text}"
     )
-    await update.message.reply_text(report)
-    try:
-        await context.bot.send_message(ADMIN_CHAT_ID, report)
-    except Exception:
-        pass
-    
     await update.message.reply_text(report)
     try:
         await context.bot.send_message(ADMIN_CHAT_ID, report)
