@@ -76,6 +76,8 @@ _ARABIC_CMDS = {
     "يوتيوب":           cmd_yt_search,
     "كتم":              cmd_mute,
     "رفع الكتم":        cmd_unmute,
+"مسح التحذير":      cmd_clearwarn,
+    "التحذيرات":        cmd_warnings,
     "أغلق المجموعة":    cmd_lock,
     "افتح المجموعة":    cmd_unlock,
     "تقرير":            cmd_report,
