@@ -720,8 +720,13 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from telegram import Chat as TGChat
     if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
         return
-    await db.increment_message_count(update.effective_user.id, update.effective_chat.id)
-
+    user = update.effective_user
+    full_name = f"{user.first_name} {user.last_name or ''}".strip()
+    await db.increment_message_count(
+        user.id,
+        update.effective_chat.id,
+        full_name
+    )
 
 async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
     expired = await db.get_expired_bans()
