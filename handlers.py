@@ -719,13 +719,10 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
         return
     user = update.effective_user
+    chat = update.effective_chat
     full_name = f"{user.first_name} {user.last_name or ''}".strip()
-    await db.increment_message_count(
-        user.id,
-        update.effective_chat.id,
-        full_name
-    )
-
+    await db.increment_message_count(user.id, chat.id, full_name)
+    await db.save_chat_name(chat.id, chat.title or str(chat.id))
 async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
     expired = await db.get_expired_bans()
     for ban in expired:
