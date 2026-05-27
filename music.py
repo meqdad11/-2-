@@ -3,8 +3,10 @@ import logging
 import os
 import re
 import tempfile
+from typing import List, Dict
 
 import yt_dlp
+import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -41,6 +43,7 @@ def fmt_dur(seconds) -> str:
         return f"{s//60}:{s%60:02d}"
     except Exception:
         return ""
+
 def _download_media(url: str, audio_only: bool) -> dict:
     tmp_dir = tempfile.mkdtemp()
     if audio_only:
@@ -99,6 +102,7 @@ async def send_media(message, path: str, info: dict, audio_only: bool):
         else:
             await message.reply_video(video=f, caption=info["title"])
     os.remove(path)
+
 async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.text:
@@ -191,19 +195,134 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو",    callback_data=f"dl_video|{url}"),
         ]])
-        await update.message.reply_text("ايش  أحمل؟", reply_markup=keyboard)
+        await update.message.reply_text("ايش أحمل؟", reply_markup=keyboard)
+
+
+def _search_youtube(query: str) -> List[Dict]:
+    """البحث في يوتيوب عن الفيديوهات"""
+    try:
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': 'in_playlist',
+            'playlistend': 5,  # أول 5 نتائج
+        }
+        search_url = f"ytsearch5:{query}"
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(search_url, download=False)
+            results = []
+            if 'entries' in info:
+                for entry in info['entries'][:5]:
+                    results.append({
+                        'title': entry.get('title', 'بدون عنوان'),
+                        'url': entry.get('url', ''),
+                        'duration': fmt_dur(entry.get('duration', 0)),
+                        'id': entry.get('id', ''),
+                    })
+            return results
+    except Exception as e:
+        logger.error("خطأ البحث في يوتيوب: %s", e)
+        return []
+
+
+def _search_soundcloud(query: str) -> List[Dict]:
+    """البحث في ساوند كلاود عن الأغاني"""
+    try:
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': 'in_playlist',
+        }
+        search_url = f"scsearch5:{query}"
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(search_url, download=False)
+            results = []
+            if 'entries' in info:
+                for entry in info['entries'][:5]:
+                    results.append({
+                        'title': entry.get('title', 'بدون عنوان'),
+                        'url': entry.get('url', ''),
+                        'duration': fmt_dur(entry.get('duration', 0)),
+                        'id': entry.get('id', ''),
+                    })
+            return results
+    except Exception as e:
+        logger.error("خطأ البحث في ساوند كلاود: %s", e)
+        return []
+
+
 async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "البحث متوقف مؤقتاً.\n"
-        "أرسل الرابط مباشرة للتحميل 😊"
-    )
+    """البحث في ساوند كلاود"""
+    if not context.args:
+        await update.message.reply_text(
+            "الاستخدام: بحث <اسم الأغنية>\n"
+            "مثال: بحث عمرو دياب"
+        )
+        return
+    
+    query = " ".join(context.args)
+    status = await update.message.reply_text("🔍 جاري البحث في ساوند كلاود...")
+    
+    try:
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, _search_soundcloud, query)
+        
+        if not results:
+            await status.edit_text("❌ لم يتم العثور على نتائج.")
+            return
+        
+        keyboard = []
+        for i, result in enumerate(results, 1):
+            btn_text = f"{i}. {result['title'][:30]}..." if len(result['title']) > 30 else f"{i}. {result['title']}"
+            keyboard.append([InlineKeyboardButton(
+                btn_text,
+                callback_data=f"sc_dl|{result['url']}"
+            )])
+        
+        await status.edit_text(
+            f"🎵 نتائج البحث عن '{query}':\n",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.error("خطأ: %s", e)
+        await status.edit_text("❌ حدث خطأ في البحث.")
 
 
 async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "البحث متوقف مؤقتاً.\n"
-        "أرسل الرابط مباشرة للتحميل 😊"
-    )
+    """البحث في يوتيوب"""
+    if not context.args:
+        await update.message.reply_text(
+            "الاستخدام: يوتيوب <اسم الفيديو>\n"
+            "مثال: يوتيوب كليب أم عمرو دياب"
+        )
+        return
+    
+    query = " ".join(context.args)
+    status = await update.message.reply_text("🔍 جاري البحث في يوتيوب...")
+    
+    try:
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, _search_youtube, query)
+        
+        if not results:
+            await status.edit_text("❌ لم يتم العثور على نتائج.")
+            return
+        
+        keyboard = []
+        for i, result in enumerate(results, 1):
+            btn_text = f"{i}. {result['title'][:30]}..." if len(result['title']) > 30 else f"{i}. {result['title']}"
+            keyboard.append([InlineKeyboardButton(
+                btn_text,
+                callback_data=f"yt_pick|{result['url']}"
+            )])
+        
+        await status.edit_text(
+            f"🎬 نتائج البحث عن '{query}':\n",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.error("خطأ: %s", e)
+        await status.edit_text("❌ حدث خطأ في البحث.")
 
 
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -230,4 +349,4 @@ async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
         InlineKeyboardButton("🎬 فيديو",    callback_data=f"dl_video|{url}"),
     ]])
-    await query.message.reply_text("شو تبي؟", reply_markup=keyboard)
+    await query.message.edit_text("شو تبي؟", reply_markup=keyboard)
