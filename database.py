@@ -233,7 +233,7 @@ async def get_top_members(chat_id: int, limit: int = 5) -> list:
         """, (chat_id, limit))
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
-async def increment_message_count(user_id: int, chat_id: int):
+async def increment_message_count(user_id: int, chat_id: int, full_name: str = ""):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
             INSERT INTO user_stats (user_id, chat_id, message_count, last_seen)
@@ -242,7 +242,21 @@ async def increment_message_count(user_id: int, chat_id: int):
                 message_count = message_count + 1,
                 last_seen = CURRENT_TIMESTAMP
         """, (user_id, chat_id))
+        await db.execute("""
+            INSERT OR REPLACE INTO settings (chat_id, key, value)
+            VALUES (?, ?, ?)
+        """, (chat_id, f"username_{user_id}", full_name))
         await db.commit()
+
+
+async def get_user_name(chat_id: int, user_id: int) -> str:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "SELECT value FROM settings WHERE chat_id=? AND key=?",
+            (chat_id, f"username_{user_id}")
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else str(user_id)
 
 
 async def get_message_count(user_id: int, chat_id: int) -> int:
