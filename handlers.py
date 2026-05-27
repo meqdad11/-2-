@@ -555,26 +555,36 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     chat_id = update.effective_chat.id
     now = datetime.now(timezone.utc)
-    week_ago = now.replace(day=now.day - 7).isoformat() if now.day > 7 else now.isoformat()
-    
-    total = await db.get_total_members(chat_id)
-    new_members = await db.get_new_members_since(chat_id, week_ago)
+    day_ago = (now - timedelta(days=1)).isoformat()
+
+    actions = await db.get_bot_actions_since(chat_id, day_ago)
     bans = await db.get_ban_list(chat_id)
     top = await db.get_top_members(chat_id, 5)
-    
+
+    lines = []
+    for a in actions[:20]:
+        detail = f" — {a['detail']}" if a.get('detail') else ""
+        lines.append(f"• {a['action']} | المستخدم: {a['user_id']}{detail}")
+
     top_text = ""
     for i, m in enumerate(top, 1):
         top_text += f"{i}. {m['user_id']} — {m['message_count']} رسالة\n"
-    
+
     report = (
-        f"📊 التقرير الأسبوعي\n"
+        f"📊 التقرير\n"
         f"{'─'*20}\n"
-        f"👥 إجمالي الأعضاء: {total}\n"
-        f"🆕 أعضاء جدد هذا الأسبوع: {new_members}\n"
         f"🚫 إجمالي المحظورين: {len(bans)}\n"
         f"{'─'*20}\n"
-        f"🏆 أكثر الأعضاء نشاطاً:\n{top_text}"
+        f"📋 آخر الإجراءات:\n"
+        + ("\n".join(lines) if lines else "لا توجد إجراءات") +
+        f"\n{'─'*20}\n"
+        f"🏆 الأكثر نشاطاً:\n{top_text}"
     )
+    await update.message.reply_text(report)
+    try:
+        await context.bot.send_message(ADMIN_CHAT_ID, report)
+    except Exception:
+        pass
     
     await update.message.reply_text(report)
     try:
