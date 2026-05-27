@@ -479,13 +479,16 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.log_event(chat_id, "mute", user_id=update.effective_user.id, target_id=user_id)
     except Exception as e:
         await update.message.reply_text(f"❌ تعذّر الكتم: {e}")
-
+ 
 
 async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
+
     from telegram import ChatPermissions
+
     reply_user = get_reply_user(update)
+
     if reply_user:
         user_id = reply_user.id
     elif context.args:
@@ -497,20 +500,29 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("قم بالرد أو أرسل المعرف.")
         return
+
     chat_id = update.effective_chat.id
+
     try:
         await context.bot.restrict_chat_member(
-            chat_id, user_id,
+            chat_id,
+            user_id,
             permissions=ChatPermissions(
                 can_send_messages=True,
-                can_send_media_messages=True,
                 can_send_polls=True,
                 can_send_other_messages=True,
                 can_add_web_page_previews=True,
             ),
         )
+
         await update.message.reply_text(f"🔊 تم رفع الكتم عن {user_id}.")
-        await db.log_event(chat_id, "unmute", user_id=update.effective_user.id, target_id=user_id)
+        await db.log_event(
+            chat_id,
+            "unmute",
+            user_id=update.effective_user.id,
+            target_id=user_id,
+        )
+
     except Exception as e:
         await update.message.reply_text(f"❌ تعذّر رفع الكتم: {e}")
 
