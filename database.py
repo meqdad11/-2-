@@ -78,17 +78,13 @@ async def init_db():
         except Exception:
             pass
 try:
+            await db.execute("ALTER TABLE ban_log ADD COLUMN target_id INTEGER")
+        except Exception:
+            pass
+        try:
             await db.execute("ALTER TABLE ban_log ADD COLUMN detail TEXT")
         except Exception:
             pass
-        await db.commit()
-async def add_ban(user_id: int, chat_id: int, reason: str = None,
-                  banned_by: int = 0, expires_at=None):
-    async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("""
-            INSERT OR REPLACE INTO bans (user_id, chat_id, reason, banned_by, expires_at)
-            VALUES (?, ?, ?, ?, ?)
-        """, (user_id, chat_id, reason, banned_by, expires_at))
         await db.commit()
 
 
