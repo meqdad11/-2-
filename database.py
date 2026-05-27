@@ -21,11 +21,11 @@ async def init_db():
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ban_log (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id      INTEGER,
+                user_id      INTEGER DEFAULT 0,
                 chat_id      INTEGER,
                 action       TEXT,
                 performed_by INTEGER,
-                target_id    INTEGER,
+                target_id    INTEGER DEFAULT 0,
                 detail       TEXT,
                 created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -68,24 +68,19 @@ async def init_db():
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 chat_id    INTEGER,
                 action     TEXT,
-                user_id    INTEGER,
+                user_id    INTEGER DEFAULT 0,
                 detail     TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        try:
-            await db.execute("ALTER TABLE ban_log ADD COLUMN target_id INTEGER")
-        except Exception:
-            pass
-        try:
-            await db.execute("ALTER TABLE ban_log ADD COLUMN detail TEXT")
-        except Exception:
-            pass 
-try:
-            await db.execute("ALTER TABLE ban_log ADD COLUMN user_id INTEGER DEFAULT 0")
-        except Exception:
-            pass
+        for col, typ in [("target_id", "INTEGER"), ("detail", "TEXT"), ("user_id", "INTEGER")]:
+            try:
+                await db.execute(f"ALTER TABLE ban_log ADD COLUMN {col} {typ} DEFAULT 0")
+            except Exception:
+                pass
         await db.commit()
+
+
 async def add_ban(user_id: int, chat_id: int, reason: str = None,
                   banned_by: int = 0, expires_at=None):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -172,13 +167,15 @@ async def clear_warnings(user_id: int, chat_id: int):
             (user_id, chat_id)
         )
         await db.commit()
+
+
 async def log_event(chat_id: int, event_type: str,
                     user_id: int = 0, target_id: int = 0, detail: str = None):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
-            INSERT INTO ban_log (chat_id, action, performed_by, target_id, detail)
+            INSERT INTO ban_log (chat_id, action, user_id, target_id, detail)
             VALUES (?, ?, ?, ?, ?)
-        """, (chat_id, event_type, user_id, target_id, detail))
+        """, (chat_id, event_type, user_id or 0, target_id or 0, detail))
         await db.commit()
 
 
@@ -188,7 +185,7 @@ async def log_bot_action(chat_id: int, action: str,
         await db.execute("""
             INSERT INTO bot_actions (chat_id, action, user_id, detail)
             VALUES (?, ?, ?, ?)
-        """, (chat_id, action, user_id, detail))
+        """, (chat_id, action, user_id or 0, detail))
         await db.commit()
 
 
@@ -245,6 +242,8 @@ async def get_top_members(chat_id: int, limit: int = 5) -> list:
         """, (chat_id, limit))
         rows = await cursor.fetchall()
         return [dict(r) for r in rows]
+
+
 async def increment_message_count(user_id: int, chat_id: int, full_name: str = ""):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
