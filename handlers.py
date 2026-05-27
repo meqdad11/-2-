@@ -590,20 +590,22 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
-    from telegram.ext import CallbackContext
     chats = await db.get_all_active_chats()
     for chat_id in chats:
+        from datetime import timedelta
         now = datetime.now(timezone.utc)
-        week_ago = now.replace(day=max(1, now.day - 7)).isoformat()
+        week_ago = (now - timedelta(days=7)).isoformat()
         total = await db.get_total_members(chat_id)
         new_members = await db.get_new_members_since(chat_id, week_ago)
         bans = await db.get_ban_list(chat_id)
         top = await db.get_top_members(chat_id, 5)
+        chat_name = await db.get_chat_name(chat_id)
         top_text = ""
         for i, m in enumerate(top, 1):
-            top_text += f"{i}. {m['user_id']} — {m['message_count']} رسالة\n"
+            name = await db.get_user_name(chat_id, m['user_id'])
+            top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
         report = (
-            f"📊 التقرير الأسبوعي التلقائي\n"
+            f"📊 التقرير الأسبوعي — {chat_name}\n"
             f"{'─'*20}\n"
             f"👥 إجمالي الأعضاء: {total}\n"
             f"🆕 أعضاء جدد: {new_members}\n"
