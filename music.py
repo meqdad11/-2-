@@ -4,7 +4,6 @@ import os
 import re
 import tempfile
 from typing import List, Dict
-import json
 
 import yt_dlp
 import requests
@@ -116,16 +115,13 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     url_type = get_url_type(url)
     if url_type == "audio":
-        status = await msg.reply_text("⏳ جارٍ التحميل...")
-        try:
-            loop = asyncio.get_event_loop()
-            info = await loop.run_in_executor(None, _download_media, url, True)
-            await status.edit_text("📤 جارٍ الإرسال...")
-            await send_media(msg, info["path"], info, True)
-            await status.delete()
-        except Exception as e:
-            logger.error("خطأ تحميل صوت: %s", e)
-            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
+        # SoundCloud غير مدعوم - توجيه للبديل
+        await msg.reply_text(
+            "❌ ساوند كلاود غير متاح حالياً.\n\n"
+            "💡 الحل: ابحث عن الأغنية على اليوتيوب\n"
+            "اكتب: يوتيوب <اسم الأغنية>"
+        )
+        return
     elif url_type == "video":
         status = await msg.reply_text("⏳ جارٍ التحميل...")
         try:
@@ -160,7 +156,7 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status.delete()
         except Exception as e:
             logger.error("خطأ تحميل: %s", e)
-            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
+            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:40]}")
     except Exception as e:
         logger.error("خطأ في معالجة الزر: %s", e)
         await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
@@ -170,7 +166,7 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
             "أرسل رابط مباشرة للتحميل\n"
-            "الروابط المدعومة: يوتيوب، تيك توك، انستقرام، ساوند كلاود"
+            "الروابط المدعومة: يوتيوب، تيك توك، انستقرام"
         )
         return
     url = extract_url(" ".join(context.args))
@@ -179,15 +175,11 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     url_type = get_url_type(url)
     if url_type == "audio":
-        status = await update.message.reply_text("⏳ جارٍ التحميل...")
-        try:
-            loop = asyncio.get_event_loop()
-            info = await loop.run_in_executor(None, _download_media, url, True)
-            await status.edit_text("📤 جارٍ الإرسال...")
-            await send_media(update.message, info["path"], info, True)
-            await status.delete()
-        except Exception as e:
-            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
+        await update.message.reply_text(
+            "❌ ساوند كلاود غير متاح حالياً.\n\n"
+            "💡 الحل: ابحث عن الأغنية على اليوتيوب\n"
+            "اكتب: يوتيوب <اسم الأغنية>"
+        )
     elif url_type == "video":
         status = await update.message.reply_text("⏳ جارٍ التحميل...")
         try:
@@ -239,77 +231,26 @@ def _search_youtube(query: str) -> List[Dict]:
         return []
 
 
-def _search_soundcloud(query: str) -> List[Dict]:
-    """البحث في ساوند كلاود عن الأغاني"""
-    try:
-        logger.info(f"بدء البحث في ساوند كلاود: {query}")
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'extract_flat': 'in_playlist',
-        }
-        search_url = f"scsearch5:{query}"
-        
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(search_url, download=False)
-            results = []
-            
-            if 'entries' in info:
-                for entry in info['entries'][:5]:
-                    if entry and entry.get('url'):
-                        results.append({
-                            'title': entry.get('title', 'بدون عنوان'),
-                            'url': entry.get('url', ''),
-                            'duration': fmt_dur(entry.get('duration', 0)),
-                            'id': entry.get('id', ''),
-                        })
-            
-            logger.info(f"وجدنا {len(results)} نتائج في ساوند كلاود")
-            return results
-    except Exception as e:
-        logger.error(f"خطأ البحث في ساوند كلاود: {e}")
-        return []
-
-
 async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """البحث في ساوند كلاود"""
+    """البحث - توجيه للبديل (YouTube)"""
     if not context.args:
         await update.message.reply_text(
-            "الاستخدام: بحث <اسم الأغنية>\n"
-            "مثال: بحث عمرو دياب"
+            "ساوند كلاود غير متاح حالياً ❌\n\n"
+            "استخدم اليوتيوب بدلاً منه:\n"
+            "يوتيوب <اسم الأغنية>\n\n"
+            "مثال: يوتيوب فيروز"
         )
         return
     
     query = " ".join(context.args)
-    status = await update.message.reply_text("🔍 جاري البحث في ساوند كلاود...")
+    await update.message.reply_text(
+        f"ساوند كلاود غير متاح حالياً ❌\n\n"
+        f"سأبحث عن '{query}' على اليوتيوب بدلاً منه 🎵"
+    )
     
-    try:
-        loop = asyncio.get_event_loop()
-        results = await loop.run_in_executor(None, _search_soundcloud, query)
-        
-        if not results:
-            await status.edit_text("❌ لم يتم العثور على نتائج.")
-            return
-        
-        # حفظ النتائج في الذاكرة المؤقتة
-        cache_id = f"sc_{query[:20]}"
-        SEARCH_CACHE[cache_id] = results
-        
-        keyboard = []
-        for i, result in enumerate(results, 1):
-            btn_text = f"{i}. {result['title'][:20]}..." if len(result['title']) > 20 else f"{i}. {result['title']}"
-            keyboard.append([InlineKeyboardButton(
-                btn_text,
-                callback_data=f"sc_pick|{cache_id}|{i-1}"
-            )])
-        
-        await status.edit_text(
-            f"🎵 نتائج البحث عن '{query}':\n\nاختر أغنية:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    except Exception as e:
-        logger.error(f"خطأ في cmd_sc_search: {e}")
-        await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:40]}")
+    # توجيه البحث إلى YouTube
+    context.args = context.args  # الاحتفاظ بالمعاملات
+    await cmd_yt_search(update, context)
 
 
 async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -354,38 +295,13 @@ async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تحميل من SoundCloud بعد اختيار النتيجة"""
+    """تحميل من SoundCloud - غير مدعوم"""
     query = update.callback_query
     await query.answer()
-    try:
-        parts = query.data.split("|")
-        cache_id = parts[1]
-        index = int(parts[2])
-        
-        if cache_id not in SEARCH_CACHE:
-            await query.message.reply_text("❌ انتهت مدة البحث. حاول مجددا.")
-            return
-        
-        results = SEARCH_CACHE[cache_id]
-        if index >= len(results):
-            await query.message.reply_text("❌ خيار غير صحيح.")
-            return
-        
-        url = results[index]['url']
-        status = await query.message.reply_text("⏳ جارٍ التحميل...")
-        
-        try:
-            loop = asyncio.get_event_loop()
-            info = await loop.run_in_executor(None, _download_media, url, True)
-            await status.edit_text("📤 جارٍ الإرسال...")
-            await send_media(query.message, info["path"], info, True)
-            await status.delete()
-        except Exception as e:
-            logger.error(f"خطأ تحميل: {e}")
-            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:40]}")
-    except Exception as e:
-        logger.error(f"خطأ في callback_sc_download: {e}")
-        await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
+    await query.message.reply_text(
+        "❌ ساوند كلاود غير متاح حالياً.\n\n"
+        "💡 استخدم اليوتيوب بدلاً منه لتحميل الأغاني"
+    )
 
 
 async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
