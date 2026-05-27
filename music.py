@@ -95,12 +95,12 @@ async def send_media(message, path: str, info: dict, audio_only: bool):
         if audio_only:
             await message.reply_audio(
                 audio=f,
-                title=info["title"],
-                performer=info["uploader"],
-                duration=info["duration"],
+                title=info["title"][:100],
+                performer=info["uploader"][:100] if info["uploader"] else "Unknown",
+                duration=int(info["duration"]) if info["duration"] else 0,
             )
         else:
-            await message.reply_video(video=f, caption=info["title"])
+            await message.reply_video(video=f, caption=info["title"][:100])
     os.remove(path)
 
 async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -121,7 +121,7 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status.delete()
         except Exception as e:
             logger.error("خطأ تحميل صوت: %s", e)
-            await status.edit_text("❌ تعذّر التحميل.")
+            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
     elif url_type == "video":
         status = await msg.reply_text("⏳ جارٍ التحميل...")
         try:
@@ -132,7 +132,7 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status.delete()
         except Exception as e:
             logger.error("خطأ تحميل فيديو: %s", e)
-            await status.edit_text("❌ تعذّر التحميل.")
+            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
     else:
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
@@ -144,18 +144,22 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    action, url = query.data.split("|", 1)
-    audio_only = action == "dl_audio"
-    status = await query.message.reply_text("⏳ جارٍ التحميل...")
     try:
-        loop = asyncio.get_event_loop()
-        info = await loop.run_in_executor(None, _download_media, url, audio_only)
-        await status.edit_text("📤 جارٍ الإرسال...")
-        await send_media(query.message, info["path"], info, audio_only)
-        await status.delete()
+        action, url = query.data.split("|", 1)
+        audio_only = action == "dl_audio"
+        status = await query.message.reply_text("⏳ جارٍ التحميل...")
+        try:
+            loop = asyncio.get_event_loop()
+            info = await loop.run_in_executor(None, _download_media, url, audio_only)
+            await status.edit_text("📤 جارٍ الإرسال...")
+            await send_media(query.message, info["path"], info, audio_only)
+            await status.delete()
+        except Exception as e:
+            logger.error("خطأ تحميل: %s", e)
+            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
     except Exception as e:
-        logger.error("خطأ تحميل: %s", e)
-        await status.edit_text("❌ تعذّر التحميل.")
+        logger.error("خطأ في معالجة الزر: %s", e)
+        await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
 
 
 async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -179,7 +183,7 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_media(update.message, info["path"], info, True)
             await status.delete()
         except Exception as e:
-            await status.edit_text("❌ تعذّر التحميل.")
+            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
     elif url_type == "video":
         status = await update.message.reply_text("⏳ جارٍ التحميل...")
         try:
@@ -189,7 +193,7 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_media(update.message, info["path"], info, False)
             await status.delete()
         except Exception as e:
-            await status.edit_text("❌ تعذّر التحميل.")
+            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
     else:
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
@@ -201,53 +205,65 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def _search_youtube(query: str) -> List[Dict]:
     """البحث في يوتيوب عن الفيديوهات"""
     try:
+        logger.info(f"بدء البحث في يوتيوب: {query}")
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': 'in_playlist',
-            'playlistend': 5,  # أول 5 نتائج
+            'playlistend': 5,
         }
         search_url = f"ytsearch5:{query}"
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(search_url, download=False)
             results = []
+            
             if 'entries' in info:
                 for entry in info['entries'][:5]:
-                    results.append({
-                        'title': entry.get('title', 'بدون عنوان'),
-                        'url': entry.get('url', ''),
-                        'duration': fmt_dur(entry.get('duration', 0)),
-                        'id': entry.get('id', ''),
-                    })
+                    if entry and entry.get('url'):
+                        results.append({
+                            'title': entry.get('title', 'بدون عنوان'),
+                            'url': f"https://www.youtube.com/watch?v={entry.get('id', '')}",
+                            'duration': fmt_dur(entry.get('duration', 0)),
+                            'id': entry.get('id', ''),
+                        })
+            
+            logger.info(f"وجدنا {len(results)} نتائج")
             return results
     except Exception as e:
-        logger.error("خطأ البحث في يوتيوب: %s", e)
+        logger.error(f"خطأ البحث في يوتيوب: {e}")
         return []
 
 
 def _search_soundcloud(query: str) -> List[Dict]:
     """البحث في ساوند كلاود عن الأغاني"""
     try:
+        logger.info(f"بدء البحث في ساوند كلاود: {query}")
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': 'in_playlist',
         }
         search_url = f"scsearch5:{query}"
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(search_url, download=False)
             results = []
+            
             if 'entries' in info:
                 for entry in info['entries'][:5]:
-                    results.append({
-                        'title': entry.get('title', 'بدون عنوان'),
-                        'url': entry.get('url', ''),
-                        'duration': fmt_dur(entry.get('duration', 0)),
-                        'id': entry.get('id', ''),
-                    })
+                    if entry and entry.get('url'):
+                        results.append({
+                            'title': entry.get('title', 'بدون عنوان'),
+                            'url': entry.get('url', ''),
+                            'duration': fmt_dur(entry.get('duration', 0)),
+                            'id': entry.get('id', ''),
+                        })
+            
+            logger.info(f"وجدنا {len(results)} نتائج")
             return results
     except Exception as e:
-        logger.error("خطأ البحث في ساوند كلاود: %s", e)
+        logger.error(f"خطأ البحث في ساوند كلاود: {e}")
         return []
 
 
@@ -273,19 +289,19 @@ async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = []
         for i, result in enumerate(results, 1):
-            btn_text = f"{i}. {result['title'][:30]}..." if len(result['title']) > 30 else f"{i}. {result['title']}"
+            btn_text = f"{i}. {result['title'][:25]}..." if len(result['title']) > 25 else f"{i}. {result['title']}"
             keyboard.append([InlineKeyboardButton(
                 btn_text,
                 callback_data=f"sc_dl|{result['url']}"
             )])
         
         await status.edit_text(
-            f"🎵 نتائج البحث عن '{query}':\n",
+            f"🎵 نتائج البحث عن '{query}':\n\nاختر أغنية:",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     except Exception as e:
-        logger.error("خطأ: %s", e)
-        await status.edit_text("❌ حدث خطأ في البحث.")
+        logger.error(f"خطأ في cmd_sc_search: {e}")
+        await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:50]}")
 
 
 async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -293,7 +309,7 @@ async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
             "الاستخدام: يوتيوب <اسم الفيديو>\n"
-            "مثال: يوتيوب كليب أم عمرو دياب"
+            "مثال: يوتيوب فيروز"
         )
         return
     
@@ -310,43 +326,51 @@ async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = []
         for i, result in enumerate(results, 1):
-            btn_text = f"{i}. {result['title'][:30]}..." if len(result['title']) > 30 else f"{i}. {result['title']}"
+            btn_text = f"{i}. {result['title'][:25]}..." if len(result['title']) > 25 else f"{i}. {result['title']}"
             keyboard.append([InlineKeyboardButton(
                 btn_text,
                 callback_data=f"yt_pick|{result['url']}"
             )])
         
         await status.edit_text(
-            f"🎬 نتائج البحث عن '{query}':\n",
+            f"🎬 نتائج البحث عن '{query}':\n\nاختر فيديو:",
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
     except Exception as e:
-        logger.error("خطأ: %s", e)
-        await status.edit_text("❌ حدث خطأ في البحث.")
+        logger.error(f"خطأ في cmd_yt_search: {e}")
+        await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:50]}")
 
 
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    _, url = query.data.split("|", 1)
-    status = await query.message.reply_text("⏳ جارٍ التحميل...")
     try:
-        loop = asyncio.get_event_loop()
-        info = await loop.run_in_executor(None, _download_media, url, True)
-        await status.edit_text("📤 جارٍ الإرسال...")
-        await send_media(query.message, info["path"], info, True)
-        await status.delete()
+        _, url = query.data.split("|", 1)
+        status = await query.message.reply_text("⏳ جارٍ التحميل...")
+        try:
+            loop = asyncio.get_event_loop()
+            info = await loop.run_in_executor(None, _download_media, url, True)
+            await status.edit_text("📤 جارٍ الإرسال...")
+            await send_media(query.message, info["path"], info, True)
+            await status.delete()
+        except Exception as e:
+            logger.error(f"خطأ تحميل: {e}")
+            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
     except Exception as e:
-        logger.error("خطأ: %s", e)
-        await status.edit_text("❌ تعذّر التحميل.")
+        logger.error(f"خطأ في callback_sc_download: {e}")
+        await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
 
 
 async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    _, url = query.data.split("|", 1)
-    keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
-        InlineKeyboardButton("🎬 فيديو",    callback_data=f"dl_video|{url}"),
-    ]])
-    await query.message.edit_text("شو تبي؟", reply_markup=keyboard)
+    try:
+        _, url = query.data.split("|", 1)
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
+            InlineKeyboardButton("🎬 فيديو",    callback_data=f"dl_video|{url}"),
+        ]])
+        await query.message.edit_text("شو تبي؟", reply_markup=keyboard)
+    except Exception as e:
+        logger.error(f"خطأ في callback_yt_pick: {e}")
+        await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
