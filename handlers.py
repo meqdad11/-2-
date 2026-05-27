@@ -554,39 +554,68 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
     from datetime import timedelta
-    chat_id = update.effective_chat.id
-    now = datetime.now(timezone.utc)
-    day_ago = (now - timedelta(days=1)).isoformat()
+    from telegram import Chat as TGChat
 
-    actions = await db.get_bot_actions_since(chat_id, day_ago)
-    bans = await db.get_ban_list(chat_id)
-    top = await db.get_top_members(chat_id, 5)
+    user_id = update.effective_user.id
+    is_private = update.effective_chat.type == TGChat.PRIVATE
 
-    lines = []
-    for a in actions[:20]:
-        detail = f" — {a['detail']}" if a.get('detail') else ""
-        lines.append(f"• {a['action']} | المستخدم: {a['user_id']}{detail}")
-
-    top_text = ""
-    for i, m in enumerate(top, 1):
-        name = await db.get_user_name(chat_id, m['user_id'])
-        top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
-
-    report = (
-        f"📊 التقرير\n"
-        f"{'─'*20}\n"
-        f"🚫 إجمالي المحظورين: {len(bans)}\n"
-        f"{'─'*20}\n"
-        f"📋 آخر الإجراءات:\n"
-        + ("\n".join(lines) if lines else "لا توجد إجراءات") +
-        f"\n{'─'*20}\n"
-        f"🏆 الأكثر نشاطاً:\n{top_text}"
-    )
-    await update.message.reply_text(report)
-    try:
-        await context.bot.send_message(ADMIN_CHAT_ID, report)
-    except Exception:
-        pass
+    if is_private:
+        chats = await db.get_all_active_chats()
+        if not chats:
+            await update.message.reply_text("لا توجد مجموعات مسجلة بعد.")
+            return
+        for chat_id in chats:
+            now = datetime.now(timezone.utc)
+            day_ago = (now - timedelta(days=1)).isoformat()
+            actions = await db.get_bot_actions_since(chat_id, day_ago)
+            bans = await db.get_ban_list(chat_id)
+            top = await db.get_top_members(chat_id, 5)
+            chat_name = await db.get_chat_name(chat_id)
+            lines = []
+            for a in actions[:10]:
+                detail = f" — {a['detail']}" if a.get('detail') else ""
+                lines.append(f"• {a['action']} | {a['user_id']}{detail}")
+            top_text = ""
+            for i, m in enumerate(top, 1):
+                name = await db.get_user_name(chat_id, m['user_id'])
+                top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
+            report = (
+                f"📊 تقرير — {chat_name}\n"
+                f"{'─'*20}\n"
+                f"🚫 محظورون: {len(bans)}\n"
+                f"{'─'*20}\n"
+                f"📋 آخر الإجراءات:\n"
+                + ("\n".join(lines) if lines else "لا توجد إجراءات") +
+                f"\n{'─'*20}\n"
+                f"🏆 الأكثر نشاطاً:\n{top_text}"
+            )
+            await update.message.reply_text(report)
+    else:
+        now = datetime.now(timezone.utc)
+        day_ago = (now - timedelta(days=1)).isoformat()
+        chat_id = update.effective_chat.id
+        actions = await db.get_bot_actions_since(chat_id, day_ago)
+        bans = await db.get_ban_list(chat_id)
+        top = await db.get_top_members(chat_id, 5)
+        lines = []
+        for a in actions[:20]:
+            detail = f" — {a['detail']}" if a.get('detail') else ""
+            lines.append(f"• {a['action']} | {a['user_id']}{detail}")
+        top_text = ""
+        for i, m in enumerate(top, 1):
+            name = await db.get_user_name(chat_id, m['user_id'])
+            top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
+        report = (
+            f"📊 التقرير\n"
+            f"{'─'*20}\n"
+            f"🚫 محظورون: {len(bans)}\n"
+            f"{'─'*20}\n"
+            f"📋 آخر الإجراءات:\n"
+            + ("\n".join(lines) if lines else "لا توجد إجراءات") +
+            f"\n{'─'*20}\n"
+            f"🏆 الأكثر نشاطاً:\n{top_text}"
+        )
+        await update.message.reply_text(report)
 
 
 async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
