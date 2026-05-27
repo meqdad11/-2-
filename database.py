@@ -73,6 +73,10 @@ async def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        try:
+            await db.execute("ALTER TABLE ban_log ADD COLUMN target_id INTEGER")
+        except Exception:
+            pass
         await db.commit()
 async def add_ban(user_id: int, chat_id: int, reason: str = None,
                   banned_by: int = 0, expires_at=None):
