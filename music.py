@@ -4,6 +4,7 @@ import os
 import re
 import tempfile
 from typing import List, Dict
+import json
 
 import yt_dlp
 import requests
@@ -25,6 +26,9 @@ URL_PATTERN = re.compile(
     r'[^\s]*',
     re.IGNORECASE
 )
+
+# تخزين مؤقت للنتائج
+SEARCH_CACHE = {}
 
 def extract_url(text: str):
     match = URL_PATTERN.search(text)
@@ -220,15 +224,15 @@ def _search_youtube(query: str) -> List[Dict]:
             
             if 'entries' in info:
                 for entry in info['entries'][:5]:
-                    if entry and entry.get('url'):
+                    if entry and entry.get('id'):
                         results.append({
                             'title': entry.get('title', 'بدون عنوان'),
-                            'url': f"https://www.youtube.com/watch?v={entry.get('id', '')}",
+                            'url': f"https://www.youtube.com/watch?v={entry.get('id')}",
                             'duration': fmt_dur(entry.get('duration', 0)),
                             'id': entry.get('id', ''),
                         })
             
-            logger.info(f"وجدنا {len(results)} نتائج")
+            logger.info(f"وجدنا {len(results)} نتائج في يوتيوب")
             return results
     except Exception as e:
         logger.error(f"خطأ البحث في يوتيوب: {e}")
@@ -260,7 +264,7 @@ def _search_soundcloud(query: str) -> List[Dict]:
                             'id': entry.get('id', ''),
                         })
             
-            logger.info(f"وجدنا {len(results)} نتائج")
+            logger.info(f"وجدنا {len(results)} نتائج في ساوند كلاود")
             return results
     except Exception as e:
         logger.error(f"خطأ البحث في ساوند كلاود: {e}")
@@ -287,12 +291,16 @@ async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status.edit_text("❌ لم يتم العثور على نتائج.")
             return
         
+        # حفظ النتائج في الذاكرة المؤقتة
+        cache_id = f"sc_{query[:20]}"
+        SEARCH_CACHE[cache_id] = results
+        
         keyboard = []
         for i, result in enumerate(results, 1):
-            btn_text = f"{i}. {result['title'][:25]}..." if len(result['title']) > 25 else f"{i}. {result['title']}"
+            btn_text = f"{i}. {result['title'][:20]}..." if len(result['title']) > 20 else f"{i}. {result['title']}"
             keyboard.append([InlineKeyboardButton(
                 btn_text,
-                callback_data=f"sc_dl|{result['url']}"
+                callback_data=f"sc_pick|{cache_id}|{i-1}"
             )])
         
         await status.edit_text(
@@ -301,7 +309,7 @@ async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         logger.error(f"خطأ في cmd_sc_search: {e}")
-        await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:50]}")
+        await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:40]}")
 
 
 async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -324,12 +332,16 @@ async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status.edit_text("❌ لم يتم العثور على نتائج.")
             return
         
+        # حفظ النتائج في الذاكرة المؤقتة
+        cache_id = f"yt_{query[:20]}"
+        SEARCH_CACHE[cache_id] = results
+        
         keyboard = []
         for i, result in enumerate(results, 1):
-            btn_text = f"{i}. {result['title'][:25]}..." if len(result['title']) > 25 else f"{i}. {result['title']}"
+            btn_text = f"{i}. {result['title'][:20]}..." if len(result['title']) > 20 else f"{i}. {result['title']}"
             keyboard.append([InlineKeyboardButton(
                 btn_text,
-                callback_data=f"yt_pick|{result['url']}"
+                callback_data=f"yt_pick|{cache_id}|{i-1}"
             )])
         
         await status.edit_text(
@@ -338,15 +350,30 @@ async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         logger.error(f"خطأ في cmd_yt_search: {e}")
-        await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:50]}")
+        await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:40]}")
 
 
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تحميل من SoundCloud بعد اختيار النتيجة"""
     query = update.callback_query
     await query.answer()
     try:
-        _, url = query.data.split("|", 1)
+        parts = query.data.split("|")
+        cache_id = parts[1]
+        index = int(parts[2])
+        
+        if cache_id not in SEARCH_CACHE:
+            await query.message.reply_text("❌ انتهت مدة البحث. حاول مجددا.")
+            return
+        
+        results = SEARCH_CACHE[cache_id]
+        if index >= len(results):
+            await query.message.reply_text("❌ خيار غير صحيح.")
+            return
+        
+        url = results[index]['url']
         status = await query.message.reply_text("⏳ جارٍ التحميل...")
+        
         try:
             loop = asyncio.get_event_loop()
             info = await loop.run_in_executor(None, _download_media, url, True)
@@ -355,17 +382,31 @@ async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYP
             await status.delete()
         except Exception as e:
             logger.error(f"خطأ تحميل: {e}")
-            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
+            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:40]}")
     except Exception as e:
         logger.error(f"خطأ في callback_sc_download: {e}")
         await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
 
 
 async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار صيغة التحميل من يوتيوب"""
     query = update.callback_query
     await query.answer()
     try:
-        _, url = query.data.split("|", 1)
+        parts = query.data.split("|")
+        cache_id = parts[1]
+        index = int(parts[2])
+        
+        if cache_id not in SEARCH_CACHE:
+            await query.message.reply_text("❌ انتهت مدة البحث. حاول مجددا.")
+            return
+        
+        results = SEARCH_CACHE[cache_id]
+        if index >= len(results):
+            await query.message.reply_text("❌ خيار غير صحيح.")
+            return
+        
+        url = results[index]['url']
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو",    callback_data=f"dl_video|{url}"),
