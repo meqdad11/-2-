@@ -20,21 +20,21 @@ async def init_db():
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ban_log (
-                id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id    INTEGER,
-                chat_id    INTEGER,
-                action     TEXT,
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      INTEGER,
+                chat_id      INTEGER,
+                action       TEXT,
                 performed_by INTEGER,
-                target_id  INTEGER,
-                detail     TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                target_id    INTEGER,
+                detail       TEXT,
+                created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
         await db.execute("""
             CREATE TABLE IF NOT EXISTS warnings (
-                user_id    INTEGER NOT NULL,
-                chat_id    INTEGER NOT NULL,
-                count      INTEGER NOT NULL DEFAULT 0,
+                user_id INTEGER NOT NULL,
+                chat_id INTEGER NOT NULL,
+                count   INTEGER NOT NULL DEFAULT 0,
                 PRIMARY KEY (user_id, chat_id)
             )
         """)
@@ -77,14 +77,18 @@ async def init_db():
             await db.execute("ALTER TABLE ban_log ADD COLUMN target_id INTEGER")
         except Exception:
             pass
-try:
-            await db.execute("ALTER TABLE ban_log ADD COLUMN target_id INTEGER")
-        except Exception:
-            pass
         try:
             await db.execute("ALTER TABLE ban_log ADD COLUMN detail TEXT")
         except Exception:
             pass
+        await db.commit()
+async def add_ban(user_id: int, chat_id: int, reason: str = None,
+                  banned_by: int = 0, expires_at=None):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT OR REPLACE INTO bans (user_id, chat_id, reason, banned_by, expires_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, chat_id, reason, banned_by, expires_at))
         await db.commit()
 
 
@@ -332,6 +336,8 @@ async def set_setting(chat_id: int, key: str, value: str):
             VALUES (?, ?, ?)
         """, (chat_id, key, value))
         await db.commit()
+
+
 async def get_all_active_chats() -> list:
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute(
@@ -339,6 +345,8 @@ async def get_all_active_chats() -> list:
         )
         rows = await cursor.fetchall()
         return [row[0] for row in rows]
+
+
 async def save_chat_name(chat_id: int, chat_name: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
