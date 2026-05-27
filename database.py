@@ -335,3 +335,20 @@ async def get_all_active_chats() -> list:
         )
         rows = await cursor.fetchall()
         return [row[0] for row in rows]
+async def save_chat_name(chat_id: int, chat_name: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT OR REPLACE INTO settings (chat_id, key, value)
+            VALUES (?, 'chat_name', ?)
+        """, (chat_id, chat_name))
+        await db.commit()
+
+
+async def get_chat_name(chat_id: int) -> str:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "SELECT value FROM settings WHERE chat_id=? AND key='chat_name'",
+            (chat_id,)
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else str(chat_id)
