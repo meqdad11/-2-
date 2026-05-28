@@ -21,11 +21,10 @@ YOUTUBE_DOMAINS = ("youtube.com", "youtu.be")
 ALL_DOMAINS = SOUNDCLOUD_DOMAINS + VIDEO_ONLY_DOMAINS + YOUTUBE_DOMAINS
 
 URL_PATTERN = re.compile(
-    r'https?://(?:(?:www\.|vm\.|vt\.)?tiktok\.com|(?:www\.)?youtube\.com|youtu\.be|(?:www\.)?instagram\.com|(?:www\.)?soundcloud\.com)'
+    r'https?://(?:(?:www\.|vm\.|vt\.)?tiktok\.com|(?:www\.)?youtube\.com|youtu\.be|(?:www\.)?instagram\.com|(?:www\.|on\.)?soundcloud\.com)'
     r'[^\s]*',
     re.IGNORECASE
 )
-
 def extract_url(text: str):
     match = URL_PATTERN.search(text)
     return match.group(0) if match else None
