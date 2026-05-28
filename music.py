@@ -115,13 +115,16 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     url_type = get_url_type(url)
     if url_type == "audio":
-        # SoundCloud غير مدعوم - توجيه للبديل
-        await msg.reply_text(
-            "❌ ساوند كلاود غير متاح حالياً.\n\n"
-            "💡 الحل: ابحث عن الأغنية على اليوتيوب\n"
-            "اكتب: يوتيوب <اسم الأغنية>"
-        )
-        return
+        status = await msg.reply_text("⏳ جارٍ التحميل...")
+        try:
+            loop = asyncio.get_event_loop()
+            info = await loop.run_in_executor(None, _download_media, url, True)
+            await status.edit_text("📤 جارٍ الإرسال...")
+            await send_media(msg, info["path"], info, True)
+            await status.delete()
+        except Exception as e:
+            logger.error("خطأ تحميل صوت: %s", e)
+            await status.edit_text("❌ تعذّر التحميل.")
     elif url_type == "video":
         status = await msg.reply_text("⏳ جارٍ التحميل...")
         try:
@@ -132,14 +135,13 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status.delete()
         except Exception as e:
             logger.error("خطأ تحميل فيديو: %s", e)
-            await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
+            await status.edit_text("❌ تعذّر التحميل.")
     else:
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو",    callback_data=f"dl_video|{url}"),
         ]])
-        await msg.reply_text("شو تبي أحمل؟", reply_markup=keyboard)
-
+        await msg.reply_text("ايش أحمل؟", reply_markup=keyboard)
 
 async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
