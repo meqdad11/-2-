@@ -377,15 +377,12 @@ async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
-        return
     chat_id = update.effective_chat.id
     rules = await db.get_setting(chat_id, "rules")
     if rules:
         await update.message.reply_text(f"📋 قواعد المجموعة:\n{rules}")
     else:
         await update.message.reply_text("لم يتم تعيين قواعد بعد.")
-
 
 async def cmd_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
