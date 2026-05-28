@@ -62,6 +62,8 @@ def _download_media(url: str, audio_only: bool) -> dict:
             "no_warnings": True,
             "noplaylist": True,
             "max_filesize": MAX_FILE_MB * 1024 * 1024,
+            "socket_timeout": 30,
+            "retries": 3,
         }
     else:
         ydl_opts = {
@@ -70,13 +72,15 @@ def _download_media(url: str, audio_only: bool) -> dict:
             "quiet": True,
             "no_warnings": True,
             "noplaylist": True,
+            "socket_timeout": 30,
+            "retries": 3,
         }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             if "entries" in info:
                 info = info["entries"][0]
-        title    = info.get("title", "media")
+        title = info.get("title", "media")
         duration = info.get("duration", 0)
         uploader = info.get("uploader", "")
         for fname in os.listdir(tmp_dir):
