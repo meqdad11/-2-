@@ -367,11 +367,14 @@ async def cmd_eventlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
+
     if not context.args:
         await update.message.reply_text("الاستخدام: /setrules <النص>")
         return
-    rules = " ".join(context.args)
+
+    rules = update.message.text.split(" ", 1)[1]
     chat_id = update.effective_chat.id
+
     await db.set_setting(chat_id, "rules", rules)
     await update.message.reply_text("✅ تم تعيين قواعد المجموعة.")
 
