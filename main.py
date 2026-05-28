@@ -81,6 +81,7 @@ _ARABIC_CMDS = {
     "أغلق المجموعة":    cmd_lock,
     "افتح المجموعة":    cmd_unlock,
     "تقرير":            cmd_report,
+"القواعد": cmd_rules,
 }
 
 
