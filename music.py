@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 MAX_FILE_MB = 45
 
 SOUNDCLOUD_DOMAINS = ("soundcloud.com",)
-VIDEO_ONLY_DOMAINS = ("tiktok.com", "instagram.com")
+VIDEO_ONLY_DOMAINS = ("vt.tiktok.com", "instagram.com")
 YOUTUBE_DOMAINS = ("youtube.com", "youtu.be")
 
 ALL_DOMAINS = SOUNDCLOUD_DOMAINS + VIDEO_ONLY_DOMAINS + YOUTUBE_DOMAINS
