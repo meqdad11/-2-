@@ -7,6 +7,12 @@ from telegram.ext import ContextTypes
 from telegram.constants import ChatMemberStatus
 
 import database as db
+import google.generativeai as genai
+
+import os
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+BOT_USERNAME = "mygroup_guardm_bot"
+genai.configure(api_key=GEMINI_API_KEY)
 from helpers import (
     require_admin,
     is_admin,
@@ -843,7 +849,6 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-
 async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
     expired = await db.get_expired_bans()
     for ban in expired:
@@ -862,29 +867,46 @@ async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             logger.warning("خطأ في رفع الحظر: %s", e)
-async def cmd_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+
+async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-    if not msg:
+    if not msg or not msg.text:
         return
-    question = " ".join(context.args) if context.args else None
-    if not question and msg.reply_to_message and msg.reply_to_message.text:
-        question = msg.reply_to_message.text
+    from telegram import Chat as TGChat
+    if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
+        return
+    
+    text = msg.text.lower()
+    bot_name = BOT_USERNAME.lower().replace("@", "")
+    
+    # تحقق من ذكر اسم البوت
+    if bot_name not in text and f"@{bot_name}" not in text:
+        return
+    
+    # استخرج السؤال بدون اسم البوت
+    question = msg.text
+    for pattern in [f"@{BOT_USERNAME}", bot_name, "شفق"]:
+        question = question.replace(pattern, "").strip()
+    
     if not question:
-        await msg.reply_text(
-            "💡 الاستخدام:\nذكاء [سؤالك]\n\nمثال: ذكاء ما هي عاصمة فرنسا؟"
-        )
+        await msg.reply_text("سؤالك قصير جداً! 😊 اسأل شيء أطول")
         return
-    user_id = update.effective_user.id
-    wait_msg = await msg.reply_text("⏳ جاري التفكير...")
+    
+    await msg.chat.send_action("typing")
+    
     try:
-        answer = await ask_ai(user_id, question)
-        await wait_msg.edit_text(answer)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(question)
+        answer = response.text
+        
+        # إذا الرد طويل جداً، قسمه
+        if len(answer) > 4096:
+            parts = [answer[i:i+4096] for i in range(0, len(answer), 4096)]
+            for part in parts:
+                await msg.reply_text(part)
+        else:
+            await msg.reply_text(answer)
     except Exception as e:
-        logger.error("خطأ في cmd_ai: %s", e)
-        await wait_msg.edit_text("❌ حدث خطأ، حاول مرة أخرى.")
-
-
-async def cmd_clear_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    clear_session(user_id)
-    await update.message.reply_text("🗑️ تم مسح ذاكرة المحادثة. تبدأ من جديد! ✨")
+        logger.error(f"خطأ Gemini: {e}")
+        await msg.reply_text("⚠️ حدث خطأ في الرد، حاول مرة أخرى.")
