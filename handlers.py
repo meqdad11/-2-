@@ -62,7 +62,7 @@ CRISIS_REPLY = """🆘 يبدو أنك تمر بلحظة صعبة.
 أو تحدث مع احد المشرفين او الأعضاء ، نحن معك. 💙"""
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        بوت شفق نشط ✅
+        "بوت شفق نشط ✅"
 
 ━━━━━━━━━━━━━━━━━━━━
 👮 أوامر المشرفين
