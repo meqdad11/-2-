@@ -632,6 +632,7 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not GEMINI_AVAILABLE or not GEMINI_API_KEY:
+        await update.message.reply_text("⚠️ Gemini غير متوفر الآن")
         return
     
     msg = update.message
@@ -639,22 +640,19 @@ async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     text = msg.text.lower()
-    
-    # تحقق من كلمة "شفق" فقط
     if "شفق" not in text:
         return
     
-    # استخرج السؤال بدون "شفق"
     question = msg.text.replace("شفق", "").strip()
     
     if not question:
-        await msg.reply_text("سؤالك قصير جداً! 😊 اسأل شيء أطول")
+        await msg.reply_text("سؤالك قصير جداً! 😊")
         return
     
     try:
         await msg.chat.send_action("typing")
         model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(question)
+        response = model.generate_content(question, timeout=30)
         answer = response.text
         
         if len(answer) > 4096:
@@ -664,8 +662,8 @@ async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await msg.reply_text(answer)
     except Exception as e:
-        logger.error(f"خطأ Gemini: {e}")
-        await msg.reply_text("⚠️ حدث خطأ في الرد، حاول مرة أخرى.")
+        logger.error(f"Gemini error: {str(e)}")
+        await msg.reply_text(f"❌ خطأ: {str(e)[:100]}")
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from datetime import timedelta
     from telegram import Chat as TGChat
