@@ -42,8 +42,7 @@ from handlers import (
     track_message,
     filter_banned_words,
     auto_reply,
-cmd_ai,
-    cmd_clear_ai,
+    ask_gemini,
 )
 from music import (
     cmd_download,
@@ -78,16 +77,12 @@ _ARABIC_CMDS = {
     "يوتيوب":           cmd_yt_search,
     "كتم":              cmd_mute,
     "رفع الكتم":        cmd_unmute,
-"مسح التحذير":      cmd_clearwarn,
+    "مسح التحذير":      cmd_clearwarn,
     "التحذيرات":        cmd_warnings,
     "أغلق المجموعة":    cmd_lock,
     "افتح المجموعة":    cmd_unlock,
     "تقرير":            cmd_report,
-"القواعد": cmd_rules,
-"ذكاء":       cmd_ai,
-    "جيمناي":     cmd_ai,
-    "شات":        cmd_ai,
-    "مسح ذاكرة": cmd_clear_ai,
+    "القواعد":          cmd_rules,
 }
 
 
@@ -105,6 +100,7 @@ async def handle_text(update: Update, context):
     await handle_media_url(update, context)
     await filter_banned_words(update, context)
     await auto_reply(update, context)
+    await ask_gemini(update, context)
     await track_message(update, context)
 
 
@@ -147,6 +143,7 @@ def main():
     app.add_handler(CommandHandler("scsearch",   cmd_sc_search))
     app.add_handler(CommandHandler("ytsearch",   cmd_yt_search))
     app.add_handler(CommandHandler("download",   cmd_download))
+
     app.add_handler(CallbackQueryHandler(callback_download,    pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
     app.add_handler(CallbackQueryHandler(callback_yt_pick,     pattern=r"^yt_pick\|"))
