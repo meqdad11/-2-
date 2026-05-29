@@ -585,13 +585,18 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ تعذّر الفتح: {e}")
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
-        return
     from datetime import timedelta
     from telegram import Chat as TGChat
 
-    user_id = update.effective_user.id
     is_private = update.effective_chat.type == TGChat.PRIVATE
+
+    if not is_private:
+        if not await require_admin(update, context):
+            return
+
+    if update.effective_user.id != ADMIN_CHAT_ID:
+        await update.message.reply_text("غير مصرح لك.")
+        return
 
     if is_private:
         chats = await db.get_all_active_chats()
