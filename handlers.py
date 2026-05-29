@@ -1,5 +1,6 @@
 import logging
 import random
+import os
 from datetime import datetime, timezone
 
 from telegram import Update, ChatMemberUpdated
@@ -7,12 +8,6 @@ from telegram.ext import ContextTypes
 from telegram.constants import ChatMemberStatus
 
 import database as db
-import google.generativeai as genai
-
-import os
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-BOT_USERNAME = "mygroup_guardm_bot"
-genai.configure(api_key=GEMINI_API_KEY)
 from helpers import (
     require_admin,
     is_admin,
@@ -26,10 +21,22 @@ from helpers import (
     estimate_telegram_registration,
 )
 
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 MAX_WARNINGS = 3
 ADMIN_CHAT_ID = 729970974
+
+# إعداد Gemini
+if GEMINI_AVAILABLE:
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+    if GEMINI_API_KEY:
+        genai.configure(api_key=GEMINI_API_KEY)
 AUTO_REPLIES = {
     "صباح الخير": ["صباح النور ☀️"],
     "صباح النور": ["صباح الورد 🌹"],
@@ -39,187 +46,65 @@ AUTO_REPLIES = {
     "مساء النور": ["مساء الورد 🌹"],
     "مساء الورد": ["مساء السعادة 🌙"]
 }
-import httpx as _httpx
-import os as _os
 
-GEMINI_API_KEY = _os.environ.get("GEMINI_API_KEY", "")
-
-async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or not msg.text:
-        return
-    
-    text = msg.text.lower()
-    bot_name = BOT_USERNAME.lower().replace("@", "")
-    
-    # تحقق من ذكر اسم البوت أو "شفق"
-    if bot_name not in text and f"@{bot_name}" not in text and "شفق" not in text:
-        return
-    
-    # استخرج السؤال بدون اسم البوت
-    question = msg.text
-    for pattern in [f"@{BOT_USERNAME}", bot_name, "شفق"]:
-        question = question.replace(pattern, "").strip()
-    
-    if not question:
-        await msg.reply_text("سؤالك قصير جداً! 😊 اسأل شيء أطول")
-        return
-    
-    await msg.chat.send_action("typing")
-    
-    try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(question)
-        answer = response.text
-        
-        if len(answer) > 4096:
-            parts = [answer[i:i+4096] for i in range(0, len(answer), 4096)]
-            for part in parts:
-                await msg.reply_text(part)
-        else:
-            await msg.reply_text(answer)
-    except Exception as e:
-        logger.error(f"خطأ Gemini: {e}")
-        await msg.reply_text("⚠️ حدث خطأ في الرد، حاول مرة أخرى.")
-        async with _httpx.AsyncClient(timeout=15) as client:
-            r = await client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
-                json={"contents": [{"parts": [{"text": prompt}]}]}
-            )
-            data = r.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        logger.error("خطأ Gemini: %s", e)
-        return "هلا! كيف أقدر أساعدك؟ 😊"
 CRISIS_KEYWORDS = [
-    "انتحار",
-    "انتحرت",
-    "أنتحر",
-    "بنتحر",
-    "بينتحر",
-    "سأنتحر",
-    "راح انتحر",
-
-    "اقتل نفسي",
-    "أقتل نفسي",
-    "بقتل نفسي",
-    "يقتل نفسه",
-    "يقتل نفسي",
-    "سأقتل نفسي",
-
-    "أذيت",
-    "أذيت نفسي",
-    "اذيت نفسي",
-    "أضر نفسي",
-    "اضر نفسي",
-    "أضر بنفسي",
-
-    "أموت",
-    "بموت",
-    "ابي اموت",
-    "أبي أموت",
-    "ابغى اموت",
-    "أبغى أموت",
-    "ودي أموت",
-    "اتمنى الموت",
-
-    "اخنق نفسي",
-    "أخنق نفسي",
-
-    "suicide",
-    "kill myself",
-    "end my life",
-    "want to die",
-    "self harm"
+    "انتحار", "انتحرت", "أنتحر", "بنتحر", "بينتحر", "سأنتحر", "راح انتحر",
+    "اقتل نفسي", "أقتل نفسي", "بقتل نفسي", "يقتل نفسه", "يقتل نفسي", "سأقتل نفسي",
+    "أذيت", "أذيت نفسي", "اذيت نفسي", "أضر نفسي", "اضر نفسي", "أضر بنفسي",
+    "أموت", "بموت", "ابي اموت", "أبي أموت", "ابغى اموت", "أبغى أموت", "ودي أموت", "اتمنى الموت",
+    "اخنق نفسي", "أخنق نفسي",
+    "suicide", "kill myself", "end my life", "want to die", "self harm"
 ]
-CRISIS_REPLY = """
-.يبدو أنك تمر بلحظة صعبة 🆘
+
+CRISIS_REPLY = """🆘 يبدو أنك تمر بلحظة صعبة.
 أنت لست وحدك 🤍
 
 📞 أرقام الدعم والمساعدة في السعودية:
 
-- 937 - وزارة الصحة (استشارات ودعم صحي ونفسي)
-- 920033360 - مركز الاستشارات والدعم النفسي
-- 1919 - بلاغات العنف الأسري والحماية الاجتماعية
-- 116111 - خط حماية الطفل
-- 999 - الشرطة
-- 997 - الهلال الأحمر (الإسعاف)
-- 998 - الدفاع المدني
-- 911 - الطوارئ العامة
+- 937 — وزارة الصحة (استشارات ودعم صحي ونفسي)
+- 920033360 — مركز الاستشارات والدعم النفسي
+- 1919 — بلاغات العنف الأسري والحماية الاجتماعية
+- 116111 — خط حماية الطفل
+- 999 — الشرطة
+- 997 — الهلال الأحمر (الإسعاف)
+- 998 — الدفاع المدني
+- 911 — الطوارئ العامة
 
-أو تحدث مع احد المشرفين او الأعضاء ، نحن معك. 💙
-"""
-
-
-
+أو تحدث مع احد المشرفين او الأعضاء ، نحن معك. 💙"""
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        await update.message.reply_text(
-        """
-
-بوت شفق نشط ✅
-
-━━━━━━━━━━━━━━━━━━━━
-👮 أوامر المشرفين
-━━━━━━━━━━━━━━━━━━━━
-
-🚫 الحظر والطرد:
-• حظر — حظر عضو (رد على رسالته)
-• حظر 123456 7d سبب — حظر مؤقت
-• رفع الحظر — رفع الحظر (رد أو معرف)
-• قائمة — عرض المحظورين
-• معلومات — تفاصيل حظر عضو
-• تحقق — هل هو محظور؟
-
-⚠️ التحذيرات:
-• تحذير — تحذير عضو (3 = حظر تلقائي)
-• مسح التحذير — مسح تحذيراته
-• التحذيرات — عدد تحذيراته
-
-🔇 الكتم:
-• كتم — كتم دائم
-• كتم 123456 1h — كتم مؤقت
-• رفع الكتم — رفع الكتم
-
-🚫 الكلمات المحظورة:
-• أضف كلمة xxx — إضافة كلمة
-• احذف كلمة xxx — حذف كلمة
-• الكلمات المحظورة — عرض القائمة
-
-🔒 المجموعة:
-• أغلق المجموعة — فقط المشرفون يكتبون
-• افتح المجموعة — الجميع يكتب
-• /setrules النص — تعيين القواعد
-
-📊 التقارير والسجلات:
-• تقرير — تقرير فوري
-• سجل — آخر الأحداث
-
-━━━━━━━━━━━━━━━━━━━━
-👥 للجميع
-━━━━━━━━━━━━━━━━━━━━
-
-• ايدي — معلوماتك + صورتك
-• القواعد — قواعد المجموعة
-
-━━━━━━━━━━━━━━━━━━━━
-🎵 الميديا
-━━━━━━━━━━━━━━━━━━━━
-
-• أرسل رابط يوتيوب/تيك توك/انستقرام
-  ← يسألك صوت أو فيديو تلقائياً
-
-━━━━━━━━━━━━━━━━━━━━
-🤖 تلقائي بدون أوامر
-━━━━━━━━━━━━━━━━━━━━
-
-✅ طرد المحظورين لو حاولوا يرجعون
-✅ إشعار المشرفين بمحاولة الدخول
-✅ حذف الكلمات المحظورة + تحذير
-✅ ترحيب بالأعضاء الجدد
-✅ رسالة طوارئ نفسية عند الحاجة
-✅ تقرير يومي وأسبوعي تلقائي
-✅ ردود ترحيبية على التحيات
-"""
+    await update.message.reply_text(
+        "بوت شفق نشط ✅\n\n"
+        "👮 أوامر المشرفين:\n"
+        "حظر — حظر عضو (رد أو معرف)\n"
+        "حظر 123 7d سبب — حظر مؤقت\n"
+        "رفع الحظر — رفع الحظر\n"
+        "تحذير — تحذير (3 = حظر تلقائي)\n"
+        "مسح التحذير — مسح تحذيرات عضو\n"
+        "التحذيرات — عدد تحذيرات عضو\n"
+        "كتم — كتم عضو\n"
+        "كتم 123 1h — كتم مؤقت\n"
+        "رفع الكتم — رفع الكتم\n"
+        "قائمة — المحظورون\n"
+        "معلومات — تفاصيل الحظر\n"
+        "تحقق — هل هو محظور؟\n"
+        "سجل — آخر الأحداث\n"
+        "تقرير — تقرير فوري\n"
+        "أضف كلمة — إضافة كلمة محظورة\n"
+        "احذف كلمة — حذف كلمة\n"
+        "الكلمات المحظورة — القائمة\n"
+        "أغلق المجموعة — إغلاق\n"
+        "افتح المجموعة — فتح\n"
+        "/setrules — تعيين القواعد\n\n"
+        "👥 للجميع:\n"
+        "ايدي — معلوماتك + صورتك\n"
+        "القواعس — قواعد المجموعة\n\n"
+        "🎵 الميديا:\n"
+        "أرسل رابط مباشرة — تحميل\n\n"
+        "🤖 تلقائي:\n"
+        "طرد المحظورين تلقائياً\n"
+        "حذف الكلمات المحظورة\n"
+        "ترحيب بالأعضاء الجدد\n"
+        "تقرير يومي وأسبوعي"
     )
 async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
@@ -276,6 +161,8 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"اليوزر: {username}\n"
             f"المعرف: {user.id}"
         )
+
+
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -307,11 +194,8 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception:
         pass
-    await db.log_event(chat_id, "ban", user_id=banner_id, target_id=user_id,
-                       detail=f"reason={reason}")
+    await db.log_event(chat_id, "ban", user_id=banner_id, target_id=user_id, detail=f"reason={reason}")
     await db.log_bot_action(chat_id, "ban", user_id=user_id, detail=reason)
-
-
 async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -340,8 +224,7 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(
                 user_id,
                 "✅ تم رفع الحظر عنك.\n\n"
-                "يمكنك الانضمام للمجموعة مجدداً عبر هذا الرابط:\n"
-                "https://t.me/+Wzrqvy2x08w1NTFk"
+                "يمكنك الانضمام للمجموعة مجدداً."
             )
         except Exception:
             pass
@@ -390,8 +273,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception:
             pass
-        await db.log_bot_action(chat_id, "auto_ban", user_id=user_id,
-                                detail=f"بعد {MAX_WARNINGS} تحذيرات")
+        await db.log_bot_action(chat_id, "auto_ban", user_id=user_id, detail=f"بعد {MAX_WARNINGS} تحذيرات")
     else:
         await update.message.reply_text(
             f"⚠️ تحذير {count}/{MAX_WARNINGS} للمستخدم {user_id}.{reason_text}"
@@ -537,8 +419,6 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"📋 قواعد المجموعة:\n{rules}")
     else:
         await update.message.reply_text("لم يتم تعيين قواعد بعد.")
-
-
 async def cmd_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -580,56 +460,6 @@ async def cmd_list_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🚫 الكلمات المحظورة:\n" + "\n".join(f"• {w}" for w in words)
     )
-async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or not msg.text:
-        return
-    from telegram import Chat as TGChat
-    if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
-        return
-    chat_id = update.effective_chat.id
-    user = update.effective_user
-    text = msg.text.lower()
-
-    # ── فحص كلمات الأزمات النفسية (للجميع) ──
-    for keyword in CRISIS_KEYWORDS:
-        if keyword.lower() in text:
-            try:
-                await msg.reply_text(CRISIS_REPLY)
-            except Exception as e:
-                logger.error("خطأ في إرسال رسالة الأزمة: %s", e)
-            return
-
-    # ── فحص الكلمات المحظورة العادية (للأعضاء فقط) ──
-    if await is_admin(update, context):
-        return
-    words = await db.get_banned_words(chat_id)
-    for word in words:
-        if word in text:
-            try:
-                await msg.delete()
-            except Exception:
-                pass
-            count = await db.add_warning(user.id, chat_id)
-            if count >= MAX_WARNINGS:
-                await db.add_ban(user.id, chat_id, f"حظر تلقائي بعد {MAX_WARNINGS} تحذيرات", 0)
-                try:
-                    await context.bot.ban_chat_member(chat_id, user.id)
-                except Exception:
-                    pass
-                await db.clear_warnings(user.id, chat_id)
-                await context.bot.send_message(
-                    chat_id,
-                    f"⛔ تم حظر {user.full_name} بعد {MAX_WARNINGS} تحذيرات."
-                )
-                await db.log_bot_action(chat_id, "auto_ban_word", user_id=user.id, detail=word)
-            else:
-                await context.bot.send_message(
-                    chat_id,
-                    f"⚠️ {user.full_name}، رسالتك تحتوي كلمات غير لائقة.\n"
-                    f"التحذير {count}/{MAX_WARNINGS}"
-                )
-            return
 
 
 async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -724,6 +554,7 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id,
             permissions=ChatPermissions(
                 can_send_messages=True,
+                can_send_media_messages=True,
                 can_send_polls=True,
                 can_send_other_messages=True,
                 can_add_web_page_previews=True,
@@ -733,6 +564,108 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.log_event(chat_id, "unlock", user_id=update.effective_user.id)
     except Exception as e:
         await update.message.reply_text(f"❌ تعذّر الفتح: {e}")
+async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.text:
+        return
+    from telegram import Chat as TGChat
+    if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
+        return
+    chat_id = update.effective_chat.id
+    user = update.effective_user
+    text = msg.text.lower()
+
+    # ── فحص كلمات الأزمات النفسية (للجميع) ──
+    for keyword in CRISIS_KEYWORDS:
+        if keyword.lower() in text:
+            try:
+                await msg.reply_text(CRISIS_REPLY)
+            except Exception as e:
+                logger.error("خطأ في إرسال رسالة الأزمة: %s", e)
+            return
+
+    # ── فحص الكلمات المحظورة العادية (للأعضاء فقط) ──
+    if await is_admin(update, context):
+        return
+    words = await db.get_banned_words(chat_id)
+    for word in words:
+        if word in text:
+            try:
+                await msg.delete()
+            except Exception:
+                pass
+            count = await db.add_warning(user.id, chat_id)
+            if count >= MAX_WARNINGS:
+                await db.add_ban(user.id, chat_id, f"حظر تلقائي بعد {MAX_WARNINGS} تحذيرات", 0)
+                try:
+                    await context.bot.ban_chat_member(chat_id, user.id)
+                except Exception:
+                    pass
+                await db.clear_warnings(user.id, chat_id)
+                await context.bot.send_message(
+                    chat_id,
+                    f"⛔ تم حظر {user.full_name} بعد {MAX_WARNINGS} تحذيرات."
+                )
+                await db.log_bot_action(chat_id, "auto_ban_word", user_id=user.id, detail=word)
+            else:
+                await context.bot.send_message(
+                    chat_id,
+                    f"⚠️ {user.full_name}، رسالتك تحتوي كلمات غير لائقة.\n"
+                    f"التحذير {count}/{MAX_WARNINGS}"
+                )
+            return
+
+
+async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.text:
+        return
+    from telegram import Chat as TGChat
+    if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
+        return
+    text = msg.text.strip().lower()
+    for keyword, replies in AUTO_REPLIES.items():
+        if keyword in text:
+            await msg.reply_text(random.choice(replies))
+            return
+
+
+async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not GEMINI_AVAILABLE or not GEMINI_API_KEY:
+        return
+    
+    msg = update.message
+    if not msg or not msg.text:
+        return
+    
+    text = msg.text.lower()
+    
+    # تحقق من كلمة "شفق" فقط
+    if "شفق" not in text:
+        return
+    
+    # استخرج السؤال بدون "شفق"
+    question = msg.text.replace("شفق", "").strip()
+    
+    if not question:
+        await msg.reply_text("سؤالك قصير جداً! 😊 اسأل شيء أطول")
+        return
+    
+    try:
+        await msg.chat.send_action("typing")
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(question)
+        answer = response.text
+        
+        if len(answer) > 4096:
+            parts = [answer[i:i+4096] for i in range(0, len(answer), 4096)]
+            for part in parts:
+                await msg.reply_text(part)
+        else:
+            await msg.reply_text(answer)
+    except Exception as e:
+        logger.error(f"خطأ Gemini: {e}")
+        await msg.reply_text("⚠️ حدث خطأ في الرد، حاول مرة أخرى.")
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from datetime import timedelta
     from telegram import Chat as TGChat
@@ -853,6 +786,8 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(ADMIN_CHAT_ID, report)
         except Exception:
             pass
+
+
 async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = update.chat_member
     if not result:
@@ -861,6 +796,7 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
     old_member = result.old_chat_member
     chat_id = result.chat.id
     user = new_member.user
+
     if new_member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED):
         if old_member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED):
             ban = await db.get_ban(user.id, chat_id)
@@ -906,25 +842,6 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
                         chat_id,
                         f"👋 أهلاً {user.first_name}! نرحب بك في مجموعتنا. 😊"
                     )
-
-
-async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or not msg.text:
-        return
-    from telegram import Chat as TGChat
-    if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
-        return
-    text = msg.text.strip().lower()
-    for keyword, replies in AUTO_REPLIES.items():
-        if keyword in text:
-            await msg.reply_text(random.choice(replies))
-            return
-    if context.bot.username and f"@{context.bot.username.lower()}" in text:
-        reply = await ask_gemini(msg.text, update.effective_user.first_name)
-        await msg.reply_text(reply)
-
-
 async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.effective_user:
         return
@@ -937,6 +854,7 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
+
 async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
     expired = await db.get_expired_bans()
     for ban in expired:
@@ -947,7 +865,7 @@ async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.unban_chat_member(chat_id, user_id, only_if_banned=True)
             await context.bot.send_message(
                 chat_id,
-                f"انتهت مدة حظر المستخدم {user_id}. يمكنه الانضمام مجدداً."
+                f"✅ انتهت مدة حظر المستخدم {user_id}. يمكنه الانضمام مجدداً."
             )
             await context.bot.send_message(
                 user_id,
@@ -955,46 +873,3 @@ async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             logger.warning("خطأ في رفع الحظر: %s", e)
-
-
-async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or not msg.text:
-        return
-    from telegram import Chat as TGChat
-    if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
-        return
-    
-    text = msg.text.lower()
-    bot_name = BOT_USERNAME.lower().replace("@", "")
-    
-    # تحقق من ذكر اسم البوت
-    if bot_name not in text and f"@{bot_name}" not in text:
-        return
-    
-    # استخرج السؤال بدون اسم البوت
-    question = msg.text
-    for pattern in [f"@{BOT_USERNAME}", bot_name, "شفق"]:
-        question = question.replace(pattern, "").strip()
-    
-    if not question:
-        await msg.reply_text("سؤالك قصير جداً! 😊 اسأل شيء أطول")
-        return
-    
-    await msg.chat.send_action("typing")
-    
-    try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(question)
-        answer = response.text
-        
-        # إذا الرد طويل جداً، قسمه
-        if len(answer) > 4096:
-            parts = [answer[i:i+4096] for i in range(0, len(answer), 4096)]
-            for part in parts:
-                await msg.reply_text(part)
-        else:
-            await msg.reply_text(answer)
-    except Exception as e:
-        logger.error(f"خطأ Gemini: {e}")
-        await msg.reply_text("⚠️ حدث خطأ في الرد، حاول مرة أخرى.")
