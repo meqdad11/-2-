@@ -61,8 +61,9 @@ CRISIS_REPLY = """🆘 يبدو أنك تمر بلحظة صعبة.
 
 أو تحدث مع احد المشرفين او الأعضاء ، نحن معك. 💙"""
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "بوت شفق نشط ✅"
+  await update.message.reply_text(
+    """
+بوت شفق نشط ✅
 
 ━━━━━━━━━━━━━━━━━━━━
 👮 أوامر المشرفين
@@ -125,6 +126,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ✅ رسالة طوارئ نفسية عند الحاجة
 ✅ تقرير يومي وأسبوعي تلقائي
 ✅ ردود ترحيبية على التحيات
+"""
+)ردود ترحيبية على التحيات
 async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
