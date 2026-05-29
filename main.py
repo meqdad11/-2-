@@ -147,6 +147,8 @@ def main():
     app.add_handler(CommandHandler("scsearch",   cmd_sc_search))
     app.add_handler(CommandHandler("ytsearch",   cmd_yt_search))
     app.add_handler(CommandHandler("download",   cmd_download))
+app.add_handler(CommandHandler("ai",      cmd_ai))
+app.add_handler(CommandHandler("clearai", cmd_clear_ai))
 
     app.add_handler(CallbackQueryHandler(callback_download,    pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
