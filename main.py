@@ -42,6 +42,8 @@ from handlers import (
     track_message,
     filter_banned_words,
     auto_reply,
+cmd_ai,
+    cmd_clear_ai,
 )
 from music import (
     cmd_download,
