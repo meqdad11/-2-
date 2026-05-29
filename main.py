@@ -84,6 +84,10 @@ _ARABIC_CMDS = {
     "افتح المجموعة":    cmd_unlock,
     "تقرير":            cmd_report,
 "القواعد": cmd_rules,
+"ذكاء":       cmd_ai,
+    "جيمناي":     cmd_ai,
+    "شات":        cmd_ai,
+    "مسح ذاكرة": cmd_clear_ai,
 }
 
 
