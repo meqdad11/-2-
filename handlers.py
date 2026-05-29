@@ -39,6 +39,31 @@ AUTO_REPLIES = {
     "مساء النور": ["مساء الورد 🌹"],
     "مساء الورد": ["مساء السعادة 🌙"]
 }
+import httpx as _httpx
+import os as _os
+
+GEMINI_API_KEY = _os.environ.get("GEMINI_API_KEY", "")
+
+async def ask_gemini(text: str, user_name: str = "") -> str:
+    if not GEMINI_API_KEY:
+        return "هلا! كيف أقدر أساعدك؟ 😊"
+    try:
+        prompt = (
+            "أنت مساعد لمجموعة دعم نفسي على تيليجرام. "
+            "ردودك باللهجة العربية الخليجية، قصيرة ومتعاطفة ومفيدة. "
+            "لا تعطي تشخيصات طبية. إذا كان الموضوع خطيراً انصح بطلب المساعدة المتخصصة.\n\n"
+            f"العضو {user_name} يقول: {text}"
+        )
+        async with _httpx.AsyncClient(timeout=15) as client:
+            r = await client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
+                json={"contents": [{"parts": [{"text": prompt}]}]}
+            )
+            data = r.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        logger.error("خطأ Gemini: %s", e)
+        return "هلا! كيف أقدر أساعدك؟ 😊"
 CRISIS_KEYWORDS = [
     "انتحار",
     "انتحرت",
