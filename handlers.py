@@ -101,9 +101,7 @@ CRISIS_REPLY = """
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
-        CRISIS_REPLY,
-        parse_mode='Markdown'
-    )
+        """
 
 بوت شفق نشط ✅
 
