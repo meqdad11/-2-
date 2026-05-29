@@ -44,16 +44,43 @@ import os as _os
 
 GEMINI_API_KEY = _os.environ.get("GEMINI_API_KEY", "")
 
-async def ask_gemini(text: str, user_name: str = "") -> str:
-    if not GEMINI_API_KEY:
-        return "هلا! كيف أقدر أساعدك؟ 😊"
+async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.text:
+        return
+    
+    text = msg.text.lower()
+    bot_name = BOT_USERNAME.lower().replace("@", "")
+    
+    # تحقق من ذكر اسم البوت أو "شفق"
+    if bot_name not in text and f"@{bot_name}" not in text and "شفق" not in text:
+        return
+    
+    # استخرج السؤال بدون اسم البوت
+    question = msg.text
+    for pattern in [f"@{BOT_USERNAME}", bot_name, "شفق"]:
+        question = question.replace(pattern, "").strip()
+    
+    if not question:
+        await msg.reply_text("سؤالك قصير جداً! 😊 اسأل شيء أطول")
+        return
+    
+    await msg.chat.send_action("typing")
+    
     try:
-        prompt = (
-            "أنت مساعد لمجموعة دعم نفسي على تيليجرام. "
-            "ردودك باللهجة العربية الخليجية، قصيرة ومتعاطفة ومفيدة. "
-            "لا تعطي تشخيصات طبية. إذا كان الموضوع خطيراً انصح بطلب المساعدة المتخصصة.\n\n"
-            f"العضو {user_name} يقول: {text}"
-        )
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(question)
+        answer = response.text
+        
+        if len(answer) > 4096:
+            parts = [answer[i:i+4096] for i in range(0, len(answer), 4096)]
+            for part in parts:
+                await msg.reply_text(part)
+        else:
+            await msg.reply_text(answer)
+    except Exception as e:
+        logger.error(f"خطأ Gemini: {e}")
+        await msg.reply_text("⚠️ حدث خطأ في الرد، حاول مرة أخرى.")
         async with _httpx.AsyncClient(timeout=15) as client:
             r = await client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
