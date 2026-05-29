@@ -894,7 +894,8 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(random.choice(replies))
             return
     if context.bot.username and f"@{context.bot.username.lower()}" in text:
-        await msg.reply_text("هلا! كيف أقدر أساعدك؟ 😊")
+        reply = await ask_gemini(msg.text, update.effective_user.first_name)
+        await msg.reply_text(reply)
 
 
 async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
