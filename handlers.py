@@ -190,14 +190,15 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(
                 user_id,
-                "✅ تم رفع الحظر عنك. يمكنك الانضمام للمجموعة مجدداً."
+                "✅ تم رفع الحظر عنك.\n\n"
+                "يمكنك الانضمام للمجموعة مجدداً عبر هذا الرابط:\n"
+                "https://t.me/+Wzrqvy2x08w1NTFk"
             )
         except Exception:
             pass
         await db.log_event(chat_id, "unban", user_id=unbanner_id, target_id=user_id)
     else:
         await update.message.reply_text(f"المستخدم {user_id} غير موجود في قائمة الحظر.")
-
 async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
