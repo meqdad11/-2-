@@ -12,6 +12,9 @@ from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
 
+# ✅ تعريف SEARCH_CACHE في أول الملف
+SEARCH_CACHE = {}
+
 MAX_FILE_MB = 45
 
 SOUNDCLOUD_DOMAINS = ("soundcloud.com",)
