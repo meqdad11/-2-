@@ -632,30 +632,25 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not GEMINI_AVAILABLE or not GEMINI_API_KEY:
-        await update.message.reply_text("⚠️ Gemini غير متوفر الآن")
-        return
-    
     msg = update.message
     if not msg or not msg.text:
         return
-    
     text = msg.text.lower()
     if "شفق" not in text:
         return
-    
     question = msg.text.replace("شفق", "").strip()
-    
-    if not question:
+    if not question or len(question) < 3:
         await msg.reply_text("سؤالك قصير جداً! 😊")
         return
-    
+    await msg.chat.send_action("typing")
     try:
-        await msg.chat.send_action("typing")
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(question)
-        answer = response.text
-        
+        api_key = os.getenv("GEMINI_API_KEY")
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+        payload = {"contents": [{"parts": [{"text": question}]}]}
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.post(url, json=payload)
+            data = r.json()
+        answer = data["candidates"][0]["content"]["parts"][0]["text"]
         if len(answer) > 4096:
             parts = [answer[i:i+4096] for i in range(0, len(answer), 4096)]
             for part in parts:
@@ -663,8 +658,8 @@ async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await msg.reply_text(answer)
     except Exception as e:
-        logger.error(f"Gemini error: {str(e)}")
-        await msg.reply_text("⚠️ حدث خطأ في الرد، جرّب لاحقاً.")
+        logger.error(f"Gemini Error: {e}")
+        await msg.reply_text(f"❌ خطأ: {str(e)[:80]}")
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from datetime import timedelta
     from telegram import Chat as TGChat
