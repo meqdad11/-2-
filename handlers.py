@@ -462,13 +462,11 @@ async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE
     from telegram import Chat as TGChat
     if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
         return
-    if await is_admin(update, context):
-        return
     chat_id = update.effective_chat.id
     user = update.effective_user
     text = msg.text.lower()
 
-    # ── فحص كلمات الأزمات النفسية ──
+    # ── فحص كلمات الأزمات النفسية (للجميع) ──
     for keyword in CRISIS_KEYWORDS:
         if keyword.lower() in text:
             try:
@@ -477,7 +475,9 @@ async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE
                 logger.error("خطأ في إرسال رسالة الأزمة: %s", e)
             return
 
-    # ── فحص الكلمات المحظورة العادية ──
+    # ── فحص الكلمات المحظورة العادية (للأعضاء فقط) ──
+    if await is_admin(update, context):
+        return
     words = await db.get_banned_words(chat_id)
     for word in words:
         if word in text:
