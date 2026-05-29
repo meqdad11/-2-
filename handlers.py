@@ -652,7 +652,7 @@ async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         await msg.chat.send_action("typing")
         model = genai.GenerativeModel('gemini-1.5-flash')
-        response = model.generate_content(question, timeout=30)
+        response = model.generate_content(question)
         answer = response.text
         
         if len(answer) > 4096:
@@ -663,7 +663,7 @@ async def ask_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text(answer)
     except Exception as e:
         logger.error(f"Gemini error: {str(e)}")
-        await msg.reply_text(f"❌ خطأ: {str(e)[:100]}")
+        await msg.reply_text("⚠️ حدث خطأ في الرد، جرّب لاحقاً.")
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from datetime import timedelta
     from telegram import Chat as TGChat
