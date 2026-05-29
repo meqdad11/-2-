@@ -832,3 +832,29 @@ async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception as e:
             logger.warning("خطأ في رفع الحظر: %s", e)
+async def cmd_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg:
+        return
+    question = " ".join(context.args) if context.args else None
+    if not question and msg.reply_to_message and msg.reply_to_message.text:
+        question = msg.reply_to_message.text
+    if not question:
+        await msg.reply_text(
+            "💡 الاستخدام:\nذكاء [سؤالك]\n\nمثال: ذكاء ما هي عاصمة فرنسا؟"
+        )
+        return
+    user_id = update.effective_user.id
+    wait_msg = await msg.reply_text("⏳ جاري التفكير...")
+    try:
+        answer = await ask_ai(user_id, question)
+        await wait_msg.edit_text(answer)
+    except Exception as e:
+        logger.error("خطأ في cmd_ai: %s", e)
+        await wait_msg.edit_text("❌ حدث خطأ، حاول مرة أخرى.")
+
+
+async def cmd_clear_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    clear_session(user_id)
+    await update.message.reply_text("🗑️ تم مسح ذاكرة المحادثة. تبدأ من جديد! ✨")
