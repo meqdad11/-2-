@@ -600,7 +600,6 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id,
             permissions=ChatPermissions(
                 can_send_messages=True,
-                can_send_media_messages=True,
                 can_send_polls=True,
                 can_send_other_messages=True,
                 can_add_web_page_previews=True,
