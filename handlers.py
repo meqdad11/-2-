@@ -2,6 +2,7 @@ import logging
 import random
 import os
 from datetime import datetime, timezone
+import httpx
 
 from telegram import Update, ChatMemberUpdated
 from telegram.ext import ContextTypes
