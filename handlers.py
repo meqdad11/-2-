@@ -20,7 +20,6 @@ from helpers import (
     estimate_telegram_registration,
 )
 
-from ai_handler import ask_ai, clear_session
 logger = logging.getLogger(__name__)
 
 MAX_WARNINGS = 3
