@@ -648,11 +648,11 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for a in actions[:10]:
                 name = await db.get_user_name(chat_id, a['user_id'])
                 detail = f" — {a['detail']}" if a.get('detail') else ""
-                lines.append(f"• {a['action']} | {name} ({a['user_id']}){detail}")
+                lines.append(f"• {a['action']} | \u200F{name} ({a['user_id']}){detail}")
             top_text = ""
             for i, m in enumerate(top, 1):
                 name = await db.get_user_name(chat_id, m['user_id'])
-                top_text += f"{i}. {name} — {m['message_count']} رسالة\n"
+                top_text += f"{i}. \u200F{name} — {m['message_count']} رسالة\n"
             report = (
                 f"📊 تقرير — {chat_name}\n"
                 f"{'━'*20}\n"
@@ -675,13 +675,13 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for a in actions[:20]:
             name = await db.get_user_name(chat_id, a['user_id'])
             detail = f" — {a['detail']}" if a.get('detail') else ""
-            lines.append(f"• {a['action']} | {name} ({a['user_id']}){detail}")
+            lines.append(f"• {a['action']} | \u200F{name} ({a['user_id']}){detail}")
         top_text = ""
         for i, m in enumerate(top, 1):
             name = await db.get_user_name(chat_id, m['user_id'])
-            top_text += f"{i}. {name} — {m['message_count']} رسالة\n"
+            top_text += f"{i}. \u200F{name} — {m['message_count']} رسالة\n"
         report = (
-            f"📊 تقرير — تقرير المجموعة\n"
+            f"📊 تقرير المجموعة\n"
             f"{'━'*20}\n"
             f"🚫 محظورون: {len(bans)}\n"
             f"{'━'*20}\n"
@@ -690,7 +690,6 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"\n{'━'*20}\n"
             f"🏆 الأعضاء حسب النشاط:\n{top_text}"
         )
-        await update.message.reply_text(report)
         await update.message.reply_text(report)
 async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
