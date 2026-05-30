@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from telegram import Update, Chat as TGChat
 from telegram.ext import (
     ApplicationBuilder,
@@ -11,21 +12,46 @@ from telegram.ext import (
 )
 import database as db
 from handlers import (
-    cmd_start, cmd_id, cmd_ban, cmd_unban, cmd_warn,
-    cmd_clearwarn, cmd_warnings, cmd_banlist, cmd_baninfo,
-    cmd_checkban, cmd_eventlog, cmd_setrules, cmd_rules,
-    cmd_add_word, cmd_remove_word, cmd_list_words,
-    cmd_mute, cmd_unmute, cmd_lock, cmd_unlock,
-    cmd_report, cmd_shafaq,
-    on_chat_member_updated, job_expire_bans,
-    job_weekly_report, job_daily_report,
-    track_message, filter_banned_words, auto_reply,
-    AUTHORIZED_PM_USERS, GROUP_CHAT_ID,
+    cmd_start,
+    cmd_id,
+    cmd_ban,
+    cmd_unban,
+    cmd_warn,
+    cmd_clearwarn,
+    cmd_warnings,
+    cmd_banlist,
+    cmd_baninfo,
+    cmd_checkban,
+    cmd_eventlog,
+    cmd_setrules,
+    cmd_rules,
+    cmd_add_word,
+    cmd_remove_word,
+    cmd_list_words,
+    cmd_mute,
+    cmd_unmute,
+    cmd_lock,
+    cmd_unlock,
+    cmd_report,
+    cmd_shafaq,
+    cmd_stats,
+    cmd_reminder,
+    on_chat_member_updated,
+    job_expire_bans,
+    job_weekly_report,
+    job_daily_report,
+    track_message,
+    filter_banned_words,
+    auto_reply,
 )
 from music import (
-    cmd_download, cmd_sc_search, cmd_yt_search,
-    handle_media_url, callback_download,
-    callback_sc_download, callback_yt_pick,
+    cmd_download,
+    cmd_sc_search,
+    cmd_yt_search,
+    handle_media_url,
+    callback_download,
+    callback_sc_download,
+    callback_yt_pick,
 )
 
 logging.basicConfig(
@@ -33,7 +59,6 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
-
 _ARABIC_CMDS = {
     "ايدي": cmd_id,
     "حظر": cmd_ban,
@@ -59,67 +84,26 @@ _ARABIC_CMDS = {
     "تقرير": cmd_report,
     "القواعد": cmd_rules,
     "شفق": cmd_shafaq,
+    "إحصائيات": cmd_stats,
+    "احصائيات": cmd_stats,
+    "تذكير": cmd_reminder,
 }
-
 
 async def handle_text(update: Update, context):
     msg = update.message
     if not msg or not msg.text:
         return
-
     text = msg.text.strip()
-    chat_type = update.effective_chat.type
-
-    # ── أوامر من الخاص ──
-    if chat_type == TGChat.PRIVATE:
-        user_id = update.effective_user.id
-        if user_id not in AUTHORIZED_PM_USERS:
-            return
-        for arabic_cmd, handler in _ARABIC_CMDS.items():
-            if text == arabic_cmd or text.startswith(arabic_cmd + " "):
-                args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
-                context.args = args
-
-                # نحفظ reply_text الأصلية ونستبدلها بالخاص
-                original_reply_text = msg.reply_text
-                original_reply_photo = msg.reply_photo
-
-                async def reply_to_pm(*a, **kw):
-                    kw.pop("reply_to_message_id", None)
-                    await context.bot.send_message(user_id, *a, **kw)
-
-                async def reply_photo_to_pm(*a, **kw):
-                    kw.pop("reply_to_message_id", None)
-                    await context.bot.send_photo(user_id, *a, **kw)
-
-                msg._unfreeze()
-                msg.reply_text = reply_to_pm
-                msg.reply_photo = reply_photo_to_pm
-                msg.chat = await context.bot.get_chat(GROUP_CHAT_ID)
-                update._unfreeze()
-
-                await handler(update, context)
-
-                msg._unfreeze()
-                msg.reply_text = original_reply_text
-                msg.reply_photo = original_reply_photo
-                return
-        return
-
-    # ── أوامر من القروب (الوضع العادي) ──
     for arabic_cmd, handler in _ARABIC_CMDS.items():
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
             args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
             context.args = args
             await handler(update, context)
             return
-
     await handle_media_url(update, context)
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
-
-
 def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -154,15 +138,13 @@ def main():
     app.add_handler(CommandHandler("unlock", cmd_unlock))
     app.add_handler(CommandHandler("report", cmd_report))
     app.add_handler(CommandHandler("addword", cmd_add_word))
-    app.add_handler(CommandHandler("removeword", cmd_remove_word))
-    app.add_handler(CommandHandler("wordlist", cmd_list_words))
-    app.add_handler(CommandHandler("scsearch", cmd_sc_search))
-    app.add_handler(CommandHandler("ytsearch", cmd_yt_search))
-    app.add_handler(CommandHandler("download", cmd_download))
-    app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
+app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
     app.add_handler(CallbackQueryHandler(callback_yt_pick, pattern=r"^yt_pick\|"))
-    app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
+
+    app.add_handler(ChatMemberHandler(on_chat_member_updated,
+                                      ChatMemberHandler.CHAT_MEMBER))
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     job_queue = app.job_queue
@@ -175,6 +157,12 @@ def main():
         drop_pending_updates=True,
     )
 
-
 if __name__ == "__main__":
     main()
+    app.add_handler(CommandHandler("removeword", cmd_remove_word))
+    app.add_handler(CommandHandler("wordlist", cmd_list_words))
+    app.add_handler(CommandHandler("scsearch", cmd_sc_search))
+    app.add_handler(CommandHandler("ytsearch", cmd_yt_search))
+    app.add_handler(CommandHandler("download", cmd_download))
+    app.add_handler(CommandHandler("stats", cmd_stats))
+    app.add_handler(CommandHandler("reminder", cmd_reminder))
