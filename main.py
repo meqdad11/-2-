@@ -92,23 +92,42 @@ async def handle_text(update: Update, context):
     msg = update.message
     if not msg or not msg.text:
         return
+
     text = msg.text.strip()
+    chat_type = update.effective_chat.type
+
+    # ── أوامر من الخاص ──
+    if chat_type == TGChat.PRIVATE:
+        user_id = update.effective_user.id
+        
+        from handlers import AUTHORIZED_PM_USERS, GROUP_CHAT_ID
+        if user_id not in AUTHORIZED_PM_USERS:
+            return
+
+        for arabic_cmd, handler in _ARABIC_CMDS.items():
+            if text == arabic_cmd or text.startswith(arabic_cmd + " "):
+                args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
+                context.args = args
+                # نخدع البوت: نحوّل الشات للقروب
+                update.message._unfreeze()
+                update.message.chat = await context.bot.get_chat(GROUP_CHAT_ID)
+                update._unfreeze()
+                await handler(update, context)
+                return
+        return
+
+    # ── أوامر من القروب (الوضع العادي) ──
     for arabic_cmd, handler in _ARABIC_CMDS.items():
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
             args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
             context.args = args
             await handler(update, context)
             return
+
     await handle_media_url(update, context)
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
-
-
-def main():
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    if not token:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN غير محدد")
 
     async def post_init(app):
         await db.init_db()
