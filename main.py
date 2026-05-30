@@ -39,6 +39,7 @@ from handlers import (
     job_expire_bans,
     job_weekly_report,
     job_daily_report,
+    job_daily_quote,
     track_message,
     filter_banned_words,
     auto_reply,
@@ -149,9 +150,14 @@ def main():
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
+    from zoneinfo import ZoneInfo
+    from datetime import time as dtime
+    TIMEZONE = ZoneInfo("Asia/Riyadh")
+
     job_queue = app.job_queue
     job_queue.run_repeating(job_expire_bans, interval=300, first=10)
-    job_queue.run_daily(job_daily_report, time=__import__("datetime").time(hour=8, minute=0))
+    job_queue.run_daily(job_daily_report, time=dtime(hour=8, minute=0, tzinfo=TIMEZONE))
+    job_queue.run_daily(job_daily_quote, time=dtime(hour=9, minute=0, tzinfo=TIMEZONE))
     job_queue.run_repeating(job_weekly_report, interval=604800, first=60)
 
     app.run_polling(
