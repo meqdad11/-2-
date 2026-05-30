@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 from telegram import Update, Chat as TGChat
 from telegram.ext import (
     ApplicationBuilder,
@@ -10,6 +9,8 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
+from zoneinfo import ZoneInfo
+from datetime import time as dtime
 import database as db
 from handlers import (
     cmd_start,
@@ -60,6 +61,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+TIMEZONE = ZoneInfo("Asia/Riyadh")
+
 _ARABIC_CMDS = {
     "ايدي": cmd_id,
     "حظر": cmd_ban,
@@ -88,6 +91,7 @@ _ARABIC_CMDS = {
     "تذكير": cmd_reminder,
 }
 
+
 async def handle_text(update: Update, context):
     msg = update.message
     if not msg or not msg.text:
@@ -103,6 +107,7 @@ async def handle_text(update: Update, context):
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
+
 
 def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -150,22 +155,21 @@ def main():
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
-    from zoneinfo import ZoneInfo
-    from datetime import time as dtime
-    TIMEZONE = ZoneInfo("Asia/Riyadh")
-
+    job_queue = app.job_queue
     job_queue.run_repeating(job_expire_bans, interval=300, first=10)
-job_queue.run_daily(job_daily_report, time=dtime(hour=8, minute=0, tzinfo=TIMEZONE))
-job_queue.run_daily(job_daily_quote, time=dtime(hour=9, minute=0, tzinfo=TIMEZONE))
-job_queue.run_daily(
-    job_weekly_report,
-    time=dtime(hour=20, minute=0, tzinfo=TIMEZONE),
-    days=(4,),
-)
+    job_queue.run_daily(job_daily_report, time=dtime(hour=8, minute=0, tzinfo=TIMEZONE))
+    job_queue.run_daily(job_daily_quote, time=dtime(hour=9, minute=0, tzinfo=TIMEZONE))
+    job_queue.run_daily(
+        job_weekly_report,
+        time=dtime(hour=20, minute=0, tzinfo=TIMEZONE),
+        days=(4,),
+    )
+
     app.run_polling(
         allowed_updates=["message", "chat_member", "callback_query"],
         drop_pending_updates=True,
     )
+
 
 if __name__ == "__main__":
     main()
