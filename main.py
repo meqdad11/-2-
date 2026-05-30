@@ -72,38 +72,36 @@ async def handle_text(update: Update, context):
 
     # ── أوامر من الخاص ──
     if chat_type == TGChat.PRIVATE:
-        user_id = update.effective_user.id
-        if user_id not in AUTHORIZED_PM_USERS:
-            return
-        for arabic_cmd, handler in _ARABIC_CMDS.items():
-            if text == arabic_cmd or text.startswith(arabic_cmd + " "):
-                args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
-                context.args = args
-                update.message._unfreeze()
-                update.message.chat = await context.bot.get_chat(GROUP_CHAT_ID)
-                update._unfreeze()
-                await handler(update, context)
-                return
+    user_id = update.effective_user.id
+    if user_id not in AUTHORIZED_PM_USERS:
         return
-
-    # ── أوامر من القروب (الوضع العادي) ──
     for arabic_cmd, handler in _ARABIC_CMDS.items():
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
             args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
             context.args = args
+
+            # تنفيذ الأمر على القروب
+            original_reply = update.message.reply_text
+
+            async def reply_to_pm(*a, **kw):
+                await context.bot.send_message(user_id, *a, **kw)
+
+            async def reply_to_pm_photo(*a, **kw):
+                await context.bot.send_photo(user_id, *a, **kw)
+
+            update.message._unfreeze()
+            update.message.reply_text = reply_to_pm
+            update.message.reply_photo = reply_to_pm_photo
+            update.message.chat = await context.bot.get_chat(GROUP_CHAT_ID)
+            update._unfreeze()
+
             await handler(update, context)
+
+            # استرجع الأصلي
+            update.message._unfreeze()
+            update.message.reply_text = original_reply
             return
-
-    await handle_media_url(update, context)
-    await filter_banned_words(update, context)
-    await auto_reply(update, context)
-    await track_message(update, context)
-
-def main():
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    if not token:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN غير محدد")
-
+    return
     async def post_init(app):
         await db.init_db()
 
