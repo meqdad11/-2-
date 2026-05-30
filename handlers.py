@@ -565,8 +565,6 @@ async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("أمر التذكير يعمل في الخاص فقط.")
         return
     args = context.args
-    # تذكير يومي 20:00 النص
-    # تذكير 20:00 النص
     if not args or len(args) < 2:
         await update.message.reply_text(
             "الاستخدام:\n"
