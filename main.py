@@ -115,9 +115,10 @@ def main():
 
     app = (
         ApplicationBuilder()
-        .token(token)
-        .post_init(post_init)
-        .build()
+    .token(token)
+    .post_init(post_init)
+    .job_queue(True)
+    .build()
     )
 
     app.add_handler(CommandHandler("start", cmd_start))
