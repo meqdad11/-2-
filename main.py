@@ -1,6 +1,7 @@
 import logging
 import os
-from telegram import Update
+import re
+from telegram import Update, Chat as TGChat
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -33,7 +34,6 @@ from handlers import (
     cmd_unlock,
     cmd_report,
     cmd_shafaq,
-    cmd_stats,
     cmd_reminder,
     on_chat_member_updated,
     job_expire_bans,
@@ -84,8 +84,6 @@ _ARABIC_CMDS = {
     "تقرير": cmd_report,
     "القواعد": cmd_rules,
     "شفق": cmd_shafaq,
-    "إحصائيات": cmd_stats,
-    "احصائيات": cmd_stats,
     "تذكير": cmd_reminder,
 }
 
@@ -115,10 +113,9 @@ def main():
 
     app = (
         ApplicationBuilder()
-    .token(token)
-    .post_init(post_init)
-    .job_queue(True)
-    .build()
+        .token(token)
+        .post_init(post_init)
+        .build()
     )
 
     app.add_handler(CommandHandler("start", cmd_start))
@@ -145,7 +142,6 @@ def main():
     app.add_handler(CommandHandler("scsearch", cmd_sc_search))
     app.add_handler(CommandHandler("ytsearch", cmd_yt_search))
     app.add_handler(CommandHandler("download", cmd_download))
-    app.add_handler(CommandHandler("stats", cmd_stats))
     app.add_handler(CommandHandler("reminder", cmd_reminder))
     app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
