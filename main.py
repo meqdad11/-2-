@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-
 from telegram import Update, Chat as TGChat
 from telegram.ext import (
     ApplicationBuilder,
@@ -11,47 +10,23 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
-
 import database as db
 from handlers import (
-    cmd_start,
-    cmd_id,
-    cmd_ban,
-    cmd_unban,
-    cmd_warn,
-    cmd_clearwarn,
-    cmd_warnings,
-    cmd_banlist,
-    cmd_baninfo,
-    cmd_checkban,
-    cmd_eventlog,
-    cmd_setrules,
-    cmd_rules,
-    cmd_add_word,
-    cmd_remove_word,
-    cmd_list_words,
-    cmd_mute,
-    cmd_unmute,
-    cmd_lock,
-    cmd_unlock,
-    cmd_report,
-    cmd_shafaq,
-    on_chat_member_updated,
-    job_expire_bans,
-    job_weekly_report,
-    job_daily_report,
-    track_message,
-    filter_banned_words,
-    auto_reply,
+    cmd_start, cmd_id, cmd_ban, cmd_unban, cmd_warn,
+    cmd_clearwarn, cmd_warnings, cmd_banlist, cmd_baninfo,
+    cmd_checkban, cmd_eventlog, cmd_setrules, cmd_rules,
+    cmd_add_word, cmd_remove_word, cmd_list_words,
+    cmd_mute, cmd_unmute, cmd_lock, cmd_unlock,
+    cmd_report, cmd_shafaq,
+    on_chat_member_updated, job_expire_bans,
+    job_weekly_report, job_daily_report,
+    track_message, filter_banned_words, auto_reply,
+    AUTHORIZED_PM_USERS, GROUP_CHAT_ID,
 )
 from music import (
-    cmd_download,
-    cmd_sc_search,
-    cmd_yt_search,
-    handle_media_url,
-    callback_download,
-    callback_sc_download,
-    callback_yt_pick,
+    cmd_download, cmd_sc_search, cmd_yt_search,
+    handle_media_url, callback_download,
+    callback_sc_download, callback_yt_pick,
 )
 
 logging.basicConfig(
@@ -61,32 +36,31 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 _ARABIC_CMDS = {
-    "ايدي":             cmd_id,
-    "حظر":              cmd_ban,
-    "رفع الحظر":        cmd_unban,
-    "رفع_الحظر":        cmd_unban,
-    "تحذير":            cmd_warn,
-    "قائمة":            cmd_banlist,
-    "معلومات":          cmd_baninfo,
-    "تحقق":             cmd_checkban,
-    "سجل":              cmd_eventlog,
-    "تحميل":            cmd_download,
-    "أضف كلمة":         cmd_add_word,
-    "احذف كلمة":        cmd_remove_word,
+    "ايدي": cmd_id,
+    "حظر": cmd_ban,
+    "رفع الحظر": cmd_unban,
+    "رفع_الحظر": cmd_unban,
+    "تحذير": cmd_warn,
+    "قائمة": cmd_banlist,
+    "معلومات": cmd_baninfo,
+    "تحقق": cmd_checkban,
+    "سجل": cmd_eventlog,
+    "تحميل": cmd_download,
+    "أضف كلمة": cmd_add_word,
+    "احذف كلمة": cmd_remove_word,
     "الكلمات المحظورة": cmd_list_words,
-    "بحث":              cmd_sc_search,
-    "يوتيوب":           cmd_yt_search,
-    "كتم":              cmd_mute,
-    "رفع الكتم":        cmd_unmute,
-    "مسح التحذير":      cmd_clearwarn,
-    "التحذيرات":        cmd_warnings,
-    "أغلق المجموعة":    cmd_lock,
-    "افتح المجموعة":    cmd_unlock,
-    "تقرير":            cmd_report,
-    "القواعد":          cmd_rules,
-    "شفق":              cmd_shafaq,
+    "بحث": cmd_sc_search,
+    "يوتيوب": cmd_yt_search,
+    "كتم": cmd_mute,
+    "رفع الكتم": cmd_unmute,
+    "مسح التحذير": cmd_clearwarn,
+    "التحذيرات": cmd_warnings,
+    "أغلق المجموعة": cmd_lock,
+    "افتح المجموعة": cmd_unlock,
+    "تقرير": cmd_report,
+    "القواعد": cmd_rules,
+    "شفق": cmd_shafaq,
 }
-
 
 async def handle_text(update: Update, context):
     msg = update.message
@@ -99,16 +73,12 @@ async def handle_text(update: Update, context):
     # ── أوامر من الخاص ──
     if chat_type == TGChat.PRIVATE:
         user_id = update.effective_user.id
-        
-        from handlers import AUTHORIZED_PM_USERS, GROUP_CHAT_ID
         if user_id not in AUTHORIZED_PM_USERS:
             return
-
         for arabic_cmd, handler in _ARABIC_CMDS.items():
             if text == arabic_cmd or text.startswith(arabic_cmd + " "):
                 args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
                 context.args = args
-                # نخدع البوت: نحوّل الشات للقروب
                 update.message._unfreeze()
                 update.message.chat = await context.bot.get_chat(GROUP_CHAT_ID)
                 update._unfreeze()
@@ -129,6 +99,11 @@ async def handle_text(update: Update, context):
     await auto_reply(update, context)
     await track_message(update, context)
 
+def main():
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    if not token:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN غير محدد")
+
     async def post_init(app):
         await db.init_db()
 
@@ -139,38 +114,34 @@ async def handle_text(update: Update, context):
         .build()
     )
 
-    app.add_handler(CommandHandler("start",      cmd_start))
-    app.add_handler(CommandHandler("id",         cmd_id))
-    app.add_handler(CommandHandler("ban",        cmd_ban))
-    app.add_handler(CommandHandler("unban",      cmd_unban))
-    app.add_handler(CommandHandler("warn",       cmd_warn))
-    app.add_handler(CommandHandler("clearwarn",  cmd_clearwarn))
-    app.add_handler(CommandHandler("warnings",   cmd_warnings))
-    app.add_handler(CommandHandler("banlist",    cmd_banlist))
-    app.add_handler(CommandHandler("baninfo",    cmd_baninfo))
-    app.add_handler(CommandHandler("checkban",   cmd_checkban))
-    app.add_handler(CommandHandler("eventlog",   cmd_eventlog))
-    app.add_handler(CommandHandler("setrules",   cmd_setrules))
-    app.add_handler(CommandHandler("rules",      cmd_rules))
-    app.add_handler(CommandHandler("mute",       cmd_mute))
-    app.add_handler(CommandHandler("unmute",     cmd_unmute))
-    app.add_handler(CommandHandler("lock",       cmd_lock))
-    app.add_handler(CommandHandler("unlock",     cmd_unlock))
-    app.add_handler(CommandHandler("report",     cmd_report))
-    app.add_handler(CommandHandler("addword",    cmd_add_word))
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("id", cmd_id))
+    app.add_handler(CommandHandler("ban", cmd_ban))
+    app.add_handler(CommandHandler("unban", cmd_unban))
+    app.add_handler(CommandHandler("warn", cmd_warn))
+    app.add_handler(CommandHandler("clearwarn", cmd_clearwarn))
+    app.add_handler(CommandHandler("warnings", cmd_warnings))
+    app.add_handler(CommandHandler("banlist", cmd_banlist))
+    app.add_handler(CommandHandler("baninfo", cmd_baninfo))
+    app.add_handler(CommandHandler("checkban", cmd_checkban))
+    app.add_handler(CommandHandler("eventlog", cmd_eventlog))
+    app.add_handler(CommandHandler("setrules", cmd_setrules))
+    app.add_handler(CommandHandler("rules", cmd_rules))
+    app.add_handler(CommandHandler("mute", cmd_mute))
+    app.add_handler(CommandHandler("unmute", cmd_unmute))
+    app.add_handler(CommandHandler("lock", cmd_lock))
+    app.add_handler(CommandHandler("unlock", cmd_unlock))
+    app.add_handler(CommandHandler("report", cmd_report))
+    app.add_handler(CommandHandler("addword", cmd_add_word))
     app.add_handler(CommandHandler("removeword", cmd_remove_word))
-    app.add_handler(CommandHandler("wordlist",   cmd_list_words))
-    app.add_handler(CommandHandler("scsearch",   cmd_sc_search))
-    app.add_handler(CommandHandler("ytsearch",   cmd_yt_search))
-    app.add_handler(CommandHandler("download",   cmd_download))
-
-    app.add_handler(CallbackQueryHandler(callback_download,    pattern=r"^dl_(audio|video)\|"))
+    app.add_handler(CommandHandler("wordlist", cmd_list_words))
+    app.add_handler(CommandHandler("scsearch", cmd_sc_search))
+    app.add_handler(CommandHandler("ytsearch", cmd_yt_search))
+    app.add_handler(CommandHandler("download", cmd_download))
+    app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
-    app.add_handler(CallbackQueryHandler(callback_yt_pick,     pattern=r"^yt_pick\|"))
-
-    app.add_handler(ChatMemberHandler(on_chat_member_updated,
-                                      ChatMemberHandler.CHAT_MEMBER))
-
+    app.add_handler(CallbackQueryHandler(callback_yt_pick, pattern=r"^yt_pick\|"))
+    app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     job_queue = app.job_queue
@@ -182,7 +153,6 @@ async def handle_text(update: Update, context):
         allowed_updates=["message", "chat_member", "callback_query"],
         drop_pending_updates=True,
     )
-
 
 if __name__ == "__main__":
     main()
