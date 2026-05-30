@@ -509,7 +509,6 @@ async def cmd_list_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from telegram import Chat as TGChat
     user = update.effective_user
-    # إذا في الخاص — يرسل إحصائيات كل المجموعات
     if update.effective_chat.type == TGChat.PRIVATE:
         chats = await db.get_all_active_chats()
         if not chats:
@@ -523,18 +522,17 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
             top_text = ""
             for i, m in enumerate(top, 1):
                 name = await db.get_user_name(chat_id, m['user_id'])
-                top_text += f"  {i}. {name} — {m['message_count']} رسالة\n"
+                top_text += f"  {i}. \u200F{name} — {m['message_count']} رسالة\n"
             msg = (
                 f"📊 إحصائيات — {chat_name}\n"
-                f"{'─'*20}\n"
+                f"{'━'*20}\n"
                 f"👥 الأعضاء: {total}\n"
                 f"🚫 المحظورون: {len(bans)}\n"
-                f"{'─'*20}\n"
+                f"{'━'*20}\n"
                 f"🏆 الأكثر نشاطاً:\n{top_text or 'لا توجد بيانات'}"
             )
             await update.message.reply_text(msg)
     else:
-        # في المجموعة — يرد في الخاص
         if not await require_admin(update, context):
             return
         chat_id = update.effective_chat.id
@@ -545,13 +543,13 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         top_text = ""
         for i, m in enumerate(top, 1):
             name = await db.get_user_name(chat_id, m['user_id'])
-            top_text += f"  {i}. {name} — {m['message_count']} رسالة\n"
+            top_text += f"  {i}. \u200F{name} — {m['message_count']} رسالة\n"
         msg = (
             f"📊 إحصائيات — {chat_name}\n"
-            f"{'─'*20}\n"
+            f"{'━'*20}\n"
             f"👥 الأعضاء: {total}\n"
             f"🚫 المحظورون: {len(bans)}\n"
-            f"{'─'*20}\n"
+            f"{'━'*20}\n"
             f"🏆 الأكثر نشاطاً:\n{top_text or 'لا توجد بيانات'}"
         )
         try:
@@ -563,7 +561,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── تذكير (في الخاص) ─────────────────────────────────────────────────────────
 async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from telegram import Chat as TGChat
-    if update.effective_chat.type != TGChat.PRIVATE:
+    if up جمdate.effective_chat.type != TGChat.PRIVATE:
         await update.message.reply_text("أمر التذكير يعمل في الخاص فقط.")
         return
     args = context.args
