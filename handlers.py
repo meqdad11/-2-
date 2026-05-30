@@ -654,15 +654,15 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             top_text = ""
             for i, m in enumerate(top, 1):
                 name = await db.get_user_name(chat_id, m['user_id'])
-                top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
+                top_text += f"{i}. {name} — {m['message_count']} رسالة\n"
             report = (
                 f"📊 تقرير — {chat_name}\n"
-                f"{'─'*20}\n"
+                f"{'━'*20}\n"
                 f"🚫 محظورون: {len(bans)}\n"
-                f"{'─'*20}\n"
+                f"{'━'*20}\n"
                 f"📋 آخر الإجراءات:\n"
                 + ("\n".join(lines) if lines else "لا توجد إجراءات") +
-                f"\n{'─'*20}\n"
+                f"\n{'━'*20}\n"
                 f"🏆 الأعضاء حسب النشاط:\n{top_text}"
             )
             await update.message.reply_text(report)
@@ -681,17 +681,18 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         top_text = ""
         for i, m in enumerate(top, 1):
             name = await db.get_user_name(chat_id, m['user_id'])
-            top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
+            top_text += f"{i}. {name} — {m['message_count']} رسالة\n"
         report = (
-            f"📊 التقرير\n"
-            f"{'─'*20}\n"
+            f"📊 تقرير — تقرير المجموعة\n"
+            f"{'━'*20}\n"
             f"🚫 محظورون: {len(bans)}\n"
-            f"{'─'*20}\n"
+            f"{'━'*20}\n"
             f"📋 آخر الإجراءات:\n"
             + ("\n".join(lines) if lines else "لا توجد إجراءات") +
-            f"\n{'─'*20}\n"
+            f"\n{'━'*20}\n"
             f"🏆 الأعضاء حسب النشاط:\n{top_text}"
         )
+        await update.message.reply_text(report)
         await update.message.reply_text(report)
 async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
