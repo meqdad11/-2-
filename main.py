@@ -35,6 +35,7 @@ from handlers import (
     cmd_lock,
     cmd_unlock,
     cmd_report,
+    cmd_shafaq,
     on_chat_member_updated,
     job_expire_bans,
     job_weekly_report,
@@ -42,7 +43,6 @@ from handlers import (
     track_message,
     filter_banned_words,
     auto_reply,
-    ask_gemini,
 )
 from music import (
     cmd_download,
@@ -59,6 +59,7 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
 _ARABIC_CMDS = {
     "ايدي":             cmd_id,
     "حظر":              cmd_ban,
@@ -83,6 +84,7 @@ _ARABIC_CMDS = {
     "افتح المجموعة":    cmd_unlock,
     "تقرير":            cmd_report,
     "القواعد":          cmd_rules,
+    "شفق":              cmd_shafaq,
 }
 
 
@@ -100,7 +102,6 @@ async def handle_text(update: Update, context):
     await handle_media_url(update, context)
     await filter_banned_words(update, context)
     await auto_reply(update, context)
-    await ask_gemini(update, context)
     await track_message(update, context)
 
 
