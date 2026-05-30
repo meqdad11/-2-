@@ -3,11 +3,9 @@ import os
 import random
 import aiohttp
 from datetime import datetime, timezone
-
 from telegram import Update, ChatMemberUpdated
 from telegram.ext import ContextTypes
 from telegram.constants import ChatMemberStatus
-
 import database as db
 from helpers import (
     require_admin,
@@ -26,56 +24,28 @@ logger = logging.getLogger(__name__)
 
 MAX_WARNINGS = 3
 ADMIN_CHAT_ID = 729970974
-GROUP_CHAT_ID = -1001461826869
-AUTHORIZED_PM_USERS = {729970974}  # أضف IDs المشرفين هنا
-# ── ردود تلقائية (نسخة المستخدم) ──────────────────────────────────────────
-AUTO_REPLIES = {}
 
-# ── كلمات الأزمات النفسية (نسخة المستخدم) ─────────────────────────────────
+AUTO_REPLIES = {
+    "صباح الخير": ["صباح النور ☀️"],
+    "صباح النور": ["صباح الورد 🌹"],
+    "صباح الورد": ["صباح السعادة ☀️"],
+    "مساء الخير": ["مساء النور 🌙"],
+    "مساء النور": ["مساء الورد 🌹"],
+    "مساء الورد": ["مساء السعادة 🌙"],
+}
+
 CRISIS_KEYWORDS = [
-    "انتحار",
-    "انتحرت",
-    "أنتحر",
-    "بنتحر",
-    "بينتحر",
-    "سأنتحر",
-    "راح انتحر",
-
-    "اقتل نفسي",
-    "أقتل نفسي",
-    "بقتل نفسي",
-    "يقتل نفسه",
-    "يقتل نفسي",
-    "سأقتل نفسي",
-
-    "أذيت",
-    "أذيت نفسي",
-    "اذيت نفسي",
-    "أضر نفسي",
-    "اضر نفسي",
-    "أضر بنفسي",
-
-    "أموت",
-    "بموت",
-    "ابي اموت",
-    "أبي أموت",
-    "ابغى اموت",
-    "أبغى أموت",
-    "ودي أموت",
-    "اتمنى الموت",
-
-    "اخنق نفسي",
-    "أخنق نفسي",
-
-    "suicide",
-    "kill myself",
-    "end my life",
-    "want to die",
-    "self harm",
+    "انتحار", "انتحرت", "أنتحر", "بنتحر", "بينتحر", "سأنتحر", "راح انتحر",
+    "اقتل نفسي", "أقتل نفسي", "بقتل نفسي", "يقتل نفسه", "يقتل نفسي",
+    "سأقتل نفسي", "أذيت", "أذيت نفسي", "اذيت نفسي", "أضر نفسي", "اضر نفسي",
+    "أضر بنفسي", "أموت", "بموت", "ابي اموت", "أبي أموت", "ابغى اموت",
+    "أبغى أموت", "ودي أموت", "اتمنى الموت", "اخنق نفسي", "أخنق نفسي",
+    "suicide", "kill myself", "end my life", "want to die", "self harm",
 ]
 
 CRISIS_REPLY = """
 .يبدو أنك تمر بلحظة صعبة 🆘
+
 أنت لست وحدك 🤍
 
 📞 أرقام الدعم والمساعدة في السعودية:
@@ -92,23 +62,16 @@ CRISIS_REPLY = """
 أو تحدث مع احد المشرفين او الأعضاء ، نحن معك. 💙
 """
 
-
-# ── Gemini عبر HTTP مباشرة (بدون أي مكتبة Google) ─────────────────────────
+# ── Gemini ──────────────────────────────────────────────────────────────────
 async def ask_gemini(question: str) -> str:
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         return "⚠️ مفتاح Gemini غير مضبوط في المتغيرات البيئية."
-
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
         f"gemini-2.0-flash:generateContent?key={api_key}"
     )
-    payload = {
-        "contents": [
-            {"parts": [{"text": question}]}
-        ]
-    }
-
+    payload = {"contents": [{"parts": [{"text": question}]}]}
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as resp:
@@ -117,36 +80,30 @@ async def ask_gemini(question: str) -> str:
                     logger.error("Gemini error %s: %s", resp.status, text)
                     return f"⚠️ خطأ من Gemini ({resp.status}). حاول مرة أخرى."
                 data = await resp.json()
-        answer = (
-            data.get("candidates", [{}])[0]
-            .get("content", {})
-            .get("parts", [{}])[0]
-            .get("text", "")
-            .strip()
-        )
-        return answer or "لم أتلقَّ إجابة من Gemini."
+                answer = (
+                    data.get("candidates", [{}])[0]
+                    .get("content", {})
+                    .get("parts", [{}])[0]
+                    .get("text", "")
+                    .strip()
+                )
+                return answer or "لم أتلقَّ إجابة من Gemini."
     except Exception as e:
         logger.error("Gemini request failed: %s", e)
         return "⚠️ تعذّر الاتصال بـ Gemini. حاول لاحقاً."
 
-
 async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """يُشغَّل عند كتابة: شفق <السؤال>"""
     question = " ".join(context.args).strip() if context.args else ""
     if not question:
         await update.message.reply_text("اكتب سؤالك بعد كلمة شفق.\nمثال: شفق ما هو الذكاء الاصطناعي؟")
         return
-
     thinking_msg = await update.message.reply_text("✨ شفق تفكر...")
     answer = await ask_gemini(question)
-
     try:
         await thinking_msg.delete()
     except Exception:
         pass
-
     await update.message.reply_text(f"🌅 {answer}")
-# ── /start ──────────────────────────────────────────────────────────────────
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "بوت شفق نشط ✅\n\n"
@@ -165,6 +122,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "تحقق — هل هو محظور؟\n"
         "سجل — آخر الأحداث\n"
         "تقرير — تقرير فوري\n"
+        "إحصائيات — إحصائيات المجموعة (في الخاص)\n"
         "أضف كلمة — إضافة كلمة محظورة\n"
         "احذف كلمة — حذف كلمة\n"
         "الكلمات المحظورة — القائمة\n"
@@ -172,9 +130,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "افتح المجموعة — فتح\n"
         "/setrules — تعيين القواعد\n\n"
         "👥 للجميع:\n"
-        "ايدي — معلوماتك + صورتك\n"
+        "ايدي — معلوماتك + عدد رسائلك\n"
         "القواعد — قواعد المجموعة\n"
-        "شفق <سؤال> — اسأل الذكاء الاصطناعي\n\n"
+        "شفق <سؤال> — اسأل الذكاء الاصطناعي\n"
+        "تذكير 20:00 نص — تذكير مرة واحدة (في الخاص)\n"
+        "تذكير يومي 20:00 نص — تذكير يومي (في الخاص)\n\n"
         "🎵 الميديا:\n"
         "أرسل رابط مباشرة — تحميل\n\n"
         "🤖 تلقائي:\n"
@@ -184,19 +144,19 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "تقرير يومي وأسبوعي"
     )
 
-
-# ── ايدي ────────────────────────────────────────────────────────────────────
 async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     reply_user = get_reply_user(update)
     from telegram import Chat as TGChat
     in_group = chat.type in (TGChat.GROUP, TGChat.SUPERGROUP)
+
     if reply_user and reply_user.id != user.id:
         if not in_group or not await is_admin(update, context):
             await update.message.reply_text("لا يمكنك عرض بيانات عضو آخر.")
             return
         username = f"@{reply_user.username}" if reply_user.username else "غير محدد"
+        msg_count = await db.get_message_count(reply_user.id, chat.id)
         try:
             photos = await context.bot.get_user_profile_photos(reply_user.id, limit=1)
             if photos.total_count > 0:
@@ -206,7 +166,8 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"معلومات العضو:\n"
                         f"الاسم: {reply_user.first_name}\n"
                         f"اليوزر: {username}\n"
-                        f"المعرف: {reply_user.id}"
+                        f"المعرف: {reply_user.id}\n"
+                        f"عدد الرسائل: {msg_count} رسالة"
                     )
                 )
                 return
@@ -216,10 +177,12 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"معلومات العضو:\n"
             f"الاسم: {reply_user.first_name}\n"
             f"اليوزر: {username}\n"
-            f"المعرف: {reply_user.id}"
+            f"المعرف: {reply_user.id}\n"
+            f"عدد الرسائل: {msg_count} رسالة"
         )
     else:
         username = f"@{user.username}" if user.username else "غير محدد"
+        msg_count = await db.get_message_count(user.id, chat.id)
         try:
             photos = await context.bot.get_user_profile_photos(user.id, limit=1)
             if photos.total_count > 0:
@@ -229,7 +192,8 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         f"معلوماتك:\n"
                         f"الاسم: {user.first_name}\n"
                         f"اليوزر: {username}\n"
-                        f"المعرف: {user.id}"
+                        f"المعرف: {user.id}\n"
+                        f"عدد رسائلك: {msg_count} رسالة"
                     )
                 )
                 return
@@ -239,11 +203,10 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"معلوماتك:\n"
             f"الاسم: {user.first_name}\n"
             f"اليوزر: {username}\n"
-            f"المعرف: {user.id}"
+            f"المعرف: {user.id}\n"
+            f"عدد رسائلك: {msg_count} رسالة"
         )
 
-
-# ── حظر ─────────────────────────────────────────────────────────────────────
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -275,12 +238,9 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception:
         pass
-    await db.log_event(chat_id, "ban", user_id=banner_id, target_id=user_id,
-                       detail=f"reason={reason}")
+    await db.log_event(chat_id, "ban", user_id=banner_id, target_id=user_id, detail=f"reason={reason}")
     await db.log_bot_action(chat_id, "ban", user_id=user_id, detail=reason)
 
-
-# ── رفع الحظر ───────────────────────────────────────────────────────────────
 async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -318,8 +278,6 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(f"المستخدم {user_id} غير موجود في قائمة الحظر.")
 
-
-# ── تحذير ───────────────────────────────────────────────────────────────────
 async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -328,10 +286,12 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_user = get_reply_user(update)
     if reply_user:
         user_id = reply_user.id
+        user_name = reply_user.full_name
         reason = " ".join(context.args) if context.args else None
     elif context.args:
         try:
             user_id = int(context.args[0])
+            user_name = str(user_id)
             reason = " ".join(context.args[1:]) or None
         except ValueError:
             await update.message.reply_text("قم بالرد أو أرسل: تحذير <معرف> [سبب]")
@@ -350,7 +310,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.warning("تعذّر الحظر التلقائي: %s", e)
         await db.clear_warnings(user_id, chat_id)
         await update.message.reply_text(
-            f"⛔ تم حظر المستخدم {user_id} تلقائياً بعد {MAX_WARNINGS} تحذيرات.{reason_text}"
+            f"⛔ تم حظر {user_name} ({user_id}) تلقائياً بعد {MAX_WARNINGS} تحذيرات.{reason_text}"
         )
         try:
             await context.bot.send_message(
@@ -360,15 +320,11 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except Exception:
             pass
-        await db.log_bot_action(chat_id, "auto_ban", user_id=user_id,
-                                detail=f"بعد {MAX_WARNINGS} تحذيرات")
+        await db.log_bot_action(chat_id, "auto_ban", user_id=user_id, detail=f"بعد {MAX_WARNINGS} تحذيرات")
     else:
         await update.message.reply_text(
-            f"⚠️ تحذير {count}/{MAX_WARNINGS} للمستخدم {user_id}.{reason_text}"
+            f"⚠️ تحذير {count}/{MAX_WARNINGS} للعضو {user_name} ({user_id}).{reason_text}"
         )
-
-
-# ── مسح التحذير ─────────────────────────────────────────────────────────────
 async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -388,8 +344,6 @@ async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.clear_warnings(user_id, chat_id)
     await update.message.reply_text(f"✅ تم مسح تحذيرات المستخدم {user_id}.")
 
-
-# ── التحذيرات ───────────────────────────────────────────────────────────────
 async def cmd_warnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -411,8 +365,6 @@ async def cmd_warnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"عدد تحذيرات المستخدم {user_id}: {count}/{MAX_WARNINGS}"
     )
 
-
-# ── قائمة ────────────────────────────────────────────────────────────────────
 async def cmd_banlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -427,8 +379,6 @@ async def cmd_banlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines.append(f"• {b['user_id']}{exp}")
     await update.message.reply_text("🚫 المحظورون:\n" + "\n".join(lines))
 
-
-# ── معلومات ──────────────────────────────────────────────────────────────────
 async def cmd_baninfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -457,8 +407,6 @@ async def cmd_baninfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"ينتهي: {exp}"
     )
 
-
-# ── تحقق ─────────────────────────────────────────────────────────────────────
 async def cmd_checkban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -481,8 +429,7 @@ async def cmd_checkban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(f"❌ المستخدم {user_id} غير محظور.")
 
-
-# ── سجل ──────────────────────────────────────────────────────────────────────
+# ── سجل (محسّن: اسم + ايدي) ──────────────────────────────────────────────────
 async def cmd_eventlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -492,11 +439,13 @@ async def cmd_eventlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not events:
         await update.message.reply_text("لا توجد أحداث مسجلة.")
         return
-    lines = [f"• {e['action']} — {e['created_at'][:16]}" for e in events]
+    lines = []
+    for e in events:
+        uid = e.get('target_id') or e.get('user_id')
+        name = await db.get_user_name(chat_id, uid) if uid else "—"
+        lines.append(f"• {e['action']} | {name} ({uid}) — {e['created_at'][:16]}")
     await update.message.reply_text("📋 سجل الأحداث:\n" + "\n".join(lines))
 
-
-# ── القواعد ───────────────────────────────────────────────────────────────────
 async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -508,7 +457,6 @@ async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.set_setting(chat_id, "rules", rules)
     await update.message.reply_text("✅ تم تعيين قواعد المجموعة.")
 
-
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     rules = await db.get_setting(chat_id, "rules")
@@ -516,7 +464,7 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"📋 قواعد المجموعة:\n{rules}")
     else:
         await update.message.reply_text("لم يتم تعيين قواعد بعد.")
-# ── الكلمات المحظورة ──────────────────────────────────────────────────────────
+
 async def cmd_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -530,7 +478,6 @@ async def cmd_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ تمت إضافة الكلمة: {word}")
     else:
         await update.message.reply_text(f"الكلمة '{word}' موجودة مسبقاً.")
-
 
 async def cmd_remove_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
@@ -546,7 +493,6 @@ async def cmd_remove_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text(f"الكلمة '{word}' غير موجودة.")
 
-
 async def cmd_list_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -559,8 +505,194 @@ async def cmd_list_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🚫 الكلمات المحظورة:\n" + "\n".join(f"• {w}" for w in words)
     )
 
+# ── إحصائيات (في الخاص) ──────────────────────────────────────────────────────
+async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from telegram import Chat as TGChat
+    user = update.effective_user
+    # إذا في الخاص — يرسل إحصائيات كل المجموعات
+    if update.effective_chat.type == TGChat.PRIVATE:
+        chats = await db.get_all_active_chats()
+        if not chats:
+            await update.message.reply_text("لا توجد مجموعات مسجلة بعد.")
+            return
+        for chat_id in chats:
+            total = await db.get_total_members(chat_id)
+            bans = await db.get_ban_list(chat_id)
+            chat_name = await db.get_chat_name(chat_id)
+            top = await db.get_top_members(chat_id, 3)
+            top_text = ""
+            for i, m in enumerate(top, 1):
+                name = await db.get_user_name(chat_id, m['user_id'])
+                top_text += f"  {i}. {name} — {m['message_count']} رسالة\n"
+            msg = (
+                f"📊 إحصائيات — {chat_name}\n"
+                f"{'─'*20}\n"
+                f"👥 الأعضاء: {total}\n"
+                f"🚫 المحظورون: {len(bans)}\n"
+                f"{'─'*20}\n"
+                f"🏆 الأكثر نشاطاً:\n{top_text or 'لا توجد بيانات'}"
+            )
+            await update.message.reply_text(msg)
+    else:
+        # في المجموعة — يرد في الخاص
+        if not await require_admin(update, context):
+            return
+        chat_id = update.effective_chat.id
+        total = await db.get_total_members(chat_id)
+        bans = await db.get_ban_list(chat_id)
+        chat_name = await db.get_chat_name(chat_id)
+        top = await db.get_top_members(chat_id, 3)
+        top_text = ""
+        for i, m in enumerate(top, 1):
+            name = await db.get_user_name(chat_id, m['user_id'])
+            top_text += f"  {i}. {name} — {m['message_count']} رسالة\n"
+        msg = (
+            f"📊 إحصائيات — {chat_name}\n"
+            f"{'─'*20}\n"
+            f"👥 الأعضاء: {total}\n"
+            f"🚫 المحظورون: {len(bans)}\n"
+            f"{'─'*20}\n"
+            f"🏆 الأكثر نشاطاً:\n{top_text or 'لا توجد بيانات'}"
+        )
+        try:
+            await context.bot.send_message(user.id, msg)
+            await update.message.reply_text("✅ تم إرسال الإحصائيات في الخاص.")
+        except Exception:
+            await update.message.reply_text("❌ فعّل محادثة الخاص مع البوت أولاً.")
 
-# ── فلتر الكلمات المحظورة + كلمات الأزمات ────────────────────────────────────
+# ── تذكير (في الخاص) ─────────────────────────────────────────────────────────
+async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from telegram import Chat as TGChat
+    if update.effective_chat.type != TGChat.PRIVATE:
+        await update.message.reply_text("أمر التذكير يعمل في الخاص فقط.")
+        return
+    args = context.args
+    # تذكير يومي 20:00 النص
+    # تذكير 20:00 النص
+    if not args or len(args) < 2:
+        await update.message.reply_text(
+            "الاستخدام:\n"
+            "تذكير 20:00 نص الرسالة\n"
+            "تذكير يومي 20:00 نص الرسالة"
+        )
+        return
+    daily = False
+    if args[0] == "يومي":
+        daily = True
+        args = args[1:]
+    time_str = args[0]
+    text = " ".join(args[1:])
+    if not text:
+        await update.message.reply_text("اكتب نص التذكير بعد الوقت.")
+        return
+    try:
+        hour, minute = map(int, time_str.split(":"))
+        assert 0 <= hour <= 23 and 0 <= minute <= 59
+    except Exception:
+        await update.message.reply_text("صيغة الوقت خاطئة. استخدم مثلاً: 20:00")
+        return
+    user_id = update.effective_user.id
+    if daily:
+        context.job_queue.run_daily(
+            _send_reminder,
+            time=datetime.now(timezone.utc).replace(hour=hour, minute=minute, second=0, microsecond=0).timetz(),
+            chat_id=user_id,
+            name=f"reminder_{user_id}_{hour}_{minute}",
+            data=text,
+        )
+        await update.message.reply_text(f"✅ تم ضبط تذكير يومي الساعة {time_str}:\n{text}")
+    else:
+        from datetime import timedelta
+        now = datetime.now(timezone.utc)
+        target = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if target <= now:
+            target += timedelta(days=1)
+        delay = (target - now).total_seconds()
+        context.job_queue.run_once(
+            _send_reminder,
+            when=delay,
+            chat_id=user_id,
+            name=f"reminder_{user_id}_{hour}_{minute}",
+            data=text,
+        )
+        await update.message.reply_text(f"✅ تم ضبط تذكير الساعة {time_str}:\n{text}")
+
+async def _send_reminder(context: ContextTypes.DEFAULT_TYPE):
+    await context.bot.send_message(
+        chat_id=context.job.chat_id,
+        text=f"🔔 تذكير:\n{context.job.data}"
+    )
+
+# ── تقرير (محسّن: كل الأعضاء + اسم في الإجراءات) ────────────────────────────
+async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from datetime import timedelta
+    from telegram import Chat as TGChat
+    is_private = update.effective_chat.type == TGChat.PRIVATE
+    if not is_private:
+        if not await require_admin(update, context):
+            return
+        if update.effective_user.id != ADMIN_CHAT_ID:
+            await update.message.reply_text("غير مصرح لك.")
+            return
+    if is_private:
+        chats = await db.get_all_active_chats()
+        if not chats:
+            await update.message.reply_text("لا توجد مجموعات مسجلة بعد.")
+            return
+        for chat_id in chats:
+            now = datetime.now(timezone.utc)
+            day_ago = (now - timedelta(days=1)).isoformat()
+            actions = await db.get_bot_actions_since(chat_id, day_ago)
+            bans = await db.get_ban_list(chat_id)
+            top = await db.get_top_members(chat_id, 999)
+            chat_name = await db.get_chat_name(chat_id)
+            lines = []
+            for a in actions[:10]:
+                name = await db.get_user_name(chat_id, a['user_id'])
+                detail = f" — {a['detail']}" if a.get('detail') else ""
+                lines.append(f"• {a['action']} | {name} ({a['user_id']}){detail}")
+            top_text = ""
+            for i, m in enumerate(top, 1):
+                name = await db.get_user_name(chat_id, m['user_id'])
+                top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
+            report = (
+                f"📊 تقرير — {chat_name}\n"
+                f"{'─'*20}\n"
+                f"🚫 محظورون: {len(bans)}\n"
+                f"{'─'*20}\n"
+                f"📋 آخر الإجراءات:\n"
+                + ("\n".join(lines) if lines else "لا توجد إجراءات") +
+                f"\n{'─'*20}\n"
+                f"🏆 الأعضاء حسب النشاط:\n{top_text}"
+            )
+            await update.message.reply_text(report)
+    else:
+        now = datetime.now(timezone.utc)
+        day_ago = (now - timedelta(days=1)).isoformat()
+        chat_id = update.effective_chat.id
+        actions = await db.get_bot_actions_since(chat_id, day_ago)
+        bans = await db.get_ban_list(chat_id)
+        top = await db.get_top_members(chat_id, 999)
+        lines = []
+        for a in actions[:20]:
+            name = await db.get_user_name(chat_id, a['user_id'])
+            detail = f" — {a['detail']}" if a.get('detail') else ""
+            lines.append(f"• {a['action']} | {name} ({a['user_id']}){detail}")
+        top_text = ""
+        for i, m in enumerate(top, 1):
+            name = await db.get_user_name(chat_id, m['user_id'])
+            top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
+        report = (
+            f"📊 التقرير\n"
+            f"{'─'*20}\n"
+            f"🚫 محظورون: {len(bans)}\n"
+            f"{'─'*20}\n"
+            f"📋 آخر الإجراءات:\n"
+            + ("\n".join(lines) if lines else "لا توجد إجراءات") +
+            f"\n{'─'*20}\n"
+            f"🏆 الأعضاء حسب النشاط:\n{top_text}"
+        )
+        await update.message.reply_text(report)
 async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.text:
@@ -571,8 +703,6 @@ async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = update.effective_chat.id
     user = update.effective_user
     text = msg.text.lower()
-
-    # ── فحص كلمات الأزمات النفسية (للجميع) ──
     for keyword in CRISIS_KEYWORDS:
         if keyword.lower() in text:
             try:
@@ -580,8 +710,6 @@ async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE
             except Exception as e:
                 logger.error("خطأ في إرسال رسالة الأزمة: %s", e)
             return
-
-    # ── فحص الكلمات المحظورة العادية (للأعضاء فقط) ──
     if await is_admin(update, context):
         return
     words = await db.get_banned_words(chat_id)
@@ -612,8 +740,6 @@ async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE
                 )
             return
 
-
-# ── كتم ──────────────────────────────────────────────────────────────────────
 async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -647,8 +773,6 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ تعذّر الكتم: {e}")
 
-
-# ── رفع الكتم ────────────────────────────────────────────────────────────────
 async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -681,8 +805,6 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ تعذّر رفع الكتم: {e}")
 
-
-# ── أغلق / افتح المجموعة ────────────────────────────────────────────────────
 async def cmd_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -696,7 +818,6 @@ async def cmd_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.log_event(chat_id, "lock", user_id=update.effective_user.id)
     except Exception as e:
         await update.message.reply_text(f"❌ تعذّر الإغلاق: {e}")
-
 
 async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
@@ -719,78 +840,6 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"❌ تعذّر الفتح: {e}")
 
-
-# ── تقرير ────────────────────────────────────────────────────────────────────
-async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from datetime import timedelta
-    from telegram import Chat as TGChat
-    is_private = update.effective_chat.type == TGChat.PRIVATE
-    if not is_private:
-        if not await require_admin(update, context):
-            return
-    if update.effective_user.id != ADMIN_CHAT_ID:
-        await update.message.reply_text("غير مصرح لك.")
-        return
-    if is_private:
-        chats = await db.get_all_active_chats()
-        if not chats:
-            await update.message.reply_text("لا توجد مجموعات مسجلة بعد.")
-            return
-        for chat_id in chats:
-            now = datetime.now(timezone.utc)
-            day_ago = (now - timedelta(days=1)).isoformat()
-            actions = await db.get_bot_actions_since(chat_id, day_ago)
-            bans = await db.get_ban_list(chat_id)
-            top = await db.get_top_members(chat_id, 5)
-            chat_name = await db.get_chat_name(chat_id)
-            lines = []
-            for a in actions[:10]:
-                detail = f" — {a['detail']}" if a.get('detail') else ""
-                lines.append(f"• {a['action']} | {a['user_id']}{detail}")
-            top_text = ""
-            for i, m in enumerate(top, 1):
-                name = await db.get_user_name(chat_id, m['user_id'])
-                top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
-            report = (
-                f"📊 تقرير — {chat_name}\n"
-                f"{'─'*20}\n"
-                f"🚫 محظورون: {len(bans)}\n"
-                f"{'─'*20}\n"
-                f"📋 آخر الإجراءات:\n"
-                + ("\n".join(lines) if lines else "لا توجد إجراءات") +
-                f"\n{'─'*20}\n"
-                f"🏆 الأكثر نشاطاً:\n{top_text}"
-            )
-            await update.message.reply_text(report)
-    else:
-        now = datetime.now(timezone.utc)
-        day_ago = (now - timedelta(days=1)).isoformat()
-        chat_id = update.effective_chat.id
-        actions = await db.get_bot_actions_since(chat_id, day_ago)
-        bans = await db.get_ban_list(chat_id)
-        top = await db.get_top_members(chat_id, 5)
-        lines = []
-        for a in actions[:20]:
-            detail = f" — {a['detail']}" if a.get('detail') else ""
-            lines.append(f"• {a['action']} | {a['user_id']}{detail}")
-        top_text = ""
-        for i, m in enumerate(top, 1):
-            name = await db.get_user_name(chat_id, m['user_id'])
-            top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
-        report = (
-            f"📊 التقرير\n"
-            f"{'─'*20}\n"
-            f"🚫 محظورون: {len(bans)}\n"
-            f"{'─'*20}\n"
-            f"📋 آخر الإجراءات:\n"
-            + ("\n".join(lines) if lines else "لا توجد إجراءات") +
-            f"\n{'─'*20}\n"
-            f"🏆 الأكثر نشاطاً:\n{top_text}"
-        )
-        await update.message.reply_text(report)
-
-
-# ── وظائف دورية ──────────────────────────────────────────────────────────────
 async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
     chats = await db.get_all_active_chats()
     for chat_id in chats:
@@ -820,7 +869,6 @@ async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
-
 async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
     chats = await db.get_all_active_chats()
     for chat_id in chats:
@@ -843,8 +891,6 @@ async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
 
-
-# ── استقبال الأعضاء الجدد / طرد المحظورين ───────────────────────────────────
 async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_TYPE):
     result = update.chat_member
     if not result:
@@ -862,16 +908,12 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
                 except Exception as e:
                     logger.warning("تعذّر طرد المحظور: %s", e)
                 reason = ban.get('reason') or 'لم يُحدد سبب'
-                notice = (
-                    f"⚠️ تنبيه للمشرفين!\n"
-                    f"المستخدم {user.full_name} (ID: {user.id})\n"
-                    f"حاول الدخول وهو محظور مسبقاً.\n"
-                    f"سبب الحظر: {reason}\n"
-                    f"تم طرده تلقائياً. 🚫"
-                )
                 await context.bot.send_message(chat_id, f"⚠️ تم طرد عضو محظور تلقائياً.")
                 try:
-                    await context.bot.send_message(ADMIN_CHAT_ID, notice)
+                    await context.bot.send_message(
+                        ADMIN_CHAT_ID,
+                        f"⚠️ تنبيه!\n{user.full_name} ({user.id}) حاول الدخول وهو محظور.\nسبب الحظر: {reason}\nتم طرده تلقائياً. 🚫"
+                    )
                 except Exception:
                     pass
                 await db.log_bot_action(chat_id, "auto_kick_banned", user_id=user.id, detail=reason)
@@ -886,21 +928,12 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
                         f"يرجى الالتزام بالقواعد واحترام الجميع."
                     )
                     if photos.total_count > 0:
-                        await context.bot.send_photo(
-                            chat_id,
-                            photo=photos.photos[0][-1].file_id,
-                            caption=welcome
-                        )
+                        await context.bot.send_photo(chat_id, photo=photos.photos[0][-1].file_id, caption=welcome)
                     else:
                         await context.bot.send_message(chat_id, welcome)
                 except Exception:
-                    await context.bot.send_message(
-                        chat_id,
-                        f"👋 أهلاً {user.first_name}! نرحب بك في مجموعتنا. 😊"
-                    )
+                    await context.bot.send_message(chat_id, f"👋 أهلاً {user.first_name}! نرحب بك في مجموعتنا. 😊")
 
-
-# ── الردود التلقائية ──────────────────────────────────────────────────────────
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.text:
@@ -916,8 +949,6 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.bot.username and f"@{context.bot.username.lower()}" in text.lower():
         await msg.reply_text("هلا! كيف أقدر أساعدك؟ 😊")
 
-
-# ── تتبع الرسائل ──────────────────────────────────────────────────────────────
 async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.effective_user:
         return
@@ -930,8 +961,6 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-
-# ── انتهاء الحظر ─────────────────────────────────────────────────────────────
 async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
     expired = await db.get_expired_bans()
     for ban in expired:
@@ -940,13 +969,7 @@ async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
         await db.remove_ban(user_id, chat_id)
         try:
             await context.bot.unban_chat_member(chat_id, user_id, only_if_banned=True)
-            await context.bot.send_message(
-                chat_id,
-                f"انتهت مدة حظر المستخدم {user_id}. يمكنه الانضمام مجدداً."
-            )
-            await context.bot.send_message(
-                user_id,
-                "✅ انتهت مدة حظرك. يمكنك الانضمام للمجموعة مجدداً."
-            )
+            await context.bot.send_message(chat_id, f"انتهت مدة حظر المستخدم {user_id}. يمكنه الانضمام مجدداً.")
+            await context.bot.send_message(user_id, "✅ انتهت مدة حظرك. يمكنك الانضمام للمجموعة مجدداً.")
         except Exception as e:
             logger.warning("خطأ في رفع الحظر: %s", e)
