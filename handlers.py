@@ -561,7 +561,7 @@ async def cmd_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── تذكير (في الخاص) ─────────────────────────────────────────────────────────
 async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from telegram import Chat as TGChat
-    if up جمdate.effective_chat.type != TGChat.PRIVATE:
+    if update.effective_chat.type != TGChat.PRIVATE:
         await update.message.reply_text("أمر التذكير يعمل في الخاص فقط.")
         return
     args = context.args
