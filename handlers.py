@@ -26,7 +26,8 @@ logger = logging.getLogger(__name__)
 
 MAX_WARNINGS = 3
 ADMIN_CHAT_ID = 729970974
-
+GROUP_CHAT_ID = -1001461826869
+AUTHORIZED_PM_USERS = {729970974}  # أضف IDs المشرفين هنا
 # ── ردود تلقائية (نسخة المستخدم) ──────────────────────────────────────────
 AUTO_REPLIES = {
     "صباح الخير": ["صباح النور ☀️"],
