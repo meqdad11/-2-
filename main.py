@@ -1,7 +1,6 @@
 import logging
 import os
-import re
-from telegram import Update, Chat as TGChat
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -59,6 +58,7 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
 _ARABIC_CMDS = {
     "ايدي": cmd_id,
     "حظر": cmd_ban,
@@ -104,6 +104,7 @@ async def handle_text(update: Update, context):
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
+
 def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     if not token:
@@ -138,13 +139,17 @@ def main():
     app.add_handler(CommandHandler("unlock", cmd_unlock))
     app.add_handler(CommandHandler("report", cmd_report))
     app.add_handler(CommandHandler("addword", cmd_add_word))
-app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
+    app.add_handler(CommandHandler("removeword", cmd_remove_word))
+    app.add_handler(CommandHandler("wordlist", cmd_list_words))
+    app.add_handler(CommandHandler("scsearch", cmd_sc_search))
+    app.add_handler(CommandHandler("ytsearch", cmd_yt_search))
+    app.add_handler(CommandHandler("download", cmd_download))
+    app.add_handler(CommandHandler("stats", cmd_stats))
+    app.add_handler(CommandHandler("reminder", cmd_reminder))
+    app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
     app.add_handler(CallbackQueryHandler(callback_yt_pick, pattern=r"^yt_pick\|"))
-
-    app.add_handler(ChatMemberHandler(on_chat_member_updated,
-                                      ChatMemberHandler.CHAT_MEMBER))
-
+    app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     job_queue = app.job_queue
@@ -159,10 +164,3 @@ app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|vid
 
 if __name__ == "__main__":
     main()
-    app.add_handler(CommandHandler("removeword", cmd_remove_word))
-    app.add_handler(CommandHandler("wordlist", cmd_list_words))
-    app.add_handler(CommandHandler("scsearch", cmd_sc_search))
-    app.add_handler(CommandHandler("ytsearch", cmd_yt_search))
-    app.add_handler(CommandHandler("download", cmd_download))
-    app.add_handler(CommandHandler("stats", cmd_stats))
-    app.add_handler(CommandHandler("reminder", cmd_reminder))
