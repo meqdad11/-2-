@@ -648,11 +648,11 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             for a in actions[:10]:
                 name = await db.get_user_name(chat_id, a['user_id'])
                 detail = f" — {a['detail']}" if a.get('detail') else ""
-                lines.append(f"• {a['action']} | \u202B{name}\u202C ({a['user_id']}){detail}")
+                lines.append(f"\u200F• {a['action']} | \u202B{name}\u202C ({a['user_id']}){detail}")
             top_text = ""
             for i, m in enumerate(top, 1):
                 name = await db.get_user_name(chat_id, m['user_id'])
-                top_text += f"{i}. \u202B{name}\u202C — {m['message_count']} رسالة\n"
+                top_text += f"\u200F{i}. \u202B{name}\u202C — {m['message_count']} رسالة\n"
             report = (
                 f"📊 تقرير — {chat_name}\n"
                 f"{'━'*20}\n"
@@ -675,11 +675,11 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for a in actions[:20]:
             name = await db.get_user_name(chat_id, a['user_id'])
             detail = f" — {a['detail']}" if a.get('detail') else ""
-            lines.append(f"• {a['action']} | \u202B{name}\u202C ({a['user_id']}){detail}")
+            lines.append(f"\u200F• {a['action']} | \u202B{name}\u202C ({a['user_id']}){detail}")
         top_text = ""
         for i, m in enumerate(top, 1):
             name = await db.get_user_name(chat_id, m['user_id'])
-            top_text += f"{i}. \u202B{name}\u202C — {m['message_count']} رسالة\n"
+            top_text += f"\u200F{i}. \u202B{name}\u202C — {m['message_count']} رسالة\n"
         report = (
             f"📊 تقرير المجموعة\n"
             f"{'━'*20}\n"
