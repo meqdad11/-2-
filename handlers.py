@@ -70,6 +70,59 @@ CRISIS_REPLY = """
 
 """
 
+DAILY_QUOTES = [
+    "الأمل لا يموت ما دام القلب ينبض. 🤍",
+    "كل يوم جديد فرصة لتبدأ من جديد. 🌅",
+    "أنت أقوى مما تظن، وأشجع مما تعتقد. 💪",
+    "الألم مؤقت، لكن قوتك دائمة. 🌟",
+    "لست وحدك في هذا الطريق. 🤝",
+    "خطوة صغيرة كل يوم تصنع فرقاً كبيراً. 👣",
+    "تقبّل نفسك كما أنت، فأنت تستحق الحب. 🌸",
+    "العواصف لا تدوم، والشمس ستشرق من جديد. ☀️",
+    "طلب المساعدة شجاعة، وليس ضعفاً. 🦋",
+    "أنت تستحق السعادة مثل أي شخص آخر. 🌈",
+    "الصبر مفتاح الفرج، ولا يضيع مع الصبر شيء. 🗝️",
+    "كل غيمة لها حاشية مضيئة. ⛅",
+    "أجمل القصص من كُتبت بعد أصعب الفصول. 📖",
+    "أنت لم تصل لهنا بالصدفة، أنت هنا لسبب. 🌟",
+    "التعافي ليس خطاً مستقيماً، وهذا طبيعي تماماً. 💙",
+    "كن لطيفاً مع نفسك، فأنت تبذل قصارى جهدك. 🤍",
+    "الجروح التي لا تُرى تستحق الاهتمام أيضاً. 🌿",
+    "لا تقارن معركتك بمعارك الآخرين، كل إنسان له طريقه. 🛤️",
+    "أحياناً النجاة هي الإنجاز الأعظم. 🏅",
+    "حتى في أحلك اللحظات، أنت لست عبئاً. 🕊️",
+    "الاعتناء بنفسك ليس أنانية، بل ضرورة. 🌺",
+    "ما تشعر به حقيقي ومهم ويستحق أن يُسمع. 👂",
+    "كل يوم تستيقظ فيه هو انتصار جديد. 🌄",
+    "أنت أكثر من مجرد أسوأ أيامك. ✨",
+    "التعب شعور مؤقت، لكن إرادتك أقوى. 🔥",
+    "الشفاء يأخذ وقته، ولا بأس في ذلك. 🌱",
+    "مهما كان الظلام، النجوم دائماً موجودة. ⭐",
+    "أنت تستحق من يسمعك ويفهمك. 💜",
+    "اليوم الصعب لن يدوم، لكن قوتك ستدوم. 💎",
+    "حتى أصغر خطوة للأمام هي تقدم. 🚶",
+    "البكاء لا يعني الضعف، يعني أنك إنسان. 🌧️",
+    "أنت لم تصمد كل هذا الوقت لتستسلم الآن. 🛡️",
+    "المساعدة موجودة، وأنت تستحقها. 🤲",
+    "كل لحظة صعبة تمر بها تجعلك أحكم. 🦅",
+    "روحك تستحق الراحة والسلام. 🕊️",
+    "أنت كافٍ تماماً كما أنت. 🌟",
+    "لا تحكم على يومك كله بلحظة واحدة سيئة. ⏳",
+    "الشجرة الأقوى هي التي اجتازت أشد العواصف. 🌳",
+    "أنت تستحق الاهتمام حتى في أيامك الصعبة. 💗",
+    "ما تمر به الآن سيصبح يوماً ما قوتك. ⚡",
+    "الأمل بذرة صغيرة لكنها تُثمر أشجاراً عظيمة. 🌳",
+    "أنت لست مكسوراً، أنت في طور التعافي. 🦋",
+    "اسمح لنفسك بأن تكون بخير. 🌈",
+    "حتى الليل الأطول ينتهي عند الفجر. 🌙",
+    "كلمة طيبة قد تغير يوم شخص بأكمله. 💬",
+    "أنت تستحق أن تُحَب بكل عيوبك. 🌸",
+    "التعافي يبدأ بخطوة واحدة، مهما كانت صغيرة. 👣",
+    "الصعوبات التي تواجهها الآن تصقل شخصيتك. 💠",
+    "أنت أهم بكثير مما تتخيل. 🌟",
+    "غداً فرصة جديدة، وأنت جاهز لها. 🌅",
+]
+
 async def ask_gemini(question: str) -> str:
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
@@ -148,6 +201,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "طرد المحظورين تلقائياً\n"
         "حذف الكلمات المحظورة\n"
         "ترحيب بالأعضاء الجدد\n"
+        "اقتباس يومي الساعة 9 صباحاً\n"
         "تقرير يومي وأسبوعي"
     )
 
@@ -226,9 +280,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.warning("تعذّر الحظر: %s", e)
     reason_text = f"\nالسبب: {reason}" if reason else ""
     duration_text = f"\nالمدة: {fmt_duration(duration)}" if duration else "\nالمدة: دائم"
-    await update.message.reply_text(
-        f"🚫 تم حظر المستخدم {user_id}.{duration_text}{reason_text}"
-    )
+    await update.message.reply_text(f"🚫 تم حظر المستخدم {user_id}.{duration_text}{reason_text}")
     try:
         await context.bot.send_message(
             user_id,
@@ -776,6 +828,18 @@ async def _send_reminder(context: ContextTypes.DEFAULT_TYPE):
         text=f"🔔 تذكير:\n{context.job.data}"
     )
 
+async def job_daily_quote(context: ContextTypes.DEFAULT_TYPE):
+    chats = await db.get_all_active_chats()
+    quote = random.choice(DAILY_QUOTES)
+    for chat_id in chats:
+        try:
+            await context.bot.send_message(
+                chat_id,
+                f"🌅 اقتباس اليوم:\n\n{quote}"
+            )
+        except Exception as e:
+            logger.warning("خطأ في إرسال اقتباس اليوم للمجموعة %s: %s", chat_id, e)
+
 async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
     chats = await db.get_all_active_chats()
     for chat_id in chats:
@@ -851,7 +915,7 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
                     f"سبب الحظر: {reason}\n"
                     f"تم طرده تلقائياً. 🚫"
                 )
-                await context.bot.send_message(chat_id, f"⚠️ تم طرد عضو محظور تلقائياً.")
+                await context.bot.send_message(chat_id, "⚠️ تم طرد عضو محظور تلقائياً.")
                 try:
                     await context.bot.send_message(ADMIN_CHAT_ID, notice)
                 except Exception:
