@@ -190,8 +190,9 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not question:
         await update.message.reply_text("اكتب سؤالك بعد كلمة شفق.\nمثال: شفق ما هو الذكاء الاصطناعي؟")
         return
+    user_id = update.effective_user.id
     thinking_msg = await update.message.reply_text("✨ شفق تفكر...")
-    answer = await ask_gemini(question)
+    answer = await ask_gemini(user_id, question)
     try:
         await thinking_msg.delete()
     except Exception:
