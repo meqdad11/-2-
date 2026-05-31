@@ -52,6 +52,7 @@ from handlers_jobs import (
     job_expire_bans,
     job_weekly_report,
     job_daily_report,
+    cmd_report,
 )
 from music import (
     cmd_download,
