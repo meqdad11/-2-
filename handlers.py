@@ -134,34 +134,37 @@ DAILY_QUOTES = [
 ]
 
 async def ask_gemini(question: str) -> str:
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
-        return "⚠️ مفتاح Gemini غير مضبوط في المتغيرات البيئية."
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.0-flash:generateContent?key={api_key}"
-    )
-    payload = {"contents": [{"parts": [{"text": question}]}]}
+        return "⚠️ مفتاح Groq غير مضبوط في المتغيرات البيئية."
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [{"role": "user", "content": question}],
+        "max_tokens": 1024,
+    }
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+            async with session.post(url, headers=headers, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 if resp.status != 200:
                     text = await resp.text()
-                    logger.error("Gemini error %s: %s", resp.status, text)
-                    return f"⚠️ خطأ من Gemini ({resp.status}). حاول مرة أخرى."
+                    logger.error("Groq error %s: %s", resp.status, text)
+                    return f"⚠️ خطأ من Groq ({resp.status}). حاول مرة أخرى."
                 data = await resp.json()
                 answer = (
-                    data.get("candidates", [{}])[0]
-                    .get("content", {})
-                    .get("parts", [{}])[0]
-                    .get("text", "")
+                    data.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
                     .strip()
                 )
-                return answer or "لم أتلقَّ إجابة من Gemini."
+                return answer or "لم أتلقَّ إجابة من Groq."
     except Exception as e:
-        logger.error("Gemini request failed: %s", e)
-        return "⚠️ تعذّر الاتصال بـ Gemini. حاول لاحقاً."
-
+        logger.error("Groq request failed: %s", e)
+        return "⚠️ تعذّر الاتصال بـ Groq. حاول لاحقاً."
 async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     question = " ".join(context.args).strip() if context.args else ""
     if not question:
