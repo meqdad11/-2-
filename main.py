@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 from telegram import Update, Chat as TGChat
 from telegram.ext import (
     ApplicationBuilder,
@@ -11,9 +10,7 @@ from telegram.ext import (
     filters,
 )
 import database as db
-from handlers import (
-    cmd_start,
-    cmd_id,
+from handlers_admin import (
     cmd_ban,
     cmd_unban,
     cmd_warn,
@@ -24,28 +21,37 @@ from handlers import (
     cmd_checkban,
     cmd_eventlog,
     cmd_setrules,
-    cmd_rules,
-    cmd_add_word,
-    cmd_remove_word,
-    cmd_list_words,
     cmd_mute,
     cmd_unmute,
     cmd_lock,
     cmd_unlock,
-    cmd_report,
-    cmd_shafaq,
-    on_chat_member_updated,
-    job_expire_bans,
-    job_weekly_report,
-    job_daily_report,
-    track_message,
-    filter_banned_words,
+)
+from handlers_user import (
+    cmd_start,
+    cmd_id,
+    cmd_rules,
+    cmd_reminder,
     auto_reply,
+    track_message,
 )
 from handlers_ai import (
     cmd_shafaq,
     cmd_choose_model,
     callback_choose_model,
+)
+from handlers_moderation import (
+    cmd_add_word,
+    cmd_remove_word,
+    cmd_list_words,
+    filter_banned_words,
+)
+from handlers_events import (
+    on_chat_member_updated,
+)
+from handlers_jobs import (
+    job_expire_bans,
+    job_weekly_report,
+    job_daily_report,
 )
 from music import (
     cmd_download,
@@ -85,10 +91,10 @@ _ARABIC_CMDS = {
     "التحذيرات": cmd_warnings,
     "أغلق المجموعة": cmd_lock,
     "افتح المجموعة": cmd_unlock,
-    "تقرير": cmd_report,
     "القواعد": cmd_rules,
     "شفق": cmd_shafaq,
     "نموذج": cmd_choose_model,
+    "تذكير": cmd_reminder,
 }
 
 async def handle_text(update: Update, context):
@@ -139,7 +145,6 @@ def main():
     app.add_handler(CommandHandler("unmute", cmd_unmute))
     app.add_handler(CommandHandler("lock", cmd_lock))
     app.add_handler(CommandHandler("unlock", cmd_unlock))
-    app.add_handler(CommandHandler("report", cmd_report))
     app.add_handler(CommandHandler("addword", cmd_add_word))
     app.add_handler(CommandHandler("removeword", cmd_remove_word))
     app.add_handler(CommandHandler("wordlist", cmd_list_words))
