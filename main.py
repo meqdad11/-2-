@@ -94,7 +94,6 @@ _ARABIC_CMDS = {
     "شفق": cmd_shafaq,
     "نموذج": cmd_choose_model,
     "تذكير": cmd_reminder,
-    "تقرير": cmd_report,
 }
 
 async def handle_text(update: Update, context):
