@@ -1,6 +1,7 @@
 import logging
 import os
-from telegram import Update
+import re
+from telegram import Update, Chat as TGChat
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -9,51 +10,43 @@ from telegram.ext import (
     CallbackQueryHandler,
     filters,
 )
-from zoneinfo import ZoneInfo
-from datetime import time as dtime
 import database as db
-
-# ================================================
-
-from handlers_ai import cmd_shafaq
-from handlers_admin import (
+from handlers import (
+    cmd_start,
+    cmd_id,
     cmd_ban,
     cmd_unban,
     cmd_warn,
     cmd_clearwarn,
     cmd_warnings,
-    cmd_mute,
-    cmd_unmute,
-    cmd_lock,
-    cmd_unlock,
     cmd_banlist,
     cmd_baninfo,
     cmd_checkban,
     cmd_eventlog,
     cmd_setrules,
-)
-from handlers_moderation import (
+    cmd_rules,
     cmd_add_word,
     cmd_remove_word,
     cmd_list_words,
-    filter_banned_words,
-)
-from handlers_user import (
-    cmd_start,
-    cmd_id,
-    cmd_rules,
-    cmd_reminder,
-    auto_reply,
-    track_message,
-)
-from handlers_jobs import (
-    job_expire_bans,
-    job_daily_quote,
-    job_daily_report,
-    job_weekly_report,
+    cmd_mute,
+    cmd_unmute,
+    cmd_lock,
+    cmd_unlock,
     cmd_report,
+    cmd_shafaq,
+    on_chat_member_updated,
+    job_expire_bans,
+    job_weekly_report,
+    job_daily_report,
+    track_message,
+    filter_banned_words,
+    auto_reply,
 )
-from handlers_events import on_chat_member_updated
+from handlers_ai import (
+    cmd_shafaq,
+    cmd_choose_model,
+    callback_choose_model,
+)
 from music import (
     cmd_download,
     cmd_sc_search,
@@ -64,16 +57,11 @@ from music import (
     callback_yt_pick,
 )
 
-# ================================================
-
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
-TIMEZONE = ZoneInfo("Asia/Riyadh")
-
-# ================================================
 
 _ARABIC_CMDS = {
     "ايدي": cmd_id,
@@ -100,10 +88,8 @@ _ARABIC_CMDS = {
     "تقرير": cmd_report,
     "القواعد": cmd_rules,
     "شفق": cmd_shafaq,
-    "تذكير": cmd_reminder,
+    "نموذج": cmd_choose_model,
 }
-
-# ================================================
 
 async def handle_text(update: Update, context):
     msg = update.message
@@ -116,26 +102,10 @@ async def handle_text(update: Update, context):
             context.args = args
             await handler(update, context)
             return
-
-    # ================================================
-
-    if (
-        update.message and
-        update.message.reply_to_message and
-        update.message.reply_to_message.from_user and
-        update.message.reply_to_message.from_user.id == context.bot.id
-    ):
-        context.args = []
-        await cmd_shafaq(update, context)
-        return
-
-    # ================================================
-
     await handle_media_url(update, context)
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
-# ================================================
 
 def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -151,8 +121,6 @@ def main():
         .post_init(post_init)
         .build()
     )
-
-    # ================================================
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("id", cmd_id))
@@ -178,33 +146,23 @@ def main():
     app.add_handler(CommandHandler("scsearch", cmd_sc_search))
     app.add_handler(CommandHandler("ytsearch", cmd_yt_search))
     app.add_handler(CommandHandler("download", cmd_download))
-    app.add_handler(CommandHandler("reminder", cmd_reminder))
     app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
     app.add_handler(CallbackQueryHandler(callback_yt_pick, pattern=r"^yt_pick\|"))
-    app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
+    app.add_handler(CallbackQueryHandler(callback_choose_model, pattern=r"^model_"))
+    app.add_handler(ChatMemberHandler(on_chat_member_updated,
+                                      ChatMemberHandler.CHAT_MEMBER))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
-    # ================================================
 
     job_queue = app.job_queue
     job_queue.run_repeating(job_expire_bans, interval=300, first=10)
-    job_queue.run_daily(job_daily_report, time=dtime(hour=8, minute=0, tzinfo=TIMEZONE))
-    job_queue.run_daily(job_daily_quote, time=dtime(hour=9, minute=0, tzinfo=TIMEZONE))
-    job_queue.run_daily(
-        job_weekly_report,
-        time=dtime(hour=20, minute=0, tzinfo=TIMEZONE),
-        days=(4,),
-    )
-
-    # ================================================
+    job_queue.run_daily(job_daily_report, time=__import__("datetime").time(hour=8, minute=0))
+    job_queue.run_repeating(job_weekly_report, interval=604800, first=60)
 
     app.run_polling(
         allowed_updates=["message", "chat_member", "callback_query"],
         drop_pending_updates=True,
     )
-
-# ================================================
 
 if __name__ == "__main__":
     main()
