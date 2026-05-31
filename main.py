@@ -50,7 +50,6 @@ from handlers_events import (
 )
 from handlers_jobs import (
     job_expire_bans,
-    cmd_report,
 )
 from music import (
     cmd_download,
