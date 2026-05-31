@@ -1,6 +1,6 @@
 import logging
 import os
-from telegram import Update, Chat as TGChat
+from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -12,39 +12,48 @@ from telegram.ext import (
 from zoneinfo import ZoneInfo
 from datetime import time as dtime
 import database as db
-from handlers import (
-    cmd_start,
-    cmd_id,
+
+# ================================================
+
+from handlers_ai import cmd_shafaq
+from handlers_admin import (
     cmd_ban,
     cmd_unban,
     cmd_warn,
     cmd_clearwarn,
     cmd_warnings,
+    cmd_mute,
+    cmd_unmute,
+    cmd_lock,
+    cmd_unlock,
     cmd_banlist,
     cmd_baninfo,
     cmd_checkban,
     cmd_eventlog,
     cmd_setrules,
-    cmd_rules,
+)
+from handlers_moderation import (
     cmd_add_word,
     cmd_remove_word,
     cmd_list_words,
-    cmd_mute,
-    cmd_unmute,
-    cmd_lock,
-    cmd_unlock,
-    cmd_report,
-    cmd_shafaq,
-    cmd_reminder,
-    on_chat_member_updated,
-    job_expire_bans,
-    job_weekly_report,
-    job_daily_report,
-    job_daily_quote,
-    track_message,
     filter_banned_words,
-    auto_reply,
 )
+from handlers_user import (
+    cmd_start,
+    cmd_id,
+    cmd_rules,
+    cmd_reminder,
+    auto_reply,
+    track_message,
+)
+from handlers_jobs import (
+    job_expire_bans,
+    job_daily_quote,
+    job_daily_report,
+    job_weekly_report,
+    cmd_report,
+)
+from handlers_events import on_chat_member_updated
 from music import (
     cmd_download,
     cmd_sc_search,
@@ -55,13 +64,16 @@ from music import (
     callback_yt_pick,
 )
 
+# ================================================
+
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
-
 TIMEZONE = ZoneInfo("Asia/Riyadh")
+
+# ================================================
 
 _ARABIC_CMDS = {
     "ايدي": cmd_id,
@@ -91,6 +103,7 @@ _ARABIC_CMDS = {
     "تذكير": cmd_reminder,
 }
 
+# ================================================
 
 async def handle_text(update: Update, context):
     msg = update.message
@@ -108,6 +121,7 @@ async def handle_text(update: Update, context):
     await auto_reply(update, context)
     await track_message(update, context)
 
+# ================================================
 
 def main():
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -123,6 +137,8 @@ def main():
         .post_init(post_init)
         .build()
     )
+
+    # ================================================
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("id", cmd_id))
@@ -155,6 +171,8 @@ def main():
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
+    # ================================================
+
     job_queue = app.job_queue
     job_queue.run_repeating(job_expire_bans, interval=300, first=10)
     job_queue.run_daily(job_daily_report, time=dtime(hour=8, minute=0, tzinfo=TIMEZONE))
@@ -165,11 +183,14 @@ def main():
         days=(4,),
     )
 
+    # ================================================
+
     app.run_polling(
         allowed_updates=["message", "chat_member", "callback_query"],
         drop_pending_updates=True,
     )
 
+# ================================================
 
 if __name__ == "__main__":
     main()
