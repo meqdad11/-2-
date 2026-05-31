@@ -72,6 +72,7 @@ logger = logging.getLogger(__name__)
 
 _ARABIC_CMDS = {
     "ايدي": cmd_id,
+    "ا": cmd_id,
     "حظر": cmd_ban,
     "رفع الحظر": cmd_unban,
     "رفع_الحظر": cmd_unban,
