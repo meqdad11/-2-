@@ -133,10 +133,28 @@ DAILY_QUOTES = [
     "يوجد دائماً ما يستحق التمسك بالأمل من أجله. 🤍"
 ]
 
-async def ask_gemini(question: str) -> str:
+async def ask_gemini(user_id: int, question: str) -> str:
     api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
         return "⚠️ مفتاح Groq غير مضبوط في المتغيرات البيئية."
+    
+    if user_id not in _conversation_history:
+        _conversation_history[user_id] = [
+            {
+                "role": "system",
+                "content": (
+                    "أنت شفق، مساعد ذكي بلهجة خليجية هادئة. "
+                    "اختصر ردودك وكن مباشراً. "
+                    "لا تعطي نصائح طبية أبداً، وإذا سألك أحد عن موضوع طبي قل له يراجع طبيب."
+                )
+            }
+        ]
+    
+    _conversation_history[user_id].append({"role": "user", "content": question})
+    
+    if len(_conversation_history[user_id]) > MAX_HISTORY:
+        _conversation_history[user_id] = _conversation_history[user_id][-MAX_HISTORY:]
+    
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -144,7 +162,7 @@ async def ask_gemini(question: str) -> str:
     }
     payload = {
         "model": "llama-3.3-70b-versatile",
-        "messages": [{"role": "user", "content": question}],
+        "messages": _conversation_history[user_id],
         "max_tokens": 1024,
     }
     try:
@@ -161,6 +179,8 @@ async def ask_gemini(question: str) -> str:
                     .get("content", "")
                     .strip()
                 )
+                if answer:
+                    _conversation_history[user_id].append({"role": "assistant", "content": answer})
                 return answer or "لم أتلقَّ إجابة من Groq."
     except Exception as e:
         logger.error("Groq request failed: %s", e)
