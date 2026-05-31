@@ -71,15 +71,30 @@ async def ask_gemini(user_id: int, question: str) -> str:
 # ================================================
 
 async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    question = " ".join(context.args).strip() if context.args else ""
-    if not question:
-        await update.message.reply_text("اكتب سؤالك بعد كلمة شفق.\nمثال: شفق ما هو الذكاء الاصطناعي؟")
+    msg = update.message
+    if not msg:
         return
+
+    is_reply_to_bot = (
+        msg.reply_to_message and
+        msg.reply_to_message.from_user and
+        msg.reply_to_message.from_user.id == context.bot.id
+    )
+
+    if is_reply_to_bot:
+        question = msg.text.strip() if msg.text else ""
+    else:
+        question = " ".join(context.args).strip() if context.args else ""
+
+    if not question:
+        await msg.reply_text("اكتب سؤالك بعد كلمة شفق.\nمثال: شفق ما هو الذكاء الاصطناعي؟")
+        return
+
     user_id = update.effective_user.id
-    thinking_msg = await update.message.reply_text("✨ شفق تفكر...")
+    thinking_msg = await msg.reply_text("✨ شفق تفكر...")
     answer = await ask_gemini(user_id, question)
     try:
         await thinking_msg.delete()
     except Exception:
         pass
-    await update.message.reply_text(f"🌅 {answer}")
+    await msg.reply_text(f"🌅 {answer}")
