@@ -116,11 +116,25 @@ async def handle_text(update: Update, context):
             context.args = args
             await handler(update, context)
             return
+
+    # ================================================
+
+    if (
+        update.message and
+        update.message.reply_to_message and
+        update.message.reply_to_message.from_user and
+        update.message.reply_to_message.from_user.id == context.bot.id
+    ):
+        context.args = []
+        await cmd_shafaq(update, context)
+        return
+
+    # ================================================
+
     await handle_media_url(update, context)
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
-
 # ================================================
 
 def main():
