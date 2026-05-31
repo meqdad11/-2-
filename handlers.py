@@ -132,7 +132,8 @@ DAILY_QUOTES = [
     "الأوقات الصعبة لا تدوم للأبد. ☀️",
     "يوجد دائماً ما يستحق التمسك بالأمل من أجله. 🤍"
 ]
-
+_conversation_history: dict[int, list] = {}
+MAX_HISTORY = 10
 async def ask_gemini(user_id: int, question: str) -> str:
     api_key = os.environ.get("GROQ_API_KEY", "")
     if not api_key:
