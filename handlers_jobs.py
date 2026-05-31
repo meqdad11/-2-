@@ -88,59 +88,8 @@ async def job_daily_quote(context: ContextTypes.DEFAULT_TYPE):
 
 # ================================================
 
-async def job_daily_report(context: ContextTypes.DEFAULT_TYPE):
-    chats = await db.get_all_active_chats()
-    for chat_id in chats:
-        now = datetime.now(timezone.utc)
-        day_ago = now.replace(hour=0, minute=0, second=0).isoformat()
-        actions = await db.get_bot_actions_since(chat_id, day_ago)
-        if not actions:
-            continue
-        lines = []
-        for a in actions[:20]:
-            lines.append(f"• {a['action']} — المستخدم {a['user_id']}")
-        report = (
-            f"📋 التقرير اليومي\n"
-            f"{'─'*20}\n"
-            f"إجمالي الإجراءات: {len(actions)}\n\n"
-            + "\n".join(lines)
-        )
-        try:
-            await context.bot.send_message(ADMIN_CHAT_ID, report)
-        except Exception:
-            pass
 
-# ================================================
 
-async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
-    chats = await db.get_all_active_chats()
-    for chat_id in chats:
-        now = datetime.now(timezone.utc)
-        week_ago = (now - timedelta(days=7)).isoformat()
-        total = await db.get_total_members(chat_id)
-        new_members = await db.get_new_members_since(chat_id, week_ago)
-        bans = await db.get_ban_list(chat_id)
-        top = await db.get_top_members(chat_id, 5)
-        chat_name = await db.get_chat_name(chat_id)
-        top_text = ""
-        for i, m in enumerate(top, 1):
-            name = await db.get_user_name(chat_id, m['user_id'])
-            top_text += f"{i}. {name} ({m['user_id']}) — {m['message_count']} رسالة\n"
-        report = (
-            f"📊 التقرير الأسبوعي — {chat_name}\n"
-            f"{'─'*20}\n"
-            f"👥 إجمالي الأعضاء: {total}\n"
-            f"🆕 أعضاء جدد: {new_members}\n"
-            f"🚫 محظورون: {len(bans)}\n"
-            f"{'─'*20}\n"
-            f"🏆 الأكثر نشاطاً:\n{top_text}"
-        )
-        try:
-            await context.bot.send_message(ADMIN_CHAT_ID, report)
-        except Exception:
-            pass
-
-# ================================================
 
 async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
     expired = await db.get_expired_bans()
