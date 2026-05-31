@@ -162,7 +162,6 @@ def main():
 
     job_queue = app.job_queue
     job_queue.run_repeating(job_expire_bans, interval=300, first=10)
-    job_queue.run_daily(job_daily_report, time=__import__("datetime").time(hour=8, minute=0))
     job_queue.run_daily(job_weekly_report, time=__import__("datetime").time(hour=5, minute=0, tzinfo=__import__("datetime").timezone.utc), days=(4,))
     app.run_polling(
         allowed_updates=["message", "chat_member", "callback_query"],
