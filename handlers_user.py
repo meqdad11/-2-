@@ -71,56 +71,52 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_user = get_reply_user(update)
     from telegram import Chat as TGChat
     in_group = chat.type in (TGChat.GROUP, TGChat.SUPERGROUP)
+
     if reply_user and reply_user.id != user.id:
         if not in_group or not await is_admin(update, context):
             await update.message.reply_text("لا يمكنك عرض بيانات عضو آخر.")
             return
-        username = f"@{reply_user.username}" if reply_user.username else "غير محدد"
-        try:
-            photos = await context.bot.get_user_profile_photos(reply_user.id, limit=1)
-            if photos.total_count > 0:
-                await update.message.reply_photo(
-                    photo=photos.photos[0][-1].file_id,
-                    caption=(
-                        f"معلومات العضو:\n"
-                        f"الاسم: {reply_user.first_name}\n"
-                        f"اليوزر: {username}\n"
-                        f"المعرف: {reply_user.id}"
-                    )
-                )
-                return
-        except Exception:
-            pass
-        await update.message.reply_text(
-            f"معلومات العضو:\n"
-            f"الاسم: {reply_user.first_name}\n"
-            f"اليوزر: {username}\n"
-            f"المعرف: {reply_user.id}"
-        )
+        target = reply_user
+        label = "معلومات العضو"
     else:
-        username = f"@{user.username}" if user.username else "غير محدد"
-        try:
-            photos = await context.bot.get_user_profile_photos(user.id, limit=1)
-            if photos.total_count > 0:
-                await update.message.reply_photo(
-                    photo=photos.photos[0][-1].file_id,
-                    caption=(
-                        f"معلوماتك:\n"
-                        f"الاسم: {user.first_name}\n"
-                        f"اليوزر: {username}\n"
-                        f"المعرف: {user.id}"
-                    )
-                )
-                return
-        except Exception:
-            pass
-        await update.message.reply_text(
-            f"معلوماتك:\n"
-            f"الاسم: {user.first_name}\n"
-            f"اليوزر: {username}\n"
-            f"المعرف: {user.id}"
-        )
+        target = user
+        label = "معلوماتك"
 
+    username = f"@{target.username}" if target.username else "غير محدد"
+    bio = "غير محدد"
+    msg_count = 0
+
+    try:
+        full_chat = await context.bot.get_chat(target.id)
+        if full_chat.bio:
+            bio = full_chat.bio
+    except Exception:
+        pass
+
+    if in_group:
+        msg_count = await db.get_message_count(target.id, chat.id)
+
+    caption = (
+        f"{label}:\n"
+        f"الاسم: {target.first_name}\n"
+        f"اليوزر: {username}\n"
+        f"المعرف: {target.id}\n"
+        f"البايو: {bio}\n"
+        f"💬 الرسائل: {msg_count}"
+    )
+
+    try:
+        photos = await context.bot.get_user_profile_photos(target.id, limit=1)
+        if photos.total_count > 0:
+            await update.message.reply_photo(
+                photo=photos.photos[0][-1].file_id,
+                caption=caption
+            )
+            return
+    except Exception:
+        pass
+
+    await update.message.reply_text(caption)
 # ================================================
 
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
