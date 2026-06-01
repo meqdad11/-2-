@@ -13,9 +13,7 @@ from helpers import (
 # ================================================
 
 logger = logging.getLogger(__name__)
-MAX_WARNINGS = 3
-ADMIN_CHAT_ID = 729970974
-
+from config import MAX_WARNINGS, ADMIN_CHAT_ID
 # ================================================
 
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
