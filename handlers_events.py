@@ -7,7 +7,7 @@ import database as db
 # ================================================
 
 logger = logging.getLogger(__name__)
-ADMIN_CHAT_ID = 729970974
+from config import ADMIN_CHAT_ID
 
 # ================================================
 
