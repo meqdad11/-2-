@@ -45,7 +45,7 @@ from music import (
     callback_sc_download, callback_yt_pick,
 )
 from handlers_menu import callback_menu, handle_interactive_messages  # <--- أضفنا handle_interactive_messages
-
+from handlers_menu import cmd_menu
 # ========== إعداد التسجيل ==========
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
