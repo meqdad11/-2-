@@ -39,6 +39,7 @@ from music import (
     cmd_yt_search,
     cmd_download,
 )
+from handlers_menu import cmd_menu
 
 # ========== قاموس الأوامر العربية ==========
 ARABIC_COMMANDS = {
@@ -84,4 +85,5 @@ ARABIC_COMMANDS = {
     "تحميل":                cmd_download,
     "بحث":                  cmd_sc_search,
     "يوتيوب":               cmd_yt_search,
+    "ابدأ":                  cmd_menu,
 }
