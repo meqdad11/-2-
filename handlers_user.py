@@ -5,12 +5,12 @@ from zoneinfo import ZoneInfo
 from telegram import Update
 from telegram.ext import ContextTypes
 import database as db
+from config import TIMEZONE
 from helpers import is_admin, get_reply_user
 
 # ================================================
 
 logger = logging.getLogger(__name__)
-TIMEZONE = ZoneInfo("Asia/Riyadh")
 
 AUTO_REPLIES = {
     "صباح الخير": ["صباح النور ☀️"],
