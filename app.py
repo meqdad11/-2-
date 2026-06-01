@@ -207,6 +207,8 @@ def main():
         allowed_updates=["message", "channel_post", "chat_member", "callback_query"],
         drop_pending_updates=True,
     )
+from web_dashboard import start_dashboard
+start_dashboard()
 
 if __name__ == "__main__":
     main()
