@@ -47,7 +47,6 @@ from music import (
 from handlers_menu import callback_menu, handle_interactive_messages, cmd_menu
 from handlers_locks import filter_locked_content
 
-# استيرادات الدوال الجديدة (لضمان عدم وجود أخطاء)
 from handlers_admin import (
     cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
     cmd_demote_all, cmd_purge_bans, cmd_purge_muted,
@@ -80,10 +79,6 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
-    # سطر تصحيح (اختياري، يمكن إزالته)
-    # print(f"[DEBUG] handle_text: {text}")
-
-    # طلبات معلقة (بحث، مسح، تذكير...)
     if (context.user_data.get('waiting_google') == chat_id or
         context.user_data.get('purge_mode') == chat_id or
         context.user_data.get('waiting_remind') == chat_id or
@@ -93,12 +88,10 @@ async def handle_text(update: Update, context):
         await handle_interactive_messages(update, context)
         return
 
-    # تأكيد تنزيل الكل
     if text == "تأكيد" and context.user_data.get('awaiting_demote_all') == chat_id:
         await confirm_demote_all(update, context)
         return
 
-    # الأوامر العربية
     for arabic_cmd, handler in ARABIC_COMMANDS.items():
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
             args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
@@ -106,10 +99,7 @@ async def handle_text(update: Update, context):
             await handler(update, context)
             return
 
-    # ردود واختصارات
     await process_custom_replies_and_commands(update, context)
-
-    # معالجة الروابط والميديا والفلترة
     await handle_media_url(update, context)
     await filter_banned_words(update, context)
     await auto_reply(update, context)
@@ -117,8 +107,6 @@ async def handle_text(update: Update, context):
 
 # ========== معالج رسائل القنوات (لتحميل الميديا فقط) ==========
 async def handle_channel_post(update: Update, context):
-    """يعالج الروابط المرسلة في القنوات (بدون تعديل في منطق التحميل)"""
-    # نمرر التحديث كما هو، و handle_media_url سيتعامل معه
     await handle_media_url(update, context)
 
 # ========== تهيئة التطبيق ==========
@@ -127,7 +115,6 @@ async def post_init(app):
 
 # ========== تسجيل الهاندلرز ==========
 def register_handlers(app):
-
     # أوامر سلاش
     app.add_handler(CommandHandler("start", cmd_menu))
     app.add_handler(CommandHandler("id",         cmd_id))
@@ -167,11 +154,9 @@ def register_handlers(app):
 
     # معالج الرسائل النصية في المجموعات
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
-
-    # معالج رسائل القنوات (لتحميل الروابط)
+    # معالج رسائل القنوات
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
-
-    # فلترة المحتوى (للمجموعات فقط)
+    # فلترة المحتوى للمجموعات فقط
     app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
 
 # ========== تسجيل الجوبز الدورية ==========
