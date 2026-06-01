@@ -69,6 +69,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• أرسل رابط مباشرة — تحميل\n"
         "• يوتيوب <اسم> — بحث\n"
     )
+
 # ================================================
 
 async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -123,6 +124,7 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     await update.message.reply_text(caption)
+
 # ================================================
 
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -229,3 +231,136 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     full_name = f"{user.first_name} {user.last_name or ''}".strip()
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
+
+# ================================================
+# ========== الأوامر الجديدة المضافة ==========
+# ================================================
+
+# 1. أمر "اهمس"
+async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.type == "private":
+        await update.message.reply_text("❌ هذا الأمر مخصص للمجموعات فقط.")
+        return
+    if not context.args:
+        await update.message.reply_text("❗️ الاستخدام: اهمس @username الرسالة")
+        return
+    target_username = context.args[0]
+    if target_username.startswith('@'):
+        target_username = target_username[1:]
+    whisper_text = " ".join(context.args[1:])
+    if not whisper_text:
+        await update.message.reply_text("❌ لا يمكن إرسال همسة فارغة.")
+        return
+    try:
+        target_user = await context.bot.get_chat(target_username)
+    except:
+        await update.message.reply_text(f"❌ لم أجد المستخدم {target_username}.")
+        return
+    try:
+        await context.bot.send_message(
+            chat_id=target_user.id,
+            text=f"🔊 لديك همسة من {update.effective_user.mention_html()}:\n\n{whisper_text}",
+            parse_mode="HTML"
+        )
+        await update.message.reply_text(f"✅ تم الإرسال إلى {target_user.mention_html()}!", parse_mode="HTML")
+    except:
+        await update.message.reply_text("❌ لم أستطع الإرسال. قد يكون المستخدم حظر البوت أو لم يبدأ محادثة معه.")
+
+# 2. أمر "افتاري" (رابط المجموعة)
+async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context):
+        await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+        return
+    try:
+        link = await context.bot.create_chat_invite_link(update.effective_chat.id, member_limit=1)
+        await update.message.reply_text(f"🔗 رابط المجموعة:\n{link.invite_link}")
+    except:
+        await update.message.reply_text("❌ لا يمكن إنشاء رابط، تأكد من صلاحيات البوت.")
+
+# 3. أمر "سورة" (آية عشوائية من سورة)
+async def cmd_surah(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("الاستخدام: سورة [اسم السورة]")
+        return
+    surah_name = " ".join(context.args).strip()
+    # محاكاة بسيطة (يمكن ربطها بـ API حقيقي)
+    await update.message.reply_text(f"📖 سورة {surah_name}:\n(هذه خدمة تجريبية، سيتم ربطها بـ API لاحقاً)")
+
+# 4. أمر "قران" (صفحة من القرآن)
+async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("الاستخدام: قران [رقم الصفحة]")
+        return
+    try:
+        page = int(context.args[0])
+        await update.message.reply_text(f"📖 صفحة {page} من القرآن الكريم:\n(خدمة تجريبية، سيتم ربطها بـ API لاحقاً)")
+    except:
+        await update.message.reply_text("الرقم غير صالح.")
+
+# 5. أمر "انطقي" (نطق النص)
+async def cmd_speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("الاستخدام: انطقي [النص]")
+        return
+    text = " ".join(context.args)
+    await update.message.reply_text(f"🔊 (محاكاة نطق): {text}")
+
+# 6. أمر "وش يقول" (تحويل الصوت لنص)
+async def cmd_voice_to_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message.reply_to_message or not update.message.reply_to_message.voice:
+        await update.message.reply_text("الرجاء الرد على رسالة صوتية (فويس).")
+        return
+    await update.message.reply_text("🎙️ (خدمة تحويل الصوت لنص غير متاحة حالياً، سيتم تفعيلها لاحقاً)")
+
+# 7. أمر "جيمناي" (ذكاء اصطناعي)
+async def cmd_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("الاستخدام: جيمناي [سؤالك]")
+        return
+    query = " ".join(context.args)
+    await update.message.reply_text(f"🧠 رد تجريبي على '{query}' (يُربط لاحقاً بـ Gemini API)")
+
+# 8. أمر "الحد" (تغيير نموذج الذكاء الاصطناعي)
+async def cmd_model_limit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚙️ إعدادات النماذج غير مفعلة حالياً.")
+
+# 9. أمر "اطردني" (للمستخدم أن يطرد نفسه)
+async def cmd_kickme(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    try:
+        await context.bot.ban_chat_member(chat_id, user_id)
+        await context.bot.unban_chat_member(chat_id, user_id)
+        await update.message.reply_text("✅ تم طردك بناءً على طلبك.")
+    except:
+        await update.message.reply_text("❌ لا أستطيع طردك، تأكد من صلاحياتي.")
+
+# 10. أمر "تفعيل الترحيب"
+async def cmd_enable_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context):
+        await update.message.reply_text("⛔ للمشرفين فقط.")
+        return
+    await db.set_setting(update.effective_chat.id, "welcome_enabled", "yes")
+    await update.message.reply_text("✅ تم تفعيل الترحيب.")
+
+# 11. أمر "تعطيل الترحيب"
+async def cmd_disable_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_admin(update, context):
+        await update.message.reply_text("⛔ للمشرفين فقط.")
+        return
+    await db.set_setting(update.effective_chat.id, "welcome_enabled", "no")
+    await update.message.reply_text("✅ تم تعطيل الترحيب.")
+
+# 12. أمر "بايـو" (عرض بايو العضو)
+async def cmd_bio(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    try:
+        full = await context.bot.get_chat(user.id)
+        bio = full.bio if full.bio else "لا يوجد بايو."
+        await update.message.reply_text(f"📝 بايو العضو {user.first_name}:\n{bio}")
+    except:
+        await update.message.reply_text("لا يمكن جلب البايو حالياً.")
+
+# 13. أمر "المالك" (عرض معلومات المطور)
+async def cmd_owner(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("👨‍💻 **المطور:** [Me8dad](https://t.me/Me8dad)\nللمساعدة والدعم.", parse_mode="Markdown")
