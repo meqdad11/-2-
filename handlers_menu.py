@@ -561,9 +561,18 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
         await msg.reply_text(f"🔍 **نتائج البحث:**\n[اضغط هنا]({link})", parse_mode="Markdown", disable_web_page_preview=True)
         return
 
-    # ========== معالج المسح (يدعم العدد والرد معاً) ==========
+    # ========== معالج المسح (يدعم: حذف رسالة، مسح بعدد، مسح بالرد) ==========
     if context.user_data.get('purge_mode') == chat_id:
         del context.user_data['purge_mode']
+        
+        # خيار 0: حذف رسالة واحدة بالرد عليها وكتابة "حذف"
+        if msg.reply_to_message and text == "حذف":
+            try:
+                await context.bot.delete_message(chat_id, msg.reply_to_message.message_id)
+                await msg.reply_text("🗑️ تم حذف الرسالة المحددة.")
+            except Exception as e:
+                await msg.reply_text("❌ لا يمكن حذف هذه الرسالة (قد تكون قديمة أو ليس لدي صلاحية).")
+            return
         
         # خيار 1: مسح بعدد محدد من الرسائل
         if text.isdigit():
@@ -579,7 +588,7 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
                 await msg.reply_text("فشل المسح، ربما الرسائل قديمة.")
             return
         
-        # خيار 2: مسح بالرد على رسالة معينة
+        # خيار 2: مسح بالرد على رسالة (من تلك الرسالة حتى آخر رسالة)
         if msg.reply_to_message:
             start_id = msg.reply_to_message.message_id
             deleted = 0
@@ -593,7 +602,7 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
             return
         
         # إذا لم يحدد المستخدم لا عدد ولا رد
-        await msg.reply_text("❌ أرسل عدد الرسائل (مثال: 10) أو رد على رسالة لمسح كل ما بعدها.")
+        await msg.reply_text("❌ أرسل عدد الرسائل (مثال: 10) أو رد على رسالة لمسح ما بعدها، أو رد واكتب 'حذف' لحذف رسالة واحدة.")
         return
 
     # معالج التذكير
