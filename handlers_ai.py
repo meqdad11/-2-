@@ -23,6 +23,9 @@ async def ask_ai(user_id: int, question: str) -> str:
         model_name = "deepseek-chat"
         if not api_key:
             return "⚠️ مفتاح DeepSeek غير مضبوط في المتغيرات البيئية."
+    elif model == "gemini":
+        # مؤقتاً: نموذج Gemini غير مفعل، نرجع رسالة تجريبية
+        return "🌐 نموذج Gemini سيتم تفعيله قريباً. حالياً استخدم 'شفق' أو غيره."
     else:
         url = "https://api.groq.com/openai/v1/chat/completions"
         api_key = os.environ.get("GROQ_API_KEY", "")
@@ -84,6 +87,7 @@ async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [InlineKeyboardButton("🦙 Llama (Groq)", callback_data="model_llama")],
         [InlineKeyboardButton("🐋 DeepSeek", callback_data="model_deepseek")],
+        [InlineKeyboardButton("🌐 Gemini (قريباً)", callback_data="model_gemini")],
     ]
     await update.message.reply_text(
         "اختر النموذج الي تبيه:",
@@ -101,6 +105,8 @@ async def callback_choose_model(update: Update, context: ContextTypes.DEFAULT_TY
         _user_model[user_id] = "deepseek"
         await query.answer("تم اختيار DeepSeek ✅")
         await query.edit_message_text("✅ تم اختيار نموذج **DeepSeek**", parse_mode="Markdown")
+    elif query.data == "model_gemini":
+        await query.answer("نموذج Gemini قيد التطوير", show_alert=True)
 
 # ================================================
 
@@ -134,3 +140,55 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     await msg.reply_text(f"🌅 {answer}")
+
+# ================================================
+# ========== الأوامر الجديدة المضافة ==========
+# ================================================
+
+# أمر "جيمناي" (نسخة تجريبية)
+async def cmd_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg:
+        return
+
+    is_reply_to_bot = (
+        msg.reply_to_message and
+        msg.reply_to_message.from_user and
+        msg.reply_to_message.from_user.id == context.bot.id
+    )
+
+    if is_reply_to_bot:
+        question = msg.text.strip() if msg.text else ""
+    else:
+        question = " ".join(context.args).strip() if context.args else ""
+
+    if not question:
+        await msg.reply_text("اكتب سؤالك بعد كلمة جيمناي.\nمثال: جيمناي ما هو الذكاء الاصطناعي؟")
+        return
+
+    user_id = update.effective_user.id
+    # مؤقتاً نستخدم نفس نظام الأسئلة لكن مع إضافة تذكير بأنه نموذج تجريبي
+    thinking_msg = await msg.reply_text("✨ جيمناي يفكر...")
+    # نغير النموذج مؤقتاً إلى gemini (لكن الدالة سترجع رسالة تجريبية حالياً)
+    old_model = _user_model.get(user_id, "llama")
+    _user_model[user_id] = "gemini"
+    answer = await ask_ai(user_id, question)
+    _user_model[user_id] = old_model  # نعيد النموذج القديم
+    try:
+        await thinking_msg.delete()
+    except Exception:
+        pass
+    await msg.reply_text(f"🌐 {answer}")
+
+# أمر "الحد" (عرض النموذج الحالي)
+async def cmd_limit(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    model = _user_model.get(user_id, "llama")
+    model_name = "Llama (Groq)" if model == "llama" else "DeepSeek" if model == "deepseek" else model
+    history_count = len(_conversation_history.get(user_id, []))
+    await update.message.reply_text(
+        f"📊 **إعدادات الذكاء الاصطناعي:**\n"
+        f"• النموذج الحالي: {model_name}\n"
+        f"• عدد الرسائل المحفوظة: {history_count}/{MAX_HISTORY}\n"
+        f"• يمكنك تغيير النموذج عبر أمر 'موديل'."
+    )
