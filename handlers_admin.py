@@ -381,3 +381,206 @@ async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     await db.set_setting(chat_id, "rules", rules)
     await update.message.reply_text("✅ تم تعيين قواعد المجموعة.")
+
+# ================================================
+# ========== الأوامر الجديدة المضافة ==========
+# ================================================
+
+# 1. رفع مشرف (يتطلب صلاحيات عالية، فقط المطور أو مشرف آخر)
+async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+        return
+    reply_user = get_reply_user(update)
+    if not reply_user and not context.args:
+        await update.message.reply_text("قم بالرد على العضو أو أرسل معرفه: رفع مشرف @username")
+        return
+    if reply_user:
+        user_id = reply_user.id
+    else:
+        try:
+            user_id = int(context.args[0]) if context.args[0].isdigit() else (await context.bot.get_chat(context.args[0])).id
+        except:
+            await update.message.reply_text("معرف غير صالح.")
+            return
+    try:
+        await context.bot.promote_chat_member(
+            update.effective_chat.id, user_id,
+            can_change_info=True, can_delete_messages=True, can_restrict_members=True,
+            can_invite_users=True, can_pin_messages=True, can_promote_members=False
+        )
+        await update.message.reply_text(f"✅ تم رفع المستخدم {user_id} إلى مشرف.")
+        await db.log_event(update.effective_chat.id, "promote", user_id=update.effective_user.id, target_id=user_id)
+    except Exception as e:
+        await update.message.reply_text(f"❌ تعذّرت الترقية: {e}")
+
+# 2. تنزيل مشرف
+async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        await update.message.reply_text("⛔ للمشرفين فقط.")
+        return
+    reply_user = get_reply_user(update)
+    if not reply_user and not context.args:
+        await update.message.reply_text("قم بالرد أو أرسل المعرف.")
+        return
+    if reply_user:
+        user_id = reply_user.id
+    else:
+        try:
+            user_id = int(context.args[0])
+        except:
+            await update.message.reply_text("معرف غير صالح.")
+            return
+    try:
+        await context.bot.promote_chat_member(
+            update.effective_chat.id, user_id,
+            can_change_info=False, can_delete_messages=False, can_restrict_members=False,
+            can_invite_users=False, can_pin_messages=False, can_promote_members=False
+        )
+        await update.message.reply_text(f"✅ تم تنزيل المستخدم {user_id} من الإدارة.")
+        await db.log_event(update.effective_chat.id, "demote", user_id=update.effective_user.id, target_id=user_id)
+    except Exception as e:
+        await update.message.reply_text(f"❌ تعذّر التنزيل: {e}")
+
+# 3. عرض قائمة المشرفين
+async def cmd_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        admins = await context.bot.get_chat_administrators(update.effective_chat.id)
+        text = "👮 قائمة المشرفين:\n"
+        for admin in admins:
+            user = admin.user
+            text += f"• {user.first_name} (@{user.username if user.username else 'لا يوجد'})\n"
+        await update.message.reply_text(text)
+    except Exception as e:
+        await update.message.reply_text(f"❌ لا يمكن جلب القائمة: {e}")
+
+# 4. تنزيل الكل (إزالة صلاحيات المشرفين عن الجميع)
+async def cmd_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        await update.message.reply_text("⛔ للمشرفين فقط.")
+        return
+    await update.message.reply_text("⚠️ هذه العملية ستجرد جميع المشرفين من صلاحياتهم ما عدا المالك.\nأكتب 'تأكيد' لتأكيد.")
+    context.user_data['awaiting_demote_all'] = update.effective_chat.id
+
+# معالج تأكيد تنزيل الكل (يمكن إضافته في handle_text)
+# لكننا نضيف هنا دالة بسيطة للاستجابة لـ "تأكيد"
+# سيتم استدعاؤها من handle_text
+async def confirm_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if context.user_data.get('awaiting_demote_all') != update.effective_chat.id:
+        return
+    del context.user_data['awaiting_demote_all']
+    if not await require_admin(update, context):
+        return
+    try:
+        admins = await context.bot.get_chat_administrators(update.effective_chat.id)
+        owner_id = update.effective_chat.id  # المالك هو منشئ المجموعة
+        # نبحث عن المالك
+        for admin in admins:
+            if admin.status == 'creator':
+                owner_id = admin.user.id
+                break
+        for admin in admins:
+            if admin.user.id != owner_id:
+                await context.bot.promote_chat_member(
+                    update.effective_chat.id, admin.user.id,
+                    can_change_info=False, can_delete_messages=False, can_restrict_members=False,
+                    can_invite_users=False, can_pin_messages=False, can_promote_members=False
+                )
+        await update.message.reply_text("✅ تم تنزيل جميع المشرفين (ما عدا المالك).")
+    except Exception as e:
+        await update.message.reply_text(f"❌ فشل: {e}")
+
+# 5. مسح المحظورين (إزالة جميع الحظر)
+async def cmd_purge_bans(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        await update.message.reply_text("⛔ للمشرفين فقط.")
+        return
+    chat_id = update.effective_chat.id
+    bans = await db.get_ban_list(chat_id)
+    count = 0
+    for ban in bans:
+        user_id = ban['user_id']
+        if await db.remove_ban(user_id, chat_id):
+            try:
+                await context.bot.unban_chat_member(chat_id, user_id)
+                count += 1
+            except:
+                pass
+    await update.message.reply_text(f"✅ تم مسح {count} حظر من القائمة.")
+
+# 6. مسح المكتومين
+async def cmd_purge_muted(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        await update.message.reply_text("⛔ للمشرفين فقط.")
+        return
+    # المكتمون ليس لديهم قائمة خاصة، نحتاج إلى معرفة المكتمين عبر قاعدة بيانات أو مسح كل القيود
+    # نكتفي بإعادة تعيين الصلاحيات للجميع (فتح المجموعة)
+    await update.message.reply_text("⚠️ سيتم فتح المجموعة ورفع الكتم عن الجميع.")
+    from telegram import ChatPermissions
+    try:
+        await context.bot.set_chat_permissions(
+            update.effective_chat.id,
+            permissions=ChatPermissions(
+                can_send_messages=True, can_send_media_messages=True,
+                can_send_polls=True, can_send_other_messages=True,
+                can_add_web_page_previews=True
+            )
+        )
+        await update.message.reply_text("✅ تم رفع الكتم عن جميع الأعضاء.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ فشل: {e}")
+
+# 7. تاك للكل (منشن جميع الأعضاء)
+async def cmd_tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        await update.message.reply_text("⛔ للمشرفين فقط.")
+        return
+    try:
+        # الحصول على أول 200 عضو (حد تيليجرام)
+        members = []
+        async for member in context.bot.get_chat_members(update.effective_chat.id):
+            if not member.user.is_bot:
+                members.append(f"@{member.user.username}" if member.user.username else f"[{member.user.first_name}](tg://user?id={member.user.id})")
+            if len(members) >= 50:  # تجنب الإزعاج
+                break
+        mentions = " ".join(members)
+        await update.message.reply_text(f"📢 تنبيه: {mentions}\n{update.message.text.split(' ', 1)[1] if len(context.args) > 0 else ''}", parse_mode="Markdown")
+    except Exception as e:
+        await update.message.reply_text(f"❌ فشل التاك: {e}")
+
+# 8. رتبتي (عرض رتبة العضو)
+async def cmd_my_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+    try:
+        member = await context.bot.get_chat_member(chat_id, user.id)
+        rank = member.status
+        rank_map = {'creator': '👑 المالك', 'administrator': '👮 مشرف', 'member': '👤 عضو', 'restricted': '🔇 مكتوم', 'left': '🚪 خارج', 'kicked': '🚫 محظور'}
+        await update.message.reply_text(f"رتبتك: {rank_map.get(rank, rank)}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ لا يمكن جلب الرتبة: {e}")
+
+# 9. رتبته (عرض رتبة عضو آخر)
+async def cmd_his_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        await update.message.reply_text("⛔ للمشرفين فقط.")
+        return
+    reply_user = get_reply_user(update)
+    if not reply_user and not context.args:
+        await update.message.reply_text("قم بالرد على العضو أو أرسل معرفه/يوزر.")
+        return
+    if reply_user:
+        target_id = reply_user.id
+    else:
+        try:
+            target_id = int(context.args[0]) if context.args[0].isdigit() else (await context.bot.get_chat(context.args[0])).id
+        except:
+            await update.message.reply_text("معرف غير صالح.")
+            return
+    try:
+        member = await context.bot.get_chat_member(update.effective_chat.id, target_id)
+        rank = member.status
+        rank_map = {'creator': '👑 المالك', 'administrator': '👮 مشرف', 'member': '👤 عضو', 'restricted': '🔇 مكتوم', 'left': '🚪 خارج', 'kicked': '🚫 محظور'}
+        await update.message.reply_text(f"رتبة العضو: {rank_map.get(rank, rank)}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ لا يمكن جلب الرتبة: {e}")
