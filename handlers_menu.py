@@ -24,7 +24,7 @@ async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
         [InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games"),
          InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google")],
-        [InlineKeyboardButton("📢 قناة التحديثات", url="https://t.me/+htFgbyDEnDc2ZjY0")],
+        [InlineKeyboardButton("📢 قناة التحديثات", url="https://t.me/shafaqmeqdad")],
         [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
     ]
     await update.message.reply_text(
