@@ -81,6 +81,9 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
+    # 👇 السطر المضاف للتصحيح (سيظهر في سجل Railway)
+    print(f"[DEBUG] handle_text received: '{text}'")
+
     # التحقق من وجود طلب معلق (بحث، مسح، تذكير...)
     if (context.user_data.get('waiting_google') == chat_id or
         context.user_data.get('purge_mode') == chat_id or
@@ -112,7 +115,6 @@ async def handle_text(update: Update, context):
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
-
 # ========== تهيئة التطبيق ==========
 async def post_init(app):
     await db.init_db()
