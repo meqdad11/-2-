@@ -125,12 +125,6 @@ def register_jobs(app):
         job_daily_quote,
         time=datetime.time(hour=9, minute=0, tzinfo=datetime.timezone.utc)
     )
-    jq.run_daily(
-        job_daily_report,
-        time=datetime.time(hour=8, minute=0)
-    )
-    jq.run_repeating(job_weekly_report, interval=604800, first=60)
-
 # ========== نقطة الدخول الرئيسية ==========
 def main():
     if not TELEGRAM_BOT_TOKEN:
