@@ -2,6 +2,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 import database as db
+from config import MAX_WARNINGS, ADMIN_CHAT_ID
 from helpers import (
     require_admin,
     get_reply_user,
@@ -13,7 +14,6 @@ from helpers import (
 # ================================================
 
 logger = logging.getLogger(__name__)
-from config import MAX_WARNINGS, ADMIN_CHAT_ID
 # ================================================
 
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
