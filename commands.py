@@ -77,7 +77,7 @@ ARABIC_COMMANDS = {
     "أضف مورد": cmd_add_resource, "الموارد": cmd_list_resources, "احذف مورد": cmd_delete_resource,
     "ايدي": cmd_id, "القواعد": cmd_rules, "شفق": cmd_shafaq,
     "تحميل": cmd_download, "بحث": cmd_sc_search, "يوتيوب": cmd_yt_search,
-    "ابدا": cmd_menu, "ابدأ": cmd_menu, "أبدا": cmd_menu,
+    "ابدا": cmd_menu, "ابدأ": cmd_menu, "أبدا": cmd_menu,"احصائيات": cmd_simple_stats,
 
     # ──── أوامر القفل والفتح ────
     "قفل الروابط": cmd_lock_links, "فتح الروابط": cmd_unlock_links,
