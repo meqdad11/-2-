@@ -4,14 +4,18 @@ from handlers_admin import (
     cmd_setrules, cmd_mute, cmd_unmute, cmd_lock, cmd_unlock,
 )
 from handlers_user import cmd_id, cmd_rules
-from handlers_moderation import cmd_add_word, cmd_remove_word, cmd_list_words
+from handlers_moderation import (
+    cmd_add_word, cmd_remove_word, cmd_list_words,
+    cmd_add_reply, cmd_remove_reply, cmd_list_replies,
+    cmd_add_command, cmd_remove_command, cmd_list_commands,
+)
 from handlers_jobs import cmd_report
-from handlers_ai import cmd_shafaq
+from handlers_ai import cmd_shafaq, cmd_gemini, cmd_limit
 from handlers_resources import cmd_add_resource, cmd_list_resources, cmd_delete_resource
 from handlers_menu import cmd_menu, callback_menu
 from music import cmd_sc_search, cmd_yt_search, cmd_download
 
-# استيراد دوال القفل من handlers_locks
+# دوال القفل
 from handlers_locks import (
     cmd_lock_links, cmd_unlock_links,
     cmd_lock_tags, cmd_unlock_tags,
@@ -44,12 +48,25 @@ from handlers_locks import (
     cmd_lock_all, cmd_unlock_all,
 )
 
-# استيراد أوامر المطور
+# دوال المطور
 from handlers_dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 
-# قاموس الأوامر العربية
+# دوال إدارة المشرفين الجديدة
+from handlers_admin import (
+    cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
+    cmd_demote_all, cmd_purge_bans, cmd_purge_muted,
+    cmd_tag_all, cmd_my_rank, cmd_his_rank,
+)
+
+# دوال المستخدم الجديدة
+from handlers_user import (
+    cmd_whisper, cmd_get_invite, cmd_surah, cmd_quran_page,
+    cmd_speak, cmd_voice_to_text, cmd_kickme,
+    cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
+)
+
 ARABIC_COMMANDS = {
-    # ──────────── الأوامر القديمة ────────────
+    # ──── الأوامر القديمة ────
     "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
     "قائمة": cmd_banlist, "معلومات": cmd_baninfo, "تحقق": cmd_checkban,
     "تحذير": cmd_warn, "مسح التحذير": cmd_clearwarn, "التحذيرات": cmd_warnings,
@@ -62,7 +79,7 @@ ARABIC_COMMANDS = {
     "تحميل": cmd_download, "بحث": cmd_sc_search, "يوتيوب": cmd_yt_search,
     "ابدا": cmd_menu, "ابدأ": cmd_menu, "أبدا": cmd_menu,
 
-    # ──────────── أوامر القفل والفتح ────────────
+    # ──── أوامر القفل والفتح ────
     "قفل الروابط": cmd_lock_links, "فتح الروابط": cmd_unlock_links,
     "قفل التاك": cmd_lock_tags, "فتح التاك": cmd_unlock_tags,
     "قفل الميديا": cmd_lock_media, "فتح الميديا": cmd_unlock_media,
@@ -93,9 +110,26 @@ ARABIC_COMMANDS = {
     "قفل الهمسه": cmd_lock_whisper, "فتح الهمسه": cmd_unlock_whisper,
     "قفل الكل": cmd_lock_all, "فتح الكل": cmd_unlock_all,
 
-    # ──────────── أوامر المطور ────────────
-    "رفع مطور": cmd_add_dev,
-    "تنزيل مطور": cmd_remove_dev,
-    "اذاعه": cmd_broadcast,
-    "احصائيات البوت": cmd_bot_stats,
+    # ──── أوامر المطور ────
+    "رفع مطور": cmd_add_dev, "تنزيل مطور": cmd_remove_dev,
+    "اذاعه": cmd_broadcast, "احصائيات البوت": cmd_bot_stats,
+
+    # ──── أوامر المشرفين الإضافية ────
+    "رفع مشرف": cmd_promote_admin, "تنزيل مشرف": cmd_demote_admin,
+    "المشرفين": cmd_list_admins, "تنزيل الكل": cmd_demote_all,
+    "مسح المحظورين": cmd_purge_bans, "مسح المكتومين": cmd_purge_muted,
+    "تاك للكل": cmd_tag_all, "رتبتي": cmd_my_rank, "رتبته": cmd_his_rank,
+
+    # ──── أوامر المستخدم الإضافية ────
+    "اهمس": cmd_whisper, "افتاري": cmd_get_invite,
+    "سورة": cmd_surah, "قران": cmd_quran_page,
+    "انطقي": cmd_speak, "وش يقول": cmd_voice_to_text,
+    "جيمناي": cmd_gemini, "الحد": cmd_limit,
+    "اطردني": cmd_kickme,
+    "تفعيل الترحيب": cmd_enable_welcome, "تعطيل الترحيب": cmd_disable_welcome,
+    "بايـو": cmd_bio, "المالك": cmd_owner,
+
+    # ──── أوامر الردود والاختصارات ────
+    "اضف رد": cmd_add_reply, "حذف رد": cmd_remove_reply, "الردود المضافه": cmd_list_replies,
+    "اضف امر": cmd_add_command, "حذف امر": cmd_remove_command, "الاوامر المضافه": cmd_list_commands,
 }
