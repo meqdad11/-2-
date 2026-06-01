@@ -15,6 +15,7 @@ import database as db
 from config import TELEGRAM_BOT_TOKEN
 from commands import ARABIC_COMMANDS
 
+# Handlers الأساسية
 from handlers_admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
     cmd_banlist, cmd_baninfo, cmd_checkban, cmd_eventlog,
@@ -47,8 +48,7 @@ from music import (
 from handlers_menu import callback_menu, handle_interactive_messages, cmd_menu
 from handlers_locks import filter_locked_content
 
-# استيراد الدوال الجديدة التي تحتاج إلى تسجيل كـ CommandHandler (اختياري، لأنها في commands)
-# لكننا نستوردها لاستخدامها في handle_text إذا لزم الأمر
+# استيرادات الدوال الجديدة (لضمان عدم وجود أخطاء)
 from handlers_admin import (
     cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
     cmd_demote_all, cmd_purge_bans, cmd_purge_muted,
@@ -73,7 +73,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ========== معالج الرسائل النصية ==========
+# ========== معالج الرسائل النصية (الأول في الترتيب) ==========
 async def handle_text(update: Update, context):
     msg = update.message
     if not msg or not msg.text:
@@ -81,7 +81,7 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
-    # 👇 السطر المضاف للتصحيح (سيظهر في سجل Railway)
+    # سطر التصحيح (يمكن إزالته بعد التأكد من العمل)
     print(f"[DEBUG] handle_text received: '{text}'")
 
     # التحقق من وجود طلب معلق (بحث، مسح، تذكير...)
@@ -115,6 +115,7 @@ async def handle_text(update: Update, context):
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
+
 # ========== تهيئة التطبيق ==========
 async def post_init(app):
     await db.init_db()
@@ -122,7 +123,7 @@ async def post_init(app):
 # ========== تسجيل الهاندلرز ==========
 def register_handlers(app):
 
-    # أوامر سلاش (لن نضيفها كلها لأنها موجودة في commands، لكن نضيف الأساسية)
+    # أوامر سلاش
     app.add_handler(CommandHandler("start", cmd_menu))
     app.add_handler(CommandHandler("id",         cmd_id))
     app.add_handler(CommandHandler("ban",        cmd_ban))
@@ -159,11 +160,12 @@ def register_handlers(app):
     # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # معالج فلترة المحتوى (لأقفال المجموعة)
-    app.add_handler(MessageHandler(filters.ALL, filter_locked_content))
-
-    # الرسائل النصية (معالج واحد)
+    # ========== الترتيب الصحيح للمعالجات النصية ==========
+    # 1. معالج الأوامر العربية أولاً
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+
+    # 2. معالج فلترة المحتوى (لأقفال المجموعة) بعد ذلك
+    app.add_handler(MessageHandler(filters.ALL, filter_locked_content))
 
 # ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
