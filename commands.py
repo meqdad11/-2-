@@ -33,15 +33,17 @@ from handlers_resources import (
     cmd_add_resource,
     cmd_list_resources,
     cmd_delete_resource,
+)  # <-- تم إغلاق القوس بشكل صحيح
 
-from handlers_menu import cmd_menu, callback_menu
-)
+from handlers_menu import cmd_menu, callback_menu  # <-- استيراد منفصل وصحيح
+
 from music import (
     cmd_sc_search,
     cmd_yt_search,
     cmd_download,
 )
-from handlers_menu import cmd_menu
+
+# تم حذف السطر المكرر: from handlers_menu import cmd_menu
 
 # ========== قاموس الأوامر العربية ==========
 ARABIC_COMMANDS = {
@@ -87,5 +89,5 @@ ARABIC_COMMANDS = {
     "تحميل":                cmd_download,
     "بحث":                  cmd_sc_search,
     "يوتيوب":               cmd_yt_search,
-    "ابدأ":                  cmd_menu,
+    "ابدأ":                 cmd_menu,
 }
