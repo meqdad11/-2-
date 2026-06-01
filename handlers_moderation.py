@@ -1,5 +1,6 @@
 import logging
 import database as db
+from config import MAX_WARNINGS
 from telegram import Update
 from telegram.ext import ContextTypes
 from helpers import require_admin, is_admin, get_reply_user
@@ -7,7 +8,6 @@ from helpers import require_admin, is_admin, get_reply_user
 # ================================================
 
 logger = logging.getLogger(__name__)
-MAX_WARNINGS = 3
 
 CRISIS_KEYWORDS = [
     "انتحار", "انتحرت", "أنتحر", "بنتحر", "بينتحر", "سأنتحر", "راح انتحر",
