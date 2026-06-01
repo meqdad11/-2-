@@ -1,17 +1,16 @@
 import logging
+import random
+import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import database as db
 from helpers import require_admin, is_admin
-
-# ================================================
 
 logger = logging.getLogger(__name__)
 
 # ================================================
 # القائمة الرئيسية
 # ================================================
-
 async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyboard = [
         [
@@ -22,7 +21,15 @@ async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🎵 الميديا",        callback_data="menu_media"),
             InlineKeyboardButton("📚 الموارد",        callback_data="menu_resources"),
         ],
-        [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],  # زر الإغلاق
+        [
+            InlineKeyboardButton("📊 إحصائيات",       callback_data="exec_stats"),
+            InlineKeyboardButton("💬 اقتباس اليوم",   callback_data="exec_quote"),
+        ],
+        [
+            InlineKeyboardButton("❓ المساعدة",       callback_data="menu_help"),
+            InlineKeyboardButton("📞 تواصل",          callback_data="menu_contact"),
+        ],
+        [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
     ]
     await update.message.reply_text(
         "🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:",
@@ -32,7 +39,6 @@ async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ================================================
 # معالج الأزرار
 # ================================================
-
 async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -41,6 +47,57 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ── إغلاق القائمة ──────────────────────────
     if data == "menu_close":
         await query.message.delete()
+        return
+
+    # ── إحصائيات المجموعة ──────────────────────
+    if data == "exec_stats":
+        chat_id = update.effective_chat.id
+        try:
+            members_count = await context.bot.get_chat_member_count(chat_id)
+            admins = await context.bot.get_chat_administrators(chat_id)
+            admins_count = len(admins)
+            text = f"📊 إحصائيات المجموعة:\n👥 الأعضاء: {members_count}\n👮 المشرفون: {admins_count}"
+        except:
+            text = "📊 لا يمكن جلب الإحصائيات حالياً."
+        await query.message.reply_text(text)
+        return
+
+    # ── اقتباس اليوم ───────────────────────────
+    if data == "exec_quote":
+        quotes = [
+            "🌟 لا تؤجل عمل اليوم إلى الغد.",
+            "💪 النجاح ليس حكراً على أحد، جربه بإصرار.",
+            "🧠 تعلم شيئاً جديداً كل يوم.",
+            "😊 ابتسم فأنت بخير.",
+            "⭐ الحياة قصيرة، عشها بفرح.",
+            "📖 المعرفة نور والجهل ظلام.",
+            "🤝 كن لطيفاً مع الجميع."
+        ]
+        quote = random.choice(quotes)
+        await query.message.reply_text(f"💬 اقتباس اليوم:\n\n{quote}")
+        return
+
+    # ── المساعدة ───────────────────────────────
+    if data == "menu_help":
+        help_text = (
+            "❓ **أوامر البوت**\n\n"
+            "/start - إظهار القائمة\n"
+            "/id - معرفك\n"
+            "/rules - عرض القواعد\n"
+            "/report - تقرير للمشرفين\n"
+            "/ban @username - حظر\n"
+            "/unban @username - رفع الحظر\n"
+            "/mute @username - كتم\n"
+            "/unmute @username - رفع الكتم\n"
+            "يمكنك استخدام الأزرار للتنقل."
+        )
+        await query.message.reply_text(help_text, parse_mode="Markdown")
+        return
+
+    # ── تواصل مع المطور (تم تعديل الرابط) ───────
+    if data == "menu_contact":
+        contact_text = "📞 **تواصل مع المطور:**\n[اضغط هنا](https://t.me/Me8dad)\nأو راسلني مباشرة."
+        await query.message.reply_text(contact_text, parse_mode="Markdown", disable_web_page_preview=True)
         return
 
     # ── القائمة الرئيسية ──────────────────────
@@ -53,6 +110,14 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [
                 InlineKeyboardButton("🎵 الميديا",        callback_data="menu_media"),
                 InlineKeyboardButton("📚 الموارد",        callback_data="menu_resources"),
+            ],
+            [
+                InlineKeyboardButton("📊 إحصائيات",       callback_data="exec_stats"),
+                InlineKeyboardButton("💬 اقتباس اليوم",   callback_data="exec_quote"),
+            ],
+            [
+                InlineKeyboardButton("❓ المساعدة",       callback_data="menu_help"),
+                InlineKeyboardButton("📞 تواصل",          callback_data="menu_contact"),
             ],
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
@@ -196,7 +261,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ================================================
     # تنفيذ الأوامر المباشرة
     # ================================================
-
     elif data == "exec_banlist":
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
