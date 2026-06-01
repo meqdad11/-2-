@@ -349,7 +349,7 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
         await msg.delete()
         await msg.reply_text("🚫 الملصقات والمتحركات مقفلة.")
         return
-    if msg.forward_from and await db.is_locked(chat_id, "forward"):
+    if msg.forward_origin and await db.is_locked(chat_id, "forward"):
         await msg.delete()
         await msg.reply_text("🚫 التوجيه مقفل.")
         return
