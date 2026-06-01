@@ -15,7 +15,6 @@ import database as db
 from config import TELEGRAM_BOT_TOKEN
 from commands import ARABIC_COMMANDS
 
-# Handlers الأساسية
 from handlers_admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
     cmd_banlist, cmd_baninfo, cmd_checkban, cmd_eventlog,
@@ -73,7 +72,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ========== معالج الرسائل النصية (الأول في الترتيب) ==========
+# ========== معالج الرسائل النصية في المجموعات ==========
 async def handle_text(update: Update, context):
     msg = update.message
     if not msg or not msg.text:
@@ -81,10 +80,10 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
-    # سطر التصحيح (يمكن إزالته بعد التأكد من العمل)
-    print(f"[DEBUG] handle_text received: '{text}'")
+    # سطر تصحيح (اختياري، يمكن إزالته)
+    # print(f"[DEBUG] handle_text: {text}")
 
-    # التحقق من وجود طلب معلق (بحث، مسح، تذكير...)
+    # طلبات معلقة (بحث، مسح، تذكير...)
     if (context.user_data.get('waiting_google') == chat_id or
         context.user_data.get('purge_mode') == chat_id or
         context.user_data.get('waiting_remind') == chat_id or
@@ -94,7 +93,7 @@ async def handle_text(update: Update, context):
         await handle_interactive_messages(update, context)
         return
 
-    # معالجة تأكيد تنزيل الكل
+    # تأكيد تنزيل الكل
     if text == "تأكيد" and context.user_data.get('awaiting_demote_all') == chat_id:
         await confirm_demote_all(update, context)
         return
@@ -107,7 +106,7 @@ async def handle_text(update: Update, context):
             await handler(update, context)
             return
 
-    # معالجة الردود التلقائية والاختصارات
+    # ردود واختصارات
     await process_custom_replies_and_commands(update, context)
 
     # معالجة الروابط والميديا والفلترة
@@ -115,6 +114,12 @@ async def handle_text(update: Update, context):
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
+
+# ========== معالج رسائل القنوات (لتحميل الميديا فقط) ==========
+async def handle_channel_post(update: Update, context):
+    """يعالج الروابط المرسلة في القنوات (بدون تعديل في منطق التحميل)"""
+    # نمرر التحديث كما هو، و handle_media_url سيتعامل معه
+    await handle_media_url(update, context)
 
 # ========== تهيئة التطبيق ==========
 async def post_init(app):
@@ -160,12 +165,14 @@ def register_handlers(app):
     # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # ========== الترتيب الصحيح للمعالجات النصية ==========
-    # 1. معالج الأوامر العربية أولاً
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    # معالج الرسائل النصية في المجموعات
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
 
-    # 2. معالج فلترة المحتوى (لأقفال المجموعة) بعد ذلك
-    app.add_handler(MessageHandler(filters.ALL, filter_locked_content))
+    # معالج رسائل القنوات (لتحميل الروابط)
+    app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
+
+    # فلترة المحتوى (للمجموعات فقط)
+    app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
 
 # ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
@@ -192,7 +199,7 @@ def main():
     register_jobs(app)
 
     app.run_polling(
-        allowed_updates=["message", "chat_member", "callback_query"],
+        allowed_updates=["message", "channel_post", "chat_member", "callback_query"],
         drop_pending_updates=True,
     )
 
