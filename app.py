@@ -29,7 +29,7 @@ from handlers_moderation import (
     filter_banned_words,
 )
 from handlers_jobs import (
-    cmd_report, job_expire_bans, job_daily_report,
+    cmd_report, job_expire_bans, 
     job_weekly_report, job_daily_quote,
 )
 from handlers_ai import (
