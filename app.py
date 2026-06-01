@@ -62,6 +62,9 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
+    # سطر التصحيح: طباعة النص المستلم
+    print(f"[DEBUG] Received text: {text}")
+
     # التحقق من وجود طلب معلق (بحث، مسح، تذكير...)
     if (context.user_data.get('waiting_google') == chat_id or
         context.user_data.get('purge_mode') == chat_id or
