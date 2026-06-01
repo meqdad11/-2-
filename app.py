@@ -91,7 +91,7 @@ async def post_init(app):
 def register_handlers(app):
 
     # أوامر سلاش
-    app.add_handler(CommandHandler("start",      cmd_start))
+    app.add_handler(CommandHandler("start", cmd_menu))
     app.add_handler(CommandHandler("id",         cmd_id))
     app.add_handler(CommandHandler("ban",        cmd_ban))
     app.add_handler(CommandHandler("unban",      cmd_unban))
