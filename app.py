@@ -26,7 +26,7 @@ from handlers_user import (
 )
 from handlers_moderation import (
     cmd_add_word, cmd_remove_word, cmd_list_words,
-    filter_banned_words,
+    filter_banned_words, process_custom_replies_and_commands,
 )
 from handlers_jobs import (
     cmd_report, job_expire_bans, 
@@ -46,6 +46,25 @@ from music import (
 )
 from handlers_menu import callback_menu, handle_interactive_messages, cmd_menu
 from handlers_locks import filter_locked_content
+
+# استيراد الدوال الجديدة التي تحتاج إلى تسجيل كـ CommandHandler (اختياري، لأنها في commands)
+# لكننا نستوردها لاستخدامها في handle_text إذا لزم الأمر
+from handlers_admin import (
+    cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
+    cmd_demote_all, cmd_purge_bans, cmd_purge_muted,
+    cmd_tag_all, cmd_my_rank, cmd_his_rank, confirm_demote_all,
+)
+from handlers_user import (
+    cmd_whisper, cmd_get_invite, cmd_surah, cmd_quran_page,
+    cmd_speak, cmd_voice_to_text, cmd_kickme,
+    cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
+)
+from handlers_moderation import (
+    cmd_add_reply, cmd_remove_reply, cmd_list_replies,
+    cmd_add_command, cmd_remove_command, cmd_list_commands,
+)
+from handlers_ai import cmd_gemini, cmd_limit
+from handlers_dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 
 # ========== إعداد التسجيل ==========
 logging.basicConfig(
@@ -72,6 +91,11 @@ async def handle_text(update: Update, context):
         await handle_interactive_messages(update, context)
         return
 
+    # معالجة تأكيد تنزيل الكل
+    if text == "تأكيد" and context.user_data.get('awaiting_demote_all') == chat_id:
+        await confirm_demote_all(update, context)
+        return
+
     # الأوامر العربية
     for arabic_cmd, handler in ARABIC_COMMANDS.items():
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
@@ -80,6 +104,10 @@ async def handle_text(update: Update, context):
             await handler(update, context)
             return
 
+    # معالجة الردود التلقائية والاختصارات
+    await process_custom_replies_and_commands(update, context)
+
+    # معالجة الروابط والميديا والفلترة
     await handle_media_url(update, context)
     await filter_banned_words(update, context)
     await auto_reply(update, context)
@@ -92,7 +120,7 @@ async def post_init(app):
 # ========== تسجيل الهاندلرز ==========
 def register_handlers(app):
 
-    # أوامر سلاش
+    # أوامر سلاش (لن نضيفها كلها لأنها موجودة في commands، لكن نضيف الأساسية)
     app.add_handler(CommandHandler("start", cmd_menu))
     app.add_handler(CommandHandler("id",         cmd_id))
     app.add_handler(CommandHandler("ban",        cmd_ban))
@@ -129,11 +157,11 @@ def register_handlers(app):
     # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # الرسائل النصية (يجب أن يكون أول معالج للنص)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-
-    # معالج فلترة المحتوى (لأقفال المجموعة) - يوضع بعد معالج النص الرئيسي
+    # معالج فلترة المحتوى (لأقفال المجموعة)
     app.add_handler(MessageHandler(filters.ALL, filter_locked_content))
+
+    # الرسائل النصية (معالج واحد)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
 # ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
