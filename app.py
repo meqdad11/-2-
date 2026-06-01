@@ -44,7 +44,7 @@ from music import (
     handle_media_url, callback_download,
     callback_sc_download, callback_yt_pick,
 )
-from handlers_menu import callback_menu  # <--- السطر المضاف الأول
+from handlers_menu import callback_menu, handle_interactive_messages  # <--- أضفنا handle_interactive_messages
 
 # ========== إعداد التسجيل ==========
 logging.basicConfig(
@@ -111,13 +111,15 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(callback_sc_download,  pattern=r"^sc_dl\|"))
     app.add_handler(CallbackQueryHandler(callback_yt_pick,      pattern=r"^yt_pick\|"))
     app.add_handler(CallbackQueryHandler(callback_choose_model, pattern=r"^model_"))
-    app.add_handler(CallbackQueryHandler(callback_menu))   # <--- السطر المضاف الثاني
+    app.add_handler(CallbackQueryHandler(callback_menu))
 
     # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
     # الرسائل النصية
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    # معالج الرسائل التفاعلية (لأوامر مثل مسح، تذكير، ترجمة، بحث جوجل، بث)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_interactive_messages))
 
 # ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
