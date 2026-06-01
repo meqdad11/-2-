@@ -62,9 +62,6 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
-    # سطر التصحيح: طباعة النص المستلم
-    print(f"[DEBUG] Received text: {text}")
-
     # التحقق من وجود طلب معلق (بحث، مسح، تذكير...)
     if (context.user_data.get('waiting_google') == chat_id or
         context.user_data.get('purge_mode') == chat_id or
@@ -132,11 +129,11 @@ def register_handlers(app):
     # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # معالج فلترة المحتوى (لأقفال المجموعة)
-    app.add_handler(MessageHandler(filters.ALL, filter_locked_content))
-
-    # الرسائل النصية (هذا هو المعالج الوحيد للرسائل النصية)
+    # الرسائل النصية (يجب أن يكون أول معالج للنص)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+
+    # معالج فلترة المحتوى (لأقفال المجموعة) - يوضع بعد معالج النص الرئيسي
+    app.add_handler(MessageHandler(filters.ALL, filter_locked_content))
 
 # ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
