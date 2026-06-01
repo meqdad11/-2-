@@ -59,7 +59,19 @@ async def handle_text(update: Update, context):
     if not msg or not msg.text:
         return
     text = msg.text.strip()
+    chat_id = msg.chat.id
 
+    # التحقق من وجود طلب معلق (بحث، مسح، تذكير...)
+    if (context.user_data.get('waiting_google') == chat_id or
+        context.user_data.get('purge_mode') == chat_id or
+        context.user_data.get('waiting_remind') == chat_id or
+        context.user_data.get('waiting_translate') == chat_id or
+        context.user_data.get('waiting_broadcast') == chat_id):
+        from handlers_menu import handle_interactive_messages
+        await handle_interactive_messages(update, context)
+        return
+
+    # الأوامر العربية
     for arabic_cmd, handler in ARABIC_COMMANDS.items():
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
             args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
@@ -71,7 +83,6 @@ async def handle_text(update: Update, context):
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
-
 # ========== تهيئة التطبيق ==========
 async def post_init(app):
     await db.init_db()
