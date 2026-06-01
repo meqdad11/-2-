@@ -33,6 +33,8 @@ from handlers_resources import (
     cmd_add_resource,
     cmd_list_resources,
     cmd_delete_resource,
+
+from handlers_menu import cmd_menu, callback_menu
 )
 from music import (
     cmd_sc_search,
