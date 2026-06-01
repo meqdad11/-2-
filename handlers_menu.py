@@ -7,7 +7,6 @@ from helpers import is_admin
 
 logger = logging.getLogger(__name__)
 
-# متغيرات مؤقتة للألعاب والنقاط
 temp_points = {}
 temp_games = {}
 
@@ -20,11 +19,11 @@ async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("📚 الموارد", callback_data="menu_resources")],
         [InlineKeyboardButton("📊 إحصائيات", callback_data="exec_stats"),
          InlineKeyboardButton("💬 اقتباس اليوم", callback_data="exec_quote")],
-        [InlineKeyboardButton("❓ المساعدة", callback_data="menu_help"),
-         InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
+        [InlineKeyboardButton("📋 الأوامر", callback_data="menu_commands")],
         [InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games"),
          InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google")],
-        [InlineKeyboardButton("📢 قناة التحديثات", url="https://t.me/shafaqmeqdad")],
+        [InlineKeyboardButton("📢 قناة التحديثات", url="https://t.me/shafaqmeqdad"),
+         InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
         [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
     ]
     await update.message.reply_text(
@@ -41,12 +40,10 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = query.message
     chat_id = msg.chat.id
 
-    # --------------------- إغلاق ---------------------
     if data == "menu_close":
         await msg.delete()
         return
 
-    # --------------------- إحصائيات ---------------------
     if data == "exec_stats":
         try:
             members_count = await context.bot.get_chat_member_count(chat_id)
@@ -57,7 +54,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text("📊 لا يمكن جلب الإحصائيات حالياً.")
         return
 
-    # --------------------- اقتباس اليوم ---------------------
     if data == "exec_quote":
         quotes = [
             "🌟 لا تؤجل عمل اليوم إلى الغد.",
@@ -71,7 +67,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(f"💬 اقتباس اليوم:\n\n{random.choice(quotes)}")
         return
 
-    # --------------------- المساعدة ---------------------
     if data == "menu_help":
         help_text = (
             "❓ **أوامر البوت**\n\n"
@@ -88,12 +83,10 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(help_text, parse_mode="Markdown")
         return
 
-    # --------------------- تواصل مع المطور ---------------------
     if data == "menu_contact":
         await msg.reply_text("📞 **تواصل مع المطور:**\n[اضغط هنا](https://t.me/Me8dad)", parse_mode="Markdown", disable_web_page_preview=True)
         return
 
-    # --------------------- ألعاب ---------------------
     if data == "menu_games":
         keyboard = [
             [InlineKeyboardButton("🎲 تخمين رقم (1-10)", callback_data="game_guess")],
@@ -151,13 +144,134 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(f"اخترت: {user_choice_text}\nالبوت اختار: {bot_choice_text}\n\n{result}")
         return
 
-    # --------------------- بحث جوجل ---------------------
     if data == "menu_google":
         context.user_data['waiting_google'] = chat_id
         await msg.reply_text("🔍 **أرسل ما تريد البحث عنه في جوجل:**", parse_mode="Markdown")
         return
 
-    # --------------------- القوائم الرئيسية ---------------------
+    # ================= القسم الجديد: قائمة الأوامر المتقدمة =================
+    if data == "menu_commands":
+        keyboard = [
+            [InlineKeyboardButton("🔐 أوامر القفل والفتح", callback_data="menu_lock_commands")],
+            [InlineKeyboardButton("🛠 الأوامر الخدمية", callback_data="menu_service_commands")],
+            [InlineKeyboardButton("👮 أوامر الإدارة", callback_data="menu_admin_commands")],
+            [InlineKeyboardButton("👨‍💻 أوامر المطور", callback_data="menu_dev_commands")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
+        ]
+        await msg.edit_text("📋 قائمة الأوامر المتخصصة:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    if data == "menu_lock_commands":
+        lock_types = [
+            "links", "tags", "media", "files", "video", "voice", "gifs",
+            "edit", "editmedia", "repeat", "join", "forward", "id", "badwords",
+            "spam", "replies", "notifications", "persian", "bots", "iranian",
+            "longtext", "quran", "porn", "ai", "autoreply", "games", "marketnews", "whisper"
+        ]
+        name_map = {
+            "links":"الروابط", "tags":"التاك", "media":"الميديا", "files":"الملفات",
+            "video":"الفيديو", "voice":"الفويسات", "gifs":"المتحركات", "edit":"التعديل",
+            "editmedia":"تعديل الميديا", "repeat":"التكرار", "join":"الدخول", "forward":"التوجيه",
+            "id":"ايدي", "badwords":"السب", "spam":"السبام", "replies":"الردود",
+            "notifications":"الاشعارات", "persian":"الفارسية", "bots":"البوتات", "iranian":"دخول الايراني",
+            "longtext":"الكلام الكثير", "quran":"القرآن", "porn":"الاباحي", "ai":"الذكاء الاصطناعي",
+            "autoreply":"الرد التلقائي", "games":"الألعاب", "marketnews":"اخبار السوق", "whisper":"الهمسة"
+        }
+        buttons = []
+        for lt in lock_types:
+            display = name_map.get(lt, lt)
+            buttons.append([InlineKeyboardButton(f"🔒 قفل {display}", callback_data=f"lock_{lt}"),
+                            InlineKeyboardButton(f"🔓 فتح {display}", callback_data=f"unlock_{lt}")])
+        buttons.append([InlineKeyboardButton("🔒 قفل الكل", callback_data="lock_all"),
+                        InlineKeyboardButton("🔓 فتح الكل", callback_data="unlock_all")])
+        buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="menu_commands")])
+        buttons.append([InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")])
+        await msg.edit_text("🔐 اختر نوع القفل:", reply_markup=InlineKeyboardMarkup(buttons))
+        return
+
+    if data.startswith("lock_") and not data.startswith("lock_all"):
+        lock_type = data.split("_")[1]
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
+        await db.set_lock(chat_id, lock_type, True)
+        await query.answer(f"🔒 تم قفل {lock_type}", show_alert=True)
+        # تحديث القائمة
+        await msg.edit_text(f"🔒 تم قفل {lock_type}.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_lock_commands")]]))
+        return
+    if data.startswith("unlock_") and not data.startswith("unlock_all"):
+        lock_type = data.split("_")[1]
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
+        await db.set_lock(chat_id, lock_type, False)
+        await query.answer(f"🔓 تم فتح {lock_type}", show_alert=True)
+        await msg.edit_text(f"🔓 تم فتح {lock_type}.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_lock_commands")]]))
+        return
+
+    if data == "lock_all":
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
+        lock_types = ["links","tags","media","files","video","voice","gifs","edit","editmedia","repeat","join","forward","id","badwords","spam","replies","notifications","persian","bots","iranian","longtext","quran","porn","ai","autoreply","games","marketnews","whisper"]
+        for lt in lock_types:
+            await db.set_lock(chat_id, lt, True)
+        await query.answer("🔒 تم قفل جميع الحمايات", show_alert=True)
+        await msg.edit_text("🔒 تم قفل كل شيء.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_lock_commands")]]))
+        return
+    if data == "unlock_all":
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
+        lock_types = ["links","tags","media","files","video","voice","gifs","edit","editmedia","repeat","join","forward","id","badwords","spam","replies","notifications","persian","bots","iranian","longtext","quran","porn","ai","autoreply","games","marketnews","whisper"]
+        for lt in lock_types:
+            await db.set_lock(chat_id, lt, False)
+        await query.answer("🔓 تم فتح جميع الحمايات", show_alert=True)
+        await msg.edit_text("🔓 تم فتح كل شيء.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_lock_commands")]]))
+        return
+
+    if data == "menu_service_commands":
+        text = (
+            "🛠 **الأوامر الخدمية:**\n"
+            "• ايدي - معرفك\n"
+            "• افتاري - رابط المجموعة\n"
+            "• اهمس @username - رسالة خاصة\n"
+            "• صارحني - تواصل خاص\n"
+            "• سورة [اسم السورة] - آية عشوائية\n"
+            "• قران [رقم الصفحة] - نص الصفحة\n"
+            "• انطقي [النص] - نطق النص\n"
+            "• وش يقول (رد على فويس) - تحويل الصوت لنص\n"
+            "• جيمناي - محادثة ذكاء اصطناعي\n"
+            "• الحد - إدارة الموديلات"
+        )
+        await msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_commands")]]))
+        return
+    if data == "menu_admin_commands":
+        text = (
+            "👮 **أوامر الإدارة (للمشرفين):**\n"
+            "• كتم / الغاء كتم\n"
+            "• طرد / حظر / الغاء حظر\n"
+            "• رفع مشرف / تنزيل مشرف\n"
+            "• رفع / تنزيل (عضو مميز)\n"
+            "• المشرفين / تنزيل الكل\n"
+            "• مسح [عدد] / مسح المحظورين\n"
+            "• مسح المكتومين / تاك للكل\n"
+            "• رتبتي / رتبته"
+        )
+        await msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_commands")]]))
+        return
+    if data == "menu_dev_commands":
+        text = (
+            "👨‍💻 **أوامر المطور:**\n"
+            "• رفع مطور / تنزيل مطور\n"
+            "• اضف مطور / حذف مطور\n"
+            "• المطور / اذاعه"
+        )
+        await msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_commands")]]))
+        return
+
+    # ================= باقي القوائم الأصلية (لم تتغير) =================
     if data == "menu_main":
         keyboard = [
             [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin")],
@@ -166,16 +280,17 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📚 الموارد", callback_data="menu_resources")],
             [InlineKeyboardButton("📊 إحصائيات", callback_data="exec_stats")],
             [InlineKeyboardButton("💬 اقتباس اليوم", callback_data="exec_quote")],
+            [InlineKeyboardButton("📋 الأوامر", callback_data="menu_commands")],
             [InlineKeyboardButton("❓ المساعدة", callback_data="menu_help")],
             [InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
             [InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
             [InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google")],
+            [InlineKeyboardButton("📢 قناة التحديثات", url="https://t.me/shafaqmeqdad")],
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text("🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # --------------------- أوامر المشرفين ---------------------
     if data == "menu_admin":
         keyboard = [
             [InlineKeyboardButton("🚫 الحظر", callback_data="menu_ban")],
@@ -198,12 +313,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text(
-            "🚫 **الحظر:**\n"
-            "• حظر — رد على عضو\n"
-            "• حظر 123 7d سبب — حظر مؤقت\n"
-            "• رفع الحظر — رد على عضو\n"
-            "• تحقق — رد على عضو\n"
-            "• معلومات — رد على عضو",
+            "🚫 **الحظر:**\n• حظر — رد على عضو\n• حظر 123 7d سبب — حظر مؤقت\n• رفع الحظر — رد على عضو\n• تحقق — رد على عضو\n• معلومات — رد على عضو",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
@@ -215,11 +325,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text(
-            "⚠️ **التحذيرات:**\n"
-            "• تحذير — رد على عضو\n"
-            "• مسح التحذير — رد على عضو\n"
-            "• التحذيرات — رد على عضو\n\n"
-            "ملاحظة: 3 تحذيرات = حظر تلقائي",
+            "⚠️ **التحذيرات:**\n• تحذير — رد على عضو\n• مسح التحذير — رد على عضو\n• التحذيرات — رد على عضو\n\nملاحظة: 3 تحذيرات = حظر تلقائي",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
@@ -231,10 +337,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text(
-            "🔇 **الكتم:**\n"
-            "• كتم — رد على عضو\n"
-            "• كتم 123 1h — كتم مؤقت\n"
-            "• رفع الكتم — رد على عضو",
+            "🔇 **الكتم:**\n• كتم — رد على عضو\n• كتم 123 1h — كتم مؤقت\n• رفع الكتم — رد على عضو",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
@@ -253,7 +356,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text("⚙️ الإدارة — اختر أمراً:", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # --------------------- للجميع ---------------------
     if data == "menu_user":
         keyboard = [
             [InlineKeyboardButton("🪪 معلوماتي", callback_data="exec_id")],
@@ -316,22 +418,18 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data['waiting_remind'] = chat_id
         return
 
-    # --------------------- الميديا ---------------------
     if data == "menu_media":
         keyboard = [
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text(
-            "🎵 **الميديا:**\n"
-            "• أرسل رابط يوتيوب / تيك توك / انستقرام مباشرة\n"
-            "• يوتيوب <اسم الأغنية> — بحث",
+            "🎵 **الميديا:**\n• أرسل رابط يوتيوب / تيك توك / انستقرام مباشرة\n• يوتيوب <اسم الأغنية> — بحث",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
         return
 
-    # --------------------- الموارد ---------------------
     if data == "menu_resources":
         keyboard = [
             [InlineKeyboardButton("📖 عرض الموارد", callback_data="exec_resources")],
@@ -339,15 +437,12 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text(
-            "📚 **الموارد:**\n"
-            "• الموارد — عرض القائمة\n"
-            "• الموارد <كلمة> — بحث",
+            "📚 **الموارد:**\n• الموارد — عرض القائمة\n• الموارد <كلمة> — بحث",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
         return
 
-    # --------------------- الأوامر التنفيذية المباشرة ---------------------
     if data == "exec_banlist":
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
@@ -404,9 +499,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         from handlers_jobs import cmd_report
         context.args = []
-        # نحتاج إلى تمرير update يحوي message، لكننا لا نستطيع تعديله. بدلاً من ذلك نستدعي الدالة مباشرة؟
-        # الحل: إنشاء كائن update مؤقت؟ هذا معقد. سنستخدم الطريقة القديمة لكننا نعلم أن cmd_report تتوقع update.message موجود.
-        # سأقوم بإعادة توجيه بسيط:
         class FakeUpdate:
             def __init__(self, msg):
                 self.message = msg
@@ -455,8 +547,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 # ================================================
-# معالج الرسائل التفاعلية
-# ================================================
 async def handle_interactive_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.text:
@@ -464,7 +554,6 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
     text = msg.text.strip()
     chat_id = msg.chat.id
 
-    # بحث جوجل
     if context.user_data.get('waiting_google') == chat_id:
         del context.user_data['waiting_google']
         query = text.replace(' ', '+')
@@ -472,7 +561,6 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
         await msg.reply_text(f"🔍 **نتائج البحث:**\n[اضغط هنا]({link})", parse_mode="Markdown", disable_web_page_preview=True)
         return
 
-    # مسح الرسائل
     if context.user_data.get('purge_mode') == chat_id:
         del context.user_data['purge_mode']
         if text.isdigit():
@@ -500,7 +588,6 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
             await msg.reply_text("أرسل عددًا أو رد على رسالة لمسح ما بعدها.")
         return
 
-    # تذكير
     if context.user_data.get('waiting_remind') == chat_id:
         del context.user_data['waiting_remind']
         parts = text.split(maxsplit=1)
@@ -517,13 +604,11 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
         await msg.reply_text(f"✅ تم ضبط تذكير بعد {minutes} دقيقة.")
         return
 
-    # ترجمة (محاكاة بسيطة)
     if context.user_data.get('waiting_translate') == chat_id:
         del context.user_data['waiting_translate']
         await msg.reply_text("🌐 خدمة الترجمة غير متاحة حالياً بسبب القيود التقنية. جرب يدوياً عبر Google Translate.")
         return
 
-    # بث للمجموعة
     if context.user_data.get('waiting_broadcast') == chat_id:
         del context.user_data['waiting_broadcast']
         if not await is_admin(update, context):
