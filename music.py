@@ -108,7 +108,7 @@ async def send_media(message, path: str, info: dict, audio_only: bool):
         raise Exception(f"الملف أكبر من {MAX_FILE_MB}MB")
     
     # زر قناة التحديثات
-    channel_button = [[InlineKeyboardButton("📢 قناة التحديثات", url="https://t.me/+htFgbyDEnDc2ZjY0")]]
+    channel_button = [[InlineKeyboardButton("📢 قناة التحديثات", url="https://t.me/shafaqmeqdad")]]
     reply_markup = InlineKeyboardMarkup(channel_button)
     
     with open(path, "rb") as f:
