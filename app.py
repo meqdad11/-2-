@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import datetime
 
@@ -79,6 +80,22 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
+    # ===== أمر حذف رسالة بالرد (للمشرفين فقط) =====
+    if msg.reply_to_message and text == "حذف":
+        if not await is_admin(update, context):
+            await msg.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+            return
+        try:
+            await context.bot.delete_message(chat_id, msg.reply_to_message.message_id)
+            # رسالة تأكيد تختفي بعد ثانية واحدة
+            temp_msg = await msg.reply_text("🗑️ تم حذف الرسالة.")
+            await asyncio.sleep(1)
+            await temp_msg.delete()
+        except Exception as e:
+            await msg.reply_text("❌ لا يمكن حذف هذه الرسالة (قد تكون قديمة أو ليس لدي صلاحية).")
+        return
+
+    # طلبات معلقة (بحث، مسح، تذكير...)
     if (context.user_data.get('waiting_google') == chat_id or
         context.user_data.get('purge_mode') == chat_id or
         context.user_data.get('waiting_remind') == chat_id or
@@ -88,10 +105,12 @@ async def handle_text(update: Update, context):
         await handle_interactive_messages(update, context)
         return
 
+    # تأكيد تنزيل الكل
     if text == "تأكيد" and context.user_data.get('awaiting_demote_all') == chat_id:
         await confirm_demote_all(update, context)
         return
 
+    # الأوامر العربية
     for arabic_cmd, handler in ARABIC_COMMANDS.items():
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
             args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
@@ -115,6 +134,7 @@ async def post_init(app):
 
 # ========== تسجيل الهاندلرز ==========
 def register_handlers(app):
+
     # أوامر سلاش
     app.add_handler(CommandHandler("start", cmd_menu))
     app.add_handler(CommandHandler("id",         cmd_id))
