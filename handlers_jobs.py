@@ -4,10 +4,10 @@ from datetime import datetime, timezone, timedelta
 from telegram import Update
 from telegram.ext import ContextTypes
 import database as db
+from config import ADMIN_CHAT_ID
 # ================================================
 
 logger = logging.getLogger(__name__)
-from config import ADMIN_CHAT_ID
 
 DAILY_QUOTES = [
     "كل يوم جديد فرصة لبداية جديدة. 🌅",
