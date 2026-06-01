@@ -44,6 +44,7 @@ from music import (
     handle_media_url, callback_download,
     callback_sc_download, callback_yt_pick,
 )
+from handlers_menu import callback_menu  # <--- السطر المضاف الأول
 
 # ========== إعداد التسجيل ==========
 logging.basicConfig(
@@ -110,6 +111,7 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(callback_sc_download,  pattern=r"^sc_dl\|"))
     app.add_handler(CallbackQueryHandler(callback_yt_pick,      pattern=r"^yt_pick\|"))
     app.add_handler(CallbackQueryHandler(callback_choose_model, pattern=r"^model_"))
+    app.add_handler(CallbackQueryHandler(callback_menu))   # <--- السطر المضاف الثاني
 
     # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
