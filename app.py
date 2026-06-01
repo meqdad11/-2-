@@ -30,7 +30,7 @@ from handlers_moderation import (
 )
 from handlers_jobs import (
     cmd_report, job_expire_bans, 
-    job_weekly_report, job_daily_quote,
+    job_daily_quote,
 )
 from handlers_ai import (
     cmd_shafaq, cmd_choose_model, callback_choose_model,
