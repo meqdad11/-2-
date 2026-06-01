@@ -25,8 +25,6 @@ _cache = {
     "bot_actions": [],
 }
 
-
-
 # ========== دالة غير متزامنة: _load_from_gist ==========
 async def _load_from_gist():
     if not GIST_ID:
