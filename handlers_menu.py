@@ -22,6 +22,7 @@ async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             InlineKeyboardButton("🎵 الميديا",        callback_data="menu_media"),
             InlineKeyboardButton("📚 الموارد",        callback_data="menu_resources"),
         ],
+        [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],  # زر الإغلاق
     ]
     await update.message.reply_text(
         "🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:",
@@ -37,6 +38,11 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
 
+    # ── إغلاق القائمة ──────────────────────────
+    if data == "menu_close":
+        await query.message.delete()
+        return
+
     # ── القائمة الرئيسية ──────────────────────
     if data == "menu_main":
         keyboard = [
@@ -48,6 +54,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("🎵 الميديا",        callback_data="menu_media"),
                 InlineKeyboardButton("📚 الموارد",        callback_data="menu_resources"),
             ],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await query.edit_message_text(
             "🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:",
@@ -66,6 +73,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("⚙️ الإدارة",   callback_data="menu_manage"),
             ],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await query.edit_message_text(
             "👮 أوامر المشرفين — اختر القسم:",
@@ -77,6 +85,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("📋 قائمة المحظورين", callback_data="exec_banlist")],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await query.edit_message_text(
             "🚫 الحظر:\n"
@@ -92,6 +101,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "menu_warn":
         keyboard = [
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await query.edit_message_text(
             "⚠️ التحذيرات:\n"
@@ -106,6 +116,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "menu_mute":
         keyboard = [
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await query.edit_message_text(
             "🔇 الكتم:\n"
@@ -130,6 +141,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("🚫 الكلمات المحظورة", callback_data="exec_wordlist"),
             ],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await query.edit_message_text(
             "⚙️ الإدارة — اختر أمراً:",
@@ -147,6 +159,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 InlineKeyboardButton("📚 الموارد",     callback_data="exec_resources"),
             ],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await query.edit_message_text(
             "👥 للجميع — اختر أمراً:",
@@ -157,6 +170,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif data == "menu_media":
         keyboard = [
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await query.edit_message_text(
             "🎵 الميديا:\n"
@@ -170,6 +184,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("📖 عرض الموارد", callback_data="exec_resources")],
             [InlineKeyboardButton("🔙 رجوع",        callback_data="menu_main")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await query.edit_message_text(
             "📚 الموارد:\n"
