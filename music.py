@@ -12,15 +12,12 @@ from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
 
-# ✅ تعريف SEARCH_CACHE في أول الملف
 SEARCH_CACHE = {}
-
 MAX_FILE_MB = 45
 
 SOUNDCLOUD_DOMAINS = ("soundcloud.com",)
 VIDEO_ONLY_DOMAINS = ("vt.tiktok.com", "instagram.com")
 YOUTUBE_DOMAINS = ("youtube.com", "youtu.be")
-
 ALL_DOMAINS = SOUNDCLOUD_DOMAINS + VIDEO_ONLY_DOMAINS + YOUTUBE_DOMAINS
 
 URL_PATTERN = re.compile(
@@ -28,6 +25,7 @@ URL_PATTERN = re.compile(
     r'[^\s]*',
     re.IGNORECASE
 )
+
 def extract_url(text: str):
     match = URL_PATTERN.search(text)
     return match.group(0) if match else None
@@ -46,9 +44,8 @@ def fmt_dur(seconds) -> str:
     except Exception:
         return ""
 
-# ========== التعديل الأساسي: إضافة extractor_args لتجنب حظر يوتيوب ==========
 def _get_common_opts():
-    """خيارات مشتركة لتجنب مشكلة 'Sign in to confirm you’re not a bot'"""
+    """خيارات مشتركة لتجنب حظر يوتيوب"""
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -57,18 +54,17 @@ def _get_common_opts():
         "retries": 3,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "web"],  # الأولوية للأندرويد لتجاوز الحظر
+                "player_client": ["android", "web"],
             }
         }
     }
-    # إذا كان ملف cookies.txt موجوداً، استخدمه (اختياري للمستخدمين الذين يستطيعون)
     if os.path.exists("cookies.txt"):
         opts["cookiefile"] = "cookies.txt"
     return opts
 
 def _download_media(url: str, audio_only: bool) -> dict:
     tmp_dir = tempfile.mkdtemp()
-    base_opts = _get_common_opts()  # استدعاء الخيارات المشتركة
+    base_opts = _get_common_opts()
     if audio_only:
         ydl_opts = {
             **base_opts,
@@ -105,12 +101,16 @@ def _download_media(url: str, audio_only: bool) -> dict:
     except Exception as e:
         raise Exception(f"فشل التحميل: {e}")
 
-# ========== باقي الدوال كما هي (بدون تغيير) ==========
 async def send_media(message, path: str, info: dict, audio_only: bool):
     size = os.path.getsize(path)
     if size > MAX_FILE_MB * 1024 * 1024:
         os.remove(path)
         raise Exception(f"الملف أكبر من {MAX_FILE_MB}MB")
+    
+    # زر قناة التحديثات
+    channel_button = [[InlineKeyboardButton("📢 قناة التحديثات", url="https://t.me/+htFgbyDEnDc2ZjY0")]]
+    reply_markup = InlineKeyboardMarkup(channel_button)
+    
     with open(path, "rb") as f:
         if audio_only:
             await message.reply_audio(
@@ -118,9 +118,14 @@ async def send_media(message, path: str, info: dict, audio_only: bool):
                 title=info["title"][:100],
                 performer=info["uploader"][:100] if info["uploader"] else "Unknown",
                 duration=int(info["duration"]) if info["duration"] else 0,
+                reply_markup=reply_markup
             )
         else:
-            await message.reply_video(video=f, caption=info["title"][:100])
+            await message.reply_video(
+                video=f,
+                caption=info["title"][:100],
+                reply_markup=reply_markup
+            )
     os.remove(path)
 
 async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -216,7 +221,6 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("ايش أحمل؟", reply_markup=keyboard)
 
 def _search_youtube(query: str) -> List[Dict]:
-    """البحث في يوتيوب عن الفيديوهات (مع نفس الخيارات)"""
     try:
         logger.info(f"بدء البحث في يوتيوب: {query}")
         ydl_opts = {
@@ -234,11 +238,9 @@ def _search_youtube(query: str) -> List[Dict]:
             ydl_opts['cookiefile'] = 'cookies.txt'
         
         search_url = f"ytsearch5:{query}"
-        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(search_url, download=False)
             results = []
-            
             if 'entries' in info:
                 for entry in info['entries'][:5]:
                     if entry and entry.get('id'):
@@ -248,7 +250,6 @@ def _search_youtube(query: str) -> List[Dict]:
                             'duration': fmt_dur(entry.get('duration', 0)),
                             'id': entry.get('id', ''),
                         })
-            
             logger.info(f"وجدنا {len(results)} نتائج في يوتيوب")
             return results
     except Exception as e:
@@ -256,7 +257,6 @@ def _search_youtube(query: str) -> List[Dict]:
         return []
 
 async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """البحث - توجيه للبديل (YouTube)"""
     if not context.args:
         await update.message.reply_text(
             "ساوند كلاود غير متاح حالياً ❌\n\n"
@@ -265,59 +265,41 @@ async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "مثال: يوتيوب فيروز"
         )
         return
-    
     query = " ".join(context.args)
     await update.message.reply_text(
         f"ساوند كلاود غير متاح حالياً ❌\n\n"
         f"سأبحث عن '{query}' على اليوتيوب بدلاً منه 🎵"
     )
-    
-    # توجيه البحث إلى YouTube
-    context.args = context.args  # الاحتفاظ بالمعاملات
+    context.args = context.args
     await cmd_yt_search(update, context)
 
 async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """البحث في يوتيوب"""
     if not context.args:
         await update.message.reply_text(
             "الاستخدام: يوتيوب <اسم الفيديو>\n"
             "مثال: يوتيوب فيروز"
         )
         return
-    
     query = " ".join(context.args)
     status = await update.message.reply_text("🔍 جاري البحث في يوتيوب...")
-    
     try:
         loop = asyncio.get_event_loop()
         results = await loop.run_in_executor(None, _search_youtube, query)
-        
         if not results:
             await status.edit_text("❌ لم يتم العثور على نتائج.")
             return
-        
-        # حفظ النتائج في الذاكرة المؤقتة
         cache_id = f"yt_{query[:20]}"
         SEARCH_CACHE[cache_id] = results
-        
         keyboard = []
         for i, result in enumerate(results, 1):
             btn_text = f"{i}. {result['title'][:20]}..." if len(result['title']) > 20 else f"{i}. {result['title']}"
-            keyboard.append([InlineKeyboardButton(
-                btn_text,
-                callback_data=f"yt_pick|{cache_id}|{i-1}"
-            )])
-        
-        await status.edit_text(
-            f"🎬 نتائج البحث عن '{query}':\n\nاختر فيديو:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+            keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"yt_pick|{cache_id}|{i-1}")])
+        await status.edit_text(f"🎬 نتائج البحث عن '{query}':\n\nاختر فيديو:", reply_markup=InlineKeyboardMarkup(keyboard))
     except Exception as e:
         logger.error(f"خطأ في cmd_yt_search: {e}")
         await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:40]}")
 
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تحميل من SoundCloud - غير مدعوم"""
     query = update.callback_query
     await query.answer()
     await query.message.reply_text(
@@ -326,23 +308,19 @@ async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
 async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """اختيار صيغة التحميل من يوتيوب"""
     query = update.callback_query
     await query.answer()
     try:
         parts = query.data.split("|")
         cache_id = parts[1]
         index = int(parts[2])
-        
         if cache_id not in SEARCH_CACHE:
             await query.message.reply_text("❌ انتهت مدة البحث. حاول مجددا.")
             return
-        
         results = SEARCH_CACHE[cache_id]
         if index >= len(results):
             await query.message.reply_text("❌ خيار غير صحيح.")
             return
-        
         url = results[index]['url']
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
