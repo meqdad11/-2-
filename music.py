@@ -46,10 +46,32 @@ def fmt_dur(seconds) -> str:
     except Exception:
         return ""
 
+# ========== التعديل الأساسي: إضافة extractor_args لتجنب حظر يوتيوب ==========
+def _get_common_opts():
+    """خيارات مشتركة لتجنب مشكلة 'Sign in to confirm you’re not a bot'"""
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "noplaylist": True,
+        "socket_timeout": 30,
+        "retries": 3,
+        "extractor_args": {
+            "youtube": {
+                "player_client": ["android", "web"],  # الأولوية للأندرويد لتجاوز الحظر
+            }
+        }
+    }
+    # إذا كان ملف cookies.txt موجوداً، استخدمه (اختياري للمستخدمين الذين يستطيعون)
+    if os.path.exists("cookies.txt"):
+        opts["cookiefile"] = "cookies.txt"
+    return opts
+
 def _download_media(url: str, audio_only: bool) -> dict:
     tmp_dir = tempfile.mkdtemp()
+    base_opts = _get_common_opts()  # استدعاء الخيارات المشتركة
     if audio_only:
         ydl_opts = {
+            **base_opts,
             "format": "bestaudio/best",
             "outtmpl": os.path.join(tmp_dir, "%(title)s.%(ext)s"),
             "postprocessors": [{
@@ -57,22 +79,14 @@ def _download_media(url: str, audio_only: bool) -> dict:
                 "preferredcodec": "mp3",
                 "preferredquality": "128",
             }],
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
             "max_filesize": MAX_FILE_MB * 1024 * 1024,
-            "socket_timeout": 30,
-            "retries": 3,
         }
     else:
         ydl_opts = {
+            **base_opts,
             "format": "best[filesize<45M]/best[height<=720]/best",
             "outtmpl": os.path.join(tmp_dir, "%(title)s.%(ext)s"),
-            "quiet": True,
-            "no_warnings": True,
-            "noplaylist": True,
-            "socket_timeout": 30,
-            "retries": 3,
+            "max_filesize": MAX_FILE_MB * 1024 * 1024,
         }
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -91,7 +105,7 @@ def _download_media(url: str, audio_only: bool) -> dict:
     except Exception as e:
         raise Exception(f"فشل التحميل: {e}")
 
-
+# ========== باقي الدوال كما هي (بدون تغيير) ==========
 async def send_media(message, path: str, info: dict, audio_only: bool):
     size = os.path.getsize(path)
     if size > MAX_FILE_MB * 1024 * 1024:
@@ -166,7 +180,6 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error("خطأ في معالجة الزر: %s", e)
         await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
 
-
 async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
@@ -202,9 +215,8 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]])
         await update.message.reply_text("ايش أحمل؟", reply_markup=keyboard)
 
-
 def _search_youtube(query: str) -> List[Dict]:
-    """البحث في يوتيوب عن الفيديوهات"""
+    """البحث في يوتيوب عن الفيديوهات (مع نفس الخيارات)"""
     try:
         logger.info(f"بدء البحث في يوتيوب: {query}")
         ydl_opts = {
@@ -212,7 +224,15 @@ def _search_youtube(query: str) -> List[Dict]:
             'no_warnings': True,
             'extract_flat': 'in_playlist',
             'playlistend': 5,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                }
+            }
         }
+        if os.path.exists("cookies.txt"):
+            ydl_opts['cookiefile'] = 'cookies.txt'
+        
         search_url = f"ytsearch5:{query}"
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -235,7 +255,6 @@ def _search_youtube(query: str) -> List[Dict]:
         logger.error(f"خطأ البحث في يوتيوب: {e}")
         return []
 
-
 async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """البحث - توجيه للبديل (YouTube)"""
     if not context.args:
@@ -256,7 +275,6 @@ async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # توجيه البحث إلى YouTube
     context.args = context.args  # الاحتفاظ بالمعاملات
     await cmd_yt_search(update, context)
-
 
 async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """البحث في يوتيوب"""
@@ -298,7 +316,6 @@ async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في cmd_yt_search: {e}")
         await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:40]}")
 
-
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """تحميل من SoundCloud - غير مدعوم"""
     query = update.callback_query
@@ -307,7 +324,6 @@ async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYP
         "❌ ساوند كلاود غير متاح حالياً.\n\n"
         "💡 استخدم اليوتيوب بدلاً منه لتحميل الأغاني"
     )
-
 
 async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """اختيار صيغة التحميل من يوتيوب"""
