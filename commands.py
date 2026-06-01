@@ -11,6 +11,7 @@ from handlers_resources import cmd_add_resource, cmd_list_resources, cmd_delete_
 from handlers_menu import cmd_menu, callback_menu
 from music import cmd_sc_search, cmd_yt_search, cmd_download
 
+# استيراد جميع دوال القفل من handlers_locks
 from handlers_locks import (
     cmd_lock_links, cmd_unlock_links,
     cmd_lock_tags, cmd_unlock_tags,
@@ -44,51 +45,20 @@ from handlers_locks import (
 )
 
 ARABIC_COMMANDS = {
-    # ──────────── الأوامر القديمة (مع مرادفات الإملاء) ────────────
-    "حظر": cmd_ban,
-    "رفع الحظر": cmd_unban,
-    "رفع_الحظر": cmd_unban,
-    "رفع حظر": cmd_unban,
-    "قائمة": cmd_banlist,
-    "قائمه": cmd_banlist,
-    "معلومات": cmd_baninfo,
-    "تحقق": cmd_checkban,
-    "تحذير": cmd_warn,
-    "مسح التحذير": cmd_clearwarn,
-    "مسح تحذير": cmd_clearwarn,
-    "التحذيرات": cmd_warnings,
-    "كتم": cmd_mute,
-    "رفع الكتم": cmd_unmute,
-    "رفع كتم": cmd_unmute,
-    "أغلق المجموعة": cmd_lock,
-    "اغلق المجموعة": cmd_lock,
-    "افتح المجموعة": cmd_unlock,
-    "سجل": cmd_eventlog,
-    "تقرير": cmd_report,
-    "أضف كلمة": cmd_add_word,
-    "اضف كلمة": cmd_add_word,
-    "احذف كلمة": cmd_remove_word,
-    "حذف كلمة": cmd_remove_word,
-    "الكلمات المحظورة": cmd_list_words,
-    "أضف مورد": cmd_add_resource,
-    "اضف مورد": cmd_add_resource,
-    "الموارد": cmd_list_resources,
-    "احذف مورد": cmd_delete_resource,
-    "حذف مورد": cmd_delete_resource,
-    "ايدي": cmd_id,
-    "أيدي": cmd_id,
-    "اي دي": cmd_id,
-    "القواعد": cmd_rules,
-    "قواعد": cmd_rules,
-    "شفق": cmd_shafaq,
-    "تحميل": cmd_download,
-    "بحث": cmd_sc_search,
-    "يوتيوب": cmd_yt_search,
-    "ابدا": cmd_menu,
-    "أبدا": cmd_menu,
-    "ابدأ": cmd_menu,
+    # الأوامر القديمة
+    "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
+    "قائمة": cmd_banlist, "معلومات": cmd_baninfo, "تحقق": cmd_checkban,
+    "تحذير": cmd_warn, "مسح التحذير": cmd_clearwarn, "التحذيرات": cmd_warnings,
+    "كتم": cmd_mute, "رفع الكتم": cmd_unmute,
+    "أغلق المجموعة": cmd_lock, "افتح المجموعة": cmd_unlock,
+    "سجل": cmd_eventlog, "تقرير": cmd_report,
+    "أضف كلمة": cmd_add_word, "احذف كلمة": cmd_remove_word, "الكلمات المحظورة": cmd_list_words,
+    "أضف مورد": cmd_add_resource, "الموارد": cmd_list_resources, "احذف مورد": cmd_delete_resource,
+    "ايدي": cmd_id, "القواعد": cmd_rules, "شفق": cmd_shafaq,
+    "تحميل": cmd_download, "بحث": cmd_sc_search, "يوتيوب": cmd_yt_search,
+    "ابدا": cmd_menu, "ابدأ": cmd_menu, "أبدا": cmd_menu,
 
-    # ──────────── أوامر القفل والفتح (مع المرادفات) ────────────
+    # أوامر القفل والفتح (جميع الأنواع)
     "قفل الروابط": cmd_lock_links, "فتح الروابط": cmd_unlock_links,
     "قفل التاك": cmd_lock_tags, "فتح التاك": cmd_unlock_tags,
     "قفل الميديا": cmd_lock_media, "فتح الميديا": cmd_unlock_media,
