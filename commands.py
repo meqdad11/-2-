@@ -11,7 +11,7 @@ from handlers_resources import cmd_add_resource, cmd_list_resources, cmd_delete_
 from handlers_menu import cmd_menu, callback_menu
 from music import cmd_sc_search, cmd_yt_search, cmd_download
 
-# استيراد جميع دوال القفل من handlers_locks
+# استيراد دوال القفل من handlers_locks
 from handlers_locks import (
     cmd_lock_links, cmd_unlock_links,
     cmd_lock_tags, cmd_unlock_tags,
@@ -44,8 +44,12 @@ from handlers_locks import (
     cmd_lock_all, cmd_unlock_all,
 )
 
+# استيراد أوامر المطور
+from handlers_dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
+
+# قاموس الأوامر العربية
 ARABIC_COMMANDS = {
-    # الأوامر القديمة
+    # ──────────── الأوامر القديمة ────────────
     "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
     "قائمة": cmd_banlist, "معلومات": cmd_baninfo, "تحقق": cmd_checkban,
     "تحذير": cmd_warn, "مسح التحذير": cmd_clearwarn, "التحذيرات": cmd_warnings,
@@ -58,7 +62,7 @@ ARABIC_COMMANDS = {
     "تحميل": cmd_download, "بحث": cmd_sc_search, "يوتيوب": cmd_yt_search,
     "ابدا": cmd_menu, "ابدأ": cmd_menu, "أبدا": cmd_menu,
 
-    # أوامر القفل والفتح (جميع الأنواع)
+    # ──────────── أوامر القفل والفتح ────────────
     "قفل الروابط": cmd_lock_links, "فتح الروابط": cmd_unlock_links,
     "قفل التاك": cmd_lock_tags, "فتح التاك": cmd_unlock_tags,
     "قفل الميديا": cmd_lock_media, "فتح الميديا": cmd_unlock_media,
@@ -88,4 +92,10 @@ ARABIC_COMMANDS = {
     "قفل اخبار السوق": cmd_lock_marketnews, "فتح اخبار السوق": cmd_unlock_marketnews,
     "قفل الهمسه": cmd_lock_whisper, "فتح الهمسه": cmd_unlock_whisper,
     "قفل الكل": cmd_lock_all, "فتح الكل": cmd_unlock_all,
+
+    # ──────────── أوامر المطور ────────────
+    "رفع مطور": cmd_add_dev,
+    "تنزيل مطور": cmd_remove_dev,
+    "اذاعه": cmd_broadcast,
+    "احصائيات البوت": cmd_bot_stats,
 }
