@@ -125,6 +125,7 @@ def register_jobs(app):
         job_daily_quote,
         time=datetime.time(hour=9, minute=0, tzinfo=datetime.timezone.utc)
     )
+
 # ========== نقطة الدخول الرئيسية ==========
 def main():
     if not TELEGRAM_BOT_TOKEN:
