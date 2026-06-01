@@ -284,26 +284,76 @@ async def cmd_unlock_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🔓 تم فتح جميع الحمايات.")
 
 # ================================================
-# فلترة المحتوى
+# فلترة المحتوى الشاملة (تمنع كل شيء حسب القفل)
 # ================================================
 async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-    if not msg or not msg.text:
+    if not msg:
         return
     chat_id = msg.chat.id
-    text = msg.text.lower()
 
-    if ("http://" in text or "https://" in text or "www." in text or ".com" in text):
-        if await db.is_locked(chat_id, "links"):
+    # --- نصوص ---
+    if msg.text:
+        text = msg.text.lower()
+        # الروابط
+        if ("http://" in text or "https://" in text or "www." in text or ".com" in text):
+            if await db.is_locked(chat_id, "links"):
+                await msg.delete()
+                await msg.reply_text("🚫 الروابط مقفلة.")
+                return
+        # التاك (منشن)
+        if "@" in text and await db.is_locked(chat_id, "tags"):
             await msg.delete()
-            await msg.reply_text("🚫 الروابط مقفلة في هذه المجموعة.")
+            await msg.reply_text("🚫 التاك مقفل.")
             return
-    if "@" in text and await db.is_locked(chat_id, "tags"):
+        # الكلمات المحظورة
+        banned_words = await db.get_banned_words(chat_id)
+        if any(word in text for word in banned_words) and await db.is_locked(chat_id, "badwords"):
+            await msg.delete()
+            await msg.reply_text("🚫 الكلمات الممنوعة غير مسموحة.")
+            return
+        # النص الطويل
+        if len(text) > 300 and await db.is_locked(chat_id, "longtext"):
+            await msg.delete()
+            await msg.reply_text("🚫 الكلام الكثير مقفل.")
+            return
+        # الفارسية (كشف بسيط)
+        if any("\u0600" <= c <= "\u06FF" for c in text) and await db.is_locked(chat_id, "persian"):
+            await msg.delete()
+            await msg.reply_text("🚫 الكتابة بالفارسية مقفلة.")
+            return
+        # قفل التكرار (يمكن إضافته لاحقاً)
+        # قفل الرد التلقائي (يمكن إضافته)
+        # قفل الذكاء الاصطناعي (يمكن إضافته)
+        # قفل القرآن (لا نمنعه عادة)
+        # قفل الاباحي (فلترة حسب كلمات)
+
+    # --- ميديا ---
+    if msg.photo and await db.is_locked(chat_id, "media"):
         await msg.delete()
-        await msg.reply_text("🚫 التاك مقفل.")
+        await msg.reply_text("🚫 الصور مقفلة.")
         return
-    banned_words = await db.get_banned_words(chat_id)
-    if any(word in text for word in banned_words) and await db.is_locked(chat_id, "badwords"):
+    if msg.video and await db.is_locked(chat_id, "video"):
         await msg.delete()
-        await msg.reply_text("🚫 الكلمات الممنوعة غير مسموحة.")
+        await msg.reply_text("🚫 الفيديو مقفل.")
+        return
+    if msg.audio and await db.is_locked(chat_id, "voice"):
+        await msg.delete()
+        await msg.reply_text("🚫 الصوتيات مقفلة.")
+        return
+    if msg.document and await db.is_locked(chat_id, "files"):
+        await msg.delete()
+        await msg.reply_text("🚫 الملفات مقفلة.")
+        return
+    if msg.sticker and await db.is_locked(chat_id, "gifs"):
+        await msg.delete()
+        await msg.reply_text("🚫 الملصقات والمتحركات مقفلة.")
+        return
+    if msg.forward_from and await db.is_locked(chat_id, "forward"):
+        await msg.delete()
+        await msg.reply_text("🚫 التوجيه مقفل.")
+        return
+    if msg.game and await db.is_locked(chat_id, "games"):
+        await msg.delete()
+        await msg.reply_text("🚫 الألعاب مقفلة.")
         return
