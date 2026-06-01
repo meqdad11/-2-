@@ -1,49 +1,17 @@
 from handlers_admin import (
-    cmd_ban,
-    cmd_unban,
-    cmd_warn,
-    cmd_clearwarn,
-    cmd_warnings,
-    cmd_banlist,
-    cmd_baninfo,
-    cmd_checkban,
-    cmd_eventlog,
-    cmd_setrules,
-    cmd_mute,
-    cmd_unmute,
-    cmd_lock,
-    cmd_unlock,
+    cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
+    cmd_banlist, cmd_baninfo, cmd_checkban, cmd_eventlog,
+    cmd_setrules, cmd_mute, cmd_unmute, cmd_lock, cmd_unlock,
 )
-from handlers_user import (
-    cmd_id,
-    cmd_rules,
-)
-from handlers_moderation import (
-    cmd_add_word,
-    cmd_remove_word,
-    cmd_list_words,
-)
-from handlers_jobs import (
-    cmd_report,
-)
-from handlers_ai import (
-    cmd_shafaq,
-)
-from handlers_resources import (
-    cmd_add_resource,
-    cmd_list_resources,
-    cmd_delete_resource,
-)
-
+from handlers_user import cmd_id, cmd_rules
+from handlers_moderation import cmd_add_word, cmd_remove_word, cmd_list_words
+from handlers_jobs import cmd_report
+from handlers_ai import cmd_shafaq
+from handlers_resources import cmd_add_resource, cmd_list_resources, cmd_delete_resource
 from handlers_menu import cmd_menu, callback_menu
+from music import cmd_sc_search, cmd_yt_search, cmd_download
 
-from music import (
-    cmd_sc_search,
-    cmd_yt_search,
-    cmd_download,
-)
-
-# استيراد جميع دوال القفل والفتح من handlers_locks
+# استيراد جميع دوال القفل من handlers_locks
 from handlers_locks import (
     cmd_lock_links, cmd_unlock_links,
     cmd_lock_tags, cmd_unlock_tags,
@@ -76,109 +44,47 @@ from handlers_locks import (
     cmd_lock_all, cmd_unlock_all,
 )
 
-# ========== قاموس الأوامر العربية ==========
 ARABIC_COMMANDS = {
-    # ── إدارة الحظر ──────────────────────────
-    "حظر":                  cmd_ban,
-    "رفع الحظر":            cmd_unban,
-    "رفع_الحظر":            cmd_unban,
-    "قائمة":                cmd_banlist,
-    "معلومات":              cmd_baninfo,
-    "تحقق":                 cmd_checkban,
+    # الأوامر القديمة كما هي
+    "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
+    "قائمة": cmd_banlist, "معلومات": cmd_baninfo, "تحقق": cmd_checkban,
+    "تحذير": cmd_warn, "مسح التحذير": cmd_clearwarn, "التحذيرات": cmd_warnings,
+    "كتم": cmd_mute, "رفع الكتم": cmd_unmute,
+    "أغلق المجموعة": cmd_lock, "افتح المجموعة": cmd_unlock,
+    "سجل": cmd_eventlog, "تقرير": cmd_report,
+    "أضف كلمة": cmd_add_word, "احذف كلمة": cmd_remove_word, "الكلمات المحظورة": cmd_list_words,
+    "أضف مورد": cmd_add_resource, "الموارد": cmd_list_resources, "احذف مورد": cmd_delete_resource,
+    "ايدي": cmd_id, "القواعد": cmd_rules, "شفق": cmd_shafaq,
+    "تحميل": cmd_download, "بحث": cmd_sc_search, "يوتيوب": cmd_yt_search, "ابدأ": cmd_menu,
 
-    # ── التحذيرات ────────────────────────────
-    "تحذير":                cmd_warn,
-    "مسح التحذير":          cmd_clearwarn,
-    "التحذيرات":            cmd_warnings,
-
-    # ── الكتم ────────────────────────────────
-    "كتم":                  cmd_mute,
-    "رفع الكتم":            cmd_unmute,
-
-    # ── إدارة المجموعة ───────────────────────
-    "أغلق المجموعة":        cmd_lock,
-    "افتح المجموعة":        cmd_unlock,
-    "سجل":                  cmd_eventlog,
-    "تقرير":                cmd_report,
-
-    # ── الكلمات المحظورة ─────────────────────
-    "أضف كلمة":             cmd_add_word,
-    "احذف كلمة":            cmd_remove_word,
-    "الكلمات المحظورة":     cmd_list_words,
-
-    # ── الموارد ──────────────────────────────
-    "أضف مورد":             cmd_add_resource,
-    "الموارد":              cmd_list_resources,
-    "احذف مورد":            cmd_delete_resource,
-
-    # ── للجميع ───────────────────────────────
-    "ايدي":                 cmd_id,
-    "القواعد":              cmd_rules,
-    "شفق":                  cmd_shafaq,
-
-    # ── الميديا ──────────────────────────────
-    "تحميل":                cmd_download,
-    "بحث":                  cmd_sc_search,
-    "يوتيوب":               cmd_yt_search,
-    "ابدأ":                 cmd_menu,
-
-    # ========== أوامر القفل والفتح الجديدة ==========
-    "قفل الروابط":          cmd_lock_links,
-    "فتح الروابط":          cmd_unlock_links,
-    "قفل التاك":            cmd_lock_tags,
-    "فتح التاك":            cmd_unlock_tags,
-    "قفل الميديا":          cmd_lock_media,
-    "فتح الميديا":          cmd_unlock_media,
-    "قفل الملفات":          cmd_lock_files,
-    "فتح الملفات":          cmd_unlock_files,
-    "قفل الفيديو":          cmd_lock_video,
-    "فتح الفيديو":          cmd_unlock_video,
-    "قفل الفويسات":         cmd_lock_voice,
-    "فتح الفويسات":         cmd_unlock_voice,
-    "قفل المتحركات":        cmd_lock_gifs,
-    "فتح المتحركات":        cmd_unlock_gifs,
-    "قفل التعديل":          cmd_lock_edit,
-    "فتح التعديل":          cmd_unlock_edit,
-    "قفل تعديل الميديا":    cmd_lock_editmedia,
-    "فتح تعديل الميديا":    cmd_unlock_editmedia,
-    "قفل التكرار":          cmd_lock_repeat,
-    "فتح التكرار":          cmd_unlock_repeat,
-    "قفل الدخول":           cmd_lock_join,
-    "فتح الدخول":           cmd_unlock_join,
-    "قفل التوجيه":          cmd_lock_forward,
-    "فتح التوجيه":          cmd_unlock_forward,
-    "قفل ايدي":             cmd_lock_id,
-    "فتح ايدي":             cmd_unlock_id,
-    "قفل السب":             cmd_lock_badwords,
-    "فتح السب":             cmd_unlock_badwords,
-    "قفل السبام":           cmd_lock_spam,
-    "فتح السبام":           cmd_unlock_spam,
-    "قفل الردود":           cmd_lock_replies,
-    "فتح الردود":           cmd_unlock_replies,
-    "قفل الاشعارات":        cmd_lock_notifications,
-    "فتح الاشعارات":        cmd_unlock_notifications,
-    "قفل الفارسيه":         cmd_lock_persian,
-    "فتح الفارسيه":         cmd_unlock_persian,
-    "قفل البوتات":          cmd_lock_bots,
-    "فتح البوتات":          cmd_unlock_bots,
-    "قفل دخول الايراني":    cmd_lock_iranian,
-    "فتح دخول الايراني":    cmd_unlock_iranian,
-    "قفل الكلام الكثير":    cmd_lock_longtext,
-    "فتح الكلام الكثير":    cmd_unlock_longtext,
-    "قفل القران":           cmd_lock_quran,
-    "فتح القران":           cmd_unlock_quran,
-    "قفل الاباحي":          cmd_lock_porn,
-    "فتح الاباحي":          cmd_unlock_porn,
-    "قفل الذكاء":           cmd_lock_ai,
-    "فتح الذكاء":           cmd_unlock_ai,
-    "قفل الرد التلقائي":    cmd_lock_autoreply,
-    "فتح الرد التلقائي":    cmd_unlock_autoreply,
-    "قفل الالعاب":          cmd_lock_games,
-    "فتح الالعاب":          cmd_unlock_games,
-    "قفل اخبار السوق":      cmd_lock_marketnews,
-    "فتح اخبار السوق":      cmd_unlock_marketnews,
-    "قفل الهمسه":           cmd_lock_whisper,
-    "فتح الهمسه":           cmd_unlock_whisper,
-    "قفل الكل":             cmd_lock_all,
-    "فتح الكل":             cmd_unlock_all,
+    # أوامر القفل والفتح الجديدة
+    "قفل الروابط": cmd_lock_links, "فتح الروابط": cmd_unlock_links,
+    "قفل التاك": cmd_lock_tags, "فتح التاك": cmd_unlock_tags,
+    "قفل الميديا": cmd_lock_media, "فتح الميديا": cmd_unlock_media,
+    "قفل الملفات": cmd_lock_files, "فتح الملفات": cmd_unlock_files,
+    "قفل الفيديو": cmd_lock_video, "فتح الفيديو": cmd_unlock_video,
+    "قفل الفويسات": cmd_lock_voice, "فتح الفويسات": cmd_unlock_voice,
+    "قفل المتحركات": cmd_lock_gifs, "فتح المتحركات": cmd_unlock_gifs,
+    "قفل التعديل": cmd_lock_edit, "فتح التعديل": cmd_unlock_edit,
+    "قفل تعديل الميديا": cmd_lock_editmedia, "فتح تعديل الميديا": cmd_unlock_editmedia,
+    "قفل التكرار": cmd_lock_repeat, "فتح التكرار": cmd_unlock_repeat,
+    "قفل الدخول": cmd_lock_join, "فتح الدخول": cmd_unlock_join,
+    "قفل التوجيه": cmd_lock_forward, "فتح التوجيه": cmd_unlock_forward,
+    "قفل ايدي": cmd_lock_id, "فتح ايدي": cmd_unlock_id,
+    "قفل السب": cmd_lock_badwords, "فتح السب": cmd_unlock_badwords,
+    "قفل السبام": cmd_lock_spam, "فتح السبام": cmd_unlock_spam,
+    "قفل الردود": cmd_lock_replies, "فتح الردود": cmd_unlock_replies,
+    "قفل الاشعارات": cmd_lock_notifications, "فتح الاشعارات": cmd_unlock_notifications,
+    "قفل الفارسيه": cmd_lock_persian, "فتح الفارسيه": cmd_unlock_persian,
+    "قفل البوتات": cmd_lock_bots, "فتح البوتات": cmd_unlock_bots,
+    "قفل دخول الايراني": cmd_lock_iranian, "فتح دخول الايراني": cmd_unlock_iranian,
+    "قفل الكلام الكثير": cmd_lock_longtext, "فتح الكلام الكثير": cmd_unlock_longtext,
+    "قفل القران": cmd_lock_quran, "فتح القران": cmd_unlock_quran,
+    "قفل الاباحي": cmd_lock_porn, "فتح الاباحي": cmd_unlock_porn,
+    "قفل الذكاء": cmd_lock_ai, "فتح الذكاء": cmd_unlock_ai,
+    "قفل الرد التلقائي": cmd_lock_autoreply, "فتح الرد التلقائي": cmd_unlock_autoreply,
+    "قفل الالعاب": cmd_lock_games, "فتح الالعاب": cmd_unlock_games,
+    "قفل اخبار السوق": cmd_lock_marketnews, "فتح اخبار السوق": cmd_unlock_marketnews,
+    "قفل الهمسه": cmd_lock_whisper, "فتح الهمسه": cmd_unlock_whisper,
+    "قفل الكل": cmd_lock_all, "فتح الكل": cmd_unlock_all,
 }
