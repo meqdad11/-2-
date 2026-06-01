@@ -45,7 +45,7 @@ from music import (
     callback_sc_download, callback_yt_pick,
 )
 from handlers_menu import callback_menu, handle_interactive_messages, cmd_menu
-from handlers_locks import filter_locked_content   # <--- استيراد الفلترة الجديدة
+from handlers_locks import filter_locked_content
 
 # ========== إعداد التسجيل ==========
 logging.basicConfig(
@@ -132,10 +132,8 @@ def register_handlers(app):
     # معالج فلترة المحتوى (لأقفال المجموعة)
     app.add_handler(MessageHandler(filters.ALL, filter_locked_content))
 
-    # الرسائل النصية
+    # الرسائل النصية (هذا هو المعالج الوحيد للرسائل النصية)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
-    # معالج الرسائل التفاعلية (لأوامر مثل مسح، تذكير، ترجمة، بحث جوجل، بث)
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_interactive_messages))
 
 # ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
