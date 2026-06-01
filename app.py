@@ -44,8 +44,9 @@ from music import (
     handle_media_url, callback_download,
     callback_sc_download, callback_yt_pick,
 )
-from handlers_menu import callback_menu, handle_interactive_messages  # <--- أضفنا handle_interactive_messages
-from handlers_menu import cmd_menu
+from handlers_menu import callback_menu, handle_interactive_messages, cmd_menu
+from handlers_locks import filter_locked_content   # <--- استيراد الفلترة الجديدة
+
 # ========== إعداد التسجيل ==========
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -83,6 +84,7 @@ async def handle_text(update: Update, context):
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
+
 # ========== تهيئة التطبيق ==========
 async def post_init(app):
     await db.init_db()
@@ -126,6 +128,9 @@ def register_handlers(app):
 
     # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
+
+    # معالج فلترة المحتوى (لأقفال المجموعة)
+    app.add_handler(MessageHandler(filters.ALL, filter_locked_content))
 
     # الرسائل النصية
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
