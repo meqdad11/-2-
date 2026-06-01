@@ -56,7 +56,7 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("استخدام: اذاعه <النص>")
         return
     text = " ".join(context.args)
-    chats = await db.get_all_active_chats()  # هذه الدالة موجودة في database.py
+    chats = await db.get_all_active_chats()
     success = 0
     for chat_id in chats:
         try:
@@ -66,19 +66,37 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
     await update.message.reply_text(f"✅ تم الإرسال إلى {success} من {len(chats)} مجموعة.")
 
-# ========== إحصائيات البوت ==========
+# ========== إحصائيات البوت (كاملة) ==========
 async def cmd_bot_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_owner(update):
         await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
         return
     chats = len(await db.get_all_active_chats())
-    # عدد المستخدمين من قاعدة البيانات
     users = sum(1 for s in db._cache.get("user_stats", {}).values())
-    # عدد الأقفال النشطة (اختياري)
     locks = sum(1 for l in db._cache.get("group_locks", {}).values() if l.get("is_locked"))
+    bans = len(db._cache.get("bans", {}))
     await update.message.reply_text(
         f"📊 **إحصائيات البوت:**\n"
         f"• المجموعات النشطة: {chats}\n"
         f"• المستخدمين المسجلين: {users}\n"
-        f"• عدد الأقفال المفعلة: {locks}"
+        f"• عدد الحظر: {bans}\n"
+        f"• الأقفال المفعلة: {locks}"
+    )
+
+# ========== إحصائيات سريعة (للاستخدام العادي) ==========
+async def cmd_simple_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إحصائيات سريعة للمطور"""
+    if not await is_owner(update):
+        await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
+        return
+    chats = len(await db.get_all_active_chats())
+    users = sum(1 for s in db._cache.get("user_stats", {}).values())
+    bans = len(db._cache.get("bans", {}))
+    locks = sum(1 for l in db._cache.get("group_locks", {}).values() if l.get("is_locked"))
+    await update.message.reply_text(
+        f"📈 **إحصائيات البوت:**\n"
+        f"• المجموعات: {chats}\n"
+        f"• المستخدمين: {users}\n"
+        f"• المحظورين: {bans}\n"
+        f"• الأقفال النشطة: {locks}"
     )
