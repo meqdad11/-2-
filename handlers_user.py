@@ -1,5 +1,6 @@
 import logging
 import random
+import uuid
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from telegram import Update
@@ -24,6 +25,21 @@ AUTO_REPLIES = {
 # ================================================
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # معالج رابط "صارحني" (يجب أن يكون أولاً)
+    if context.args and context.args[0].startswith("anon_"):
+        link_id = context.args[0].replace("anon_", "")
+        target_user_id = await db.get_user_by_link(link_id)
+        if not target_user_id:
+            await update.message.reply_text("❌ هذا الرابط غير صالح.")
+            return
+        context.user_data["anon_target"] = target_user_id
+        await update.message.reply_text(
+            "📝 **أرسل رسالتك المجهولة الآن.**\n"
+            "اكتب رسالتك في سطر واحد وسيتم إرسالها إلى صاحب الرابط دون معرفة هويتك."
+        )
+        return
+
+    # القائمة العادية (بدون رابط)
     await update.message.reply_text(
         "بوت شفق 🌅\n\n"
         "━━━━━━━━━━━━━━━\n"
@@ -283,7 +299,6 @@ async def cmd_surah(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("الاستخدام: سورة [اسم السورة]")
         return
     surah_name = " ".join(context.args).strip()
-    # محاكاة بسيطة (يمكن ربطها بـ API حقيقي)
     await update.message.reply_text(f"📖 سورة {surah_name}:\n(هذه خدمة تجريبية، سيتم ربطها بـ API لاحقاً)")
 
 # 4. أمر "قران" (صفحة من القرآن)
@@ -364,3 +379,35 @@ async def cmd_bio(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # 13. أمر "المالك" (عرض معلومات المطور)
 async def cmd_owner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👨‍💻 **المطور:** [Me8dad](https://t.me/Me8dad)\nللمساعدة والدعم.", parse_mode="Markdown")
+
+# ================================================
+# ========== نظام "صارحني" ==========
+# ================================================
+
+async def cmd_create_anon_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إنشاء رابط صارحني للمستخدم (عام، يبقى صالحاً)"""
+    user_id = update.effective_user.id
+    link_id = await db.create_anonymous_link(user_id)
+    bot_username = (await context.bot.get_me()).username
+    link = f"https://t.me/{bot_username}?start=anon_{link_id}"
+    await update.message.reply_text(
+        f"🔗 **رابط صارحني:**\n{link}\n\n"
+        f"• أرسل هذا الرابط لأي شخص.\n"
+        f"• من يفتح الرابط سيتمكن من إرسال رسالة مجهولة إليك.\n"
+        f"• الرابط صالح دائماً (يمكنك إنشاء رابط جديد وسيتم استبداله).\n"
+        f"• لعرض رسائلك المستلمة: استخدم أمر `رسائلي`.",
+        parse_mode="Markdown",
+        disable_web_page_preview=True
+    )
+
+async def cmd_my_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عرض الرسائل المستلمة عبر صارحني"""
+    user_id = update.effective_user.id
+    messages = await db.get_anonymous_messages(user_id)
+    if not messages:
+        await update.message.reply_text("📭 لا توجد رسائل مستلمة حتى الآن.")
+        return
+    text = "📬 **رسائلك المستلمة (صارحني):**\n\n"
+    for i, msg in enumerate(messages[:10], 1):
+        text += f"{i}. {msg['message']}\n   _({msg['created_at'][:16]})_\n\n"
+    await update.message.reply_text(text, parse_mode="Markdown")
