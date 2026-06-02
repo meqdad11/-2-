@@ -216,19 +216,23 @@ async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         page = int(context.args[0])
+        if page < 1 or page > 604:
+            await update.message.reply_text("رقم الصفحة بين 1 و 604")
+            return
         async with aiohttp.ClientSession() as session:
             async with session.get(f"https://api.alquran.cloud/v1/page/{page}") as resp:
                 if resp.status != 200:
-                    await update.message.reply_text("❌ صفحة غير موجودة.")
+                    await update.message.reply_text("❌ خطأ في جلب الصفحة")
                     return
                 data = await resp.json()
                 verses = data["data"]["verses"]
-                first_verse = verses[0]["text"]
-                last_verse = verses[-1]["text"]
-                await update.message.reply_text(f"📖 **صفحة {page}**\n\nالآية الأولى:\n{first_verse}\n\nالآية الأخيرة:\n{last_verse}")
-    except:
-        await update.message.reply_text("الرقم غير صالح.")
-
+                # عرض أول 3 آيات فقط (لأن الآيات كثيرة)
+                lines = [f"{v['text']}" for v in verses[:5]]
+                text = "\n".join(lines)
+                await update.message.reply_text(f"📖 **صفحة {page}**\n\n{text}\n\n...")
+    except Exception as e:
+        logger.error(f"خطأ في قران: {e}")
+        await update.message.reply_text("حدث خطأ، تأكد من الرقم.")
 # ========== أمر انطقي (محاكاة) ==========
 async def cmd_speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
