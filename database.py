@@ -1,308 +1,517 @@
-import httpx
+import sqlite3
 import json
 import os
 from datetime import datetime, timezone
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
+import asyncio
+from contextlib import contextmanager
 
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-GIST_ID = os.environ.get("GIST_ID", "")
+# ========== مسار قاعدة البيانات ==========
+DB_PATH = os.environ.get("DATABASE_PATH", "bot_data.db")
 
-HEADERS = {
-    "Authorization": f"token {GITHUB_TOKEN}",
-    "Accept": "application/vnd.github.v3+json"
-}
+# ========== دبورات مساعدة للتعامل مع SQLite ==========
+def get_connection():
+    """إنشاء اتصال بقاعدة البيانات مع Row factory"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-_cache = {
-    "bans": {},
-    "warnings": {},
-    "banned_words": {},
-    "settings": {},
-    "user_stats": {},
-    "ban_log": [],
-    "bot_actions": [],
-    "group_locks": {},
-    "anon_links": {},
-    "anon_messages": [],
-}
+def init_tables():
+    """إنشاء الجداول إذا لم تكن موجودة"""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # جدول الحظر
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bans (
+                user_id INTEGER,
+                chat_id INTEGER,
+                reason TEXT,
+                banned_by INTEGER,
+                expires_at TEXT,
+                created_at TEXT,
+                PRIMARY KEY (user_id, chat_id)
+            )
+        ''')
+        
+        # جدول التحذيرات
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS warnings (
+                user_id INTEGER,
+                chat_id INTEGER,
+                count INTEGER DEFAULT 0,
+                PRIMARY KEY (user_id, chat_id)
+            )
+        ''')
+        
+        # جدول الكلمات المحظورة
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS banned_words (
+                chat_id INTEGER,
+                word TEXT,
+                PRIMARY KEY (chat_id, word)
+            )
+        ''')
+        
+        # جدول الإعدادات
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                chat_id INTEGER,
+                key TEXT,
+                value TEXT,
+                PRIMARY KEY (chat_id, key)
+            )
+        ''')
+        
+        # جدول إحصائيات المستخدمين
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_stats (
+                user_id INTEGER,
+                chat_id INTEGER,
+                message_count INTEGER DEFAULT 0,
+                first_seen TEXT,
+                last_seen TEXT,
+                full_name TEXT,
+                PRIMARY KEY (user_id, chat_id)
+            )
+        ''')
+        
+        # جدول سجل الأحداث
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ban_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER,
+                action TEXT,
+                user_id INTEGER,
+                target_id INTEGER,
+                detail TEXT,
+                created_at TEXT
+            )
+        ''')
+        
+        # جدول سجل إجراءات البوت
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS bot_actions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                chat_id INTEGER,
+                action TEXT,
+                user_id INTEGER,
+                detail TEXT,
+                created_at TEXT
+            )
+        ''')
+        
+        # جدول الأقفال
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS group_locks (
+                chat_id INTEGER,
+                lock_type TEXT,
+                is_locked INTEGER DEFAULT 0,
+                updated_at TEXT,
+                PRIMARY KEY (chat_id, lock_type)
+            )
+        ''')
+        
+        # جدول روابط صارحني
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS anon_links (
+                link_id TEXT PRIMARY KEY,
+                user_id INTEGER,
+                created_at TEXT
+            )
+        ''')
+        
+        # جدول رسائل صارحني
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS anon_messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                link_id TEXT,
+                message TEXT,
+                sender_id INTEGER,
+                created_at TEXT,
+                is_read INTEGER DEFAULT 0
+            )
+        ''')
+        
+        conn.commit()
 
-
-async def _load_from_gist():
-    if not GIST_ID:
-        return
-    try:
-        async with httpx.AsyncClient() as client:
-            r = await client.get(f"https://api.github.com/gists/{GIST_ID}", headers=HEADERS)
-            if r.status_code == 200:
-                files = r.json().get("files", {})
-                for key in _cache:
-                    if f"{key}.json" in files:
-                        _cache[key] = json.loads(files[f"{key}.json"]["content"])
-    except Exception:
-        pass
-
-
-async def _save_to_gist():
-    global GIST_ID
-    try:
-        files = {}
-        for key in _cache:
-            files[f"{key}.json"] = {"content": json.dumps(_cache[key], ensure_ascii=False, default=str)}
-        async with httpx.AsyncClient() as client:
-            if GIST_ID:
-                await client.patch(f"https://api.github.com/gists/{GIST_ID}", headers=HEADERS, json={"files": files})
-            else:
-                r = await client.post("https://api.github.com/gists", headers=HEADERS, json={
-                    "description": "Bot Database", "public": False, "files": files
-                })
-                if r.status_code == 201:
-                    GIST_ID = r.json()["id"]
-                    os.environ["GIST_ID"] = GIST_ID
-    except Exception:
-        pass
-
-
+# ========== تهيئة قاعدة البيانات ==========
 async def init_db():
-    await _load_from_gist()
-    if not GIST_ID:
-        await _save_to_gist()
+    """تهيئة قاعدة البيانات (إنشاء الجداول في أول تشغيل)"""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, init_tables)
 
-
-# ========== دوال الحظر والتحذيرات ==========
+# ========== دوال الحظر ==========
 async def add_ban(user_id: int, chat_id: int, reason: str = None, banned_by: int = 0, expires_at=None):
-    key = f"{user_id}_{chat_id}"
-    _cache["bans"][key] = {
-        "user_id": user_id, "chat_id": chat_id, "reason": reason, "banned_by": banned_by or 0,
-        "expires_at": expires_at.isoformat() if expires_at else None,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await _save_to_gist()
-
+    def _add():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO bans (user_id, chat_id, reason, banned_by, expires_at, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (user_id, chat_id, reason, banned_by, expires_at.isoformat() if expires_at else None,
+                  datetime.now(timezone.utc).isoformat()))
+            conn.commit()
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _add)
 
 async def remove_ban(user_id: int, chat_id: int, performed_by: int = 0) -> bool:
-    key = f"{user_id}_{chat_id}"
-    if key in _cache["bans"]:
-        del _cache["bans"][key]
-        await _save_to_gist()
-        return True
-    return False
-
+    def _remove():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM bans WHERE user_id = ? AND chat_id = ?', (user_id, chat_id))
+            return cursor.rowcount > 0
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _remove)
 
 async def get_ban(user_id: int, chat_id: int) -> dict:
-    return _cache["bans"].get(f"{user_id}_{chat_id}")
-
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM bans WHERE user_id = ? AND chat_id = ?', (user_id, chat_id))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
 async def get_ban_list(chat_id: int) -> list:
-    return [b for b in _cache["bans"].values() if b["chat_id"] == chat_id]
-
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM bans WHERE chat_id = ?', (chat_id,))
+            return [dict(row) for row in cursor.fetchall()]
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
 async def get_expired_bans() -> list:
-    now = datetime.now(timezone.utc)
-    expired = []
-    for b in _cache["bans"].values():
-        if b.get("expires_at"):
-            try:
-                exp = datetime.fromisoformat(b["expires_at"])
-                if exp.tzinfo is None:
-                    exp = exp.replace(tzinfo=timezone.utc)
-                if exp <= now:
-                    expired.append(b)
-            except Exception:
-                pass
-    return expired
+    now = datetime.now(timezone.utc).isoformat()
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT * FROM bans WHERE expires_at IS NOT NULL AND expires_at <= ?', (now,))
+            return [dict(row) for row in cursor.fetchall()]
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
-
+# ========== دوال التحذيرات ==========
 async def add_warning(user_id: int, chat_id: int) -> int:
-    key = f"{user_id}_{chat_id}"
-    current = _cache["warnings"].get(key, {"count": 0})
-    current["count"] = current.get("count", 0) + 1
-    current["user_id"] = user_id
-    current["chat_id"] = chat_id
-    _cache["warnings"][key] = current
-    await _save_to_gist()
-    return current["count"]
-
+    def _add():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO warnings (user_id, chat_id, count) VALUES (?, ?, 1)
+                ON CONFLICT(user_id, chat_id) DO UPDATE SET count = count + 1
+                RETURNING count
+            ''', (user_id, chat_id))
+            row = cursor.fetchone()
+            return row['count'] if row else 1
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _add)
 
 async def get_warnings(user_id: int, chat_id: int) -> int:
-    return _cache["warnings"].get(f"{user_id}_{chat_id}", {}).get("count", 0)
-
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT count FROM warnings WHERE user_id = ? AND chat_id = ?', (user_id, chat_id))
+            row = cursor.fetchone()
+            return row['count'] if row else 0
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
 async def clear_warnings(user_id: int, chat_id: int):
-    key = f"{user_id}_{chat_id}"
-    if key in _cache["warnings"]:
-        del _cache["warnings"][key]
-        await _save_to_gist()
+    def _clear():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM warnings WHERE user_id = ? AND chat_id = ?', (user_id, chat_id))
+            conn.commit()
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _clear)
 
-
-async def log_event(chat_id: int, event_type: str, user_id: int = 0, target_id: int = 0, detail: str = None):
-    _cache["ban_log"].append({
-        "chat_id": chat_id, "action": event_type, "user_id": user_id or 0, "target_id": target_id or 0,
-        "detail": detail, "created_at": datetime.now(timezone.utc).isoformat()
-    })
-    if len(_cache["ban_log"]) > 100:
-        _cache["ban_log"] = _cache["ban_log"][-100:]
-
-
-async def log_bot_action(chat_id: int, action: str, user_id: int = 0, detail: str = None):
-    _cache["bot_actions"].append({
-        "chat_id": chat_id, "action": action, "user_id": user_id or 0, "detail": detail,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
-    if len(_cache["bot_actions"]) > 200:
-        _cache["bot_actions"] = _cache["bot_actions"][-200:]
-    await _save_to_gist()
-
-
-async def get_event_log(chat_id: int, limit: int = 10) -> list:
-    logs = [e for e in _cache["ban_log"] if e["chat_id"] == chat_id]
-    return sorted(logs, key=lambda x: x["created_at"], reverse=True)[:limit]
-
-
-async def get_bot_actions_since(chat_id: int, since: str) -> list:
-    return [a for a in _cache["bot_actions"] if a["chat_id"] == chat_id and a["created_at"] >= since]
-
-
-async def get_new_members_since(chat_id: int, since: str) -> int:
-    return sum(1 for s in _cache["user_stats"].values() if s["chat_id"] == chat_id and s.get("first_seen", "") >= since)
-
-
-async def get_total_members(chat_id: int) -> int:
-    return sum(1 for s in _cache["user_stats"].values() if s["chat_id"] == chat_id)
-
-
-async def get_top_members(chat_id: int, limit: int = 5) -> list:
-    members = [s for s in _cache["user_stats"].values() if s["chat_id"] == chat_id]
-    return sorted(members, key=lambda x: x.get("message_count", 0), reverse=True)[:limit]
-
-
-async def increment_message_count(user_id: int, chat_id: int, full_name: str = ""):
-    key = f"{user_id}_{chat_id}"
-    if key not in _cache["user_stats"]:
-        _cache["user_stats"][key] = {
-            "user_id": user_id, "chat_id": chat_id, "message_count": 0,
-            "first_seen": datetime.now(timezone.utc).isoformat()
-        }
-    _cache["user_stats"][key]["message_count"] += 1
-    _cache["user_stats"][key]["last_seen"] = datetime.now(timezone.utc).isoformat()
-    skey = f"{chat_id}_username_{user_id}"
-    _cache["settings"][skey] = {"chat_id": chat_id, "key": f"username_{user_id}", "value": full_name}
-
-
-async def get_user_name(chat_id: int, user_id: int) -> str:
-    return _cache["settings"].get(f"{chat_id}_username_{user_id}", {}).get("value", str(user_id))
-
-
-async def get_message_count(user_id: int, chat_id: int) -> int:
-    return _cache["user_stats"].get(f"{user_id}_{chat_id}", {}).get("message_count", 0)
-
-
-async def get_user_first_seen(user_id: int, chat_id: int) -> Optional[str]:
-    return _cache["user_stats"].get(f"{user_id}_{chat_id}", {}).get("first_seen")
-
-
+# ========== دوال الكلمات المحظورة ==========
 async def add_banned_word(chat_id: int, word: str) -> bool:
-    key = f"{chat_id}_{word.lower()}"
-    if key in _cache["banned_words"]:
-        return False
-    _cache["banned_words"][key] = {"chat_id": chat_id, "word": word.lower()}
-    await _save_to_gist()
-    return True
-
+    def _add():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('INSERT INTO banned_words (chat_id, word) VALUES (?, ?)', (chat_id, word.lower()))
+                conn.commit()
+                return True
+            except sqlite3.IntegrityError:
+                return False
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _add)
 
 async def remove_banned_word(chat_id: int, word: str) -> bool:
-    key = f"{chat_id}_{word.lower()}"
-    if key in _cache["banned_words"]:
-        del _cache["banned_words"][key]
-        await _save_to_gist()
-        return True
-    return False
-
+    def _remove():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('DELETE FROM banned_words WHERE chat_id = ? AND word = ?', (chat_id, word.lower()))
+            return cursor.rowcount > 0
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _remove)
 
 async def get_banned_words(chat_id: int) -> list:
-    return [v["word"] for v in _cache["banned_words"].values() if v["chat_id"] == chat_id]
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT word FROM banned_words WHERE chat_id = ?', (chat_id,))
+            return [row['word'] for row in cursor.fetchall()]
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
-
+# ========== دوال الإعدادات ==========
 async def get_setting(chat_id: int, key: str) -> Optional[str]:
-    return _cache["settings"].get(f"{chat_id}_{key}", {}).get("value")
-
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT value FROM settings WHERE chat_id = ? AND key = ?', (chat_id, key))
+            row = cursor.fetchone()
+            return row['value'] if row else None
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
 async def set_setting(chat_id: int, key: str, value: str):
-    _cache["settings"][f"{chat_id}_{key}"] = {"chat_id": chat_id, "key": key, "value": value}
-    await _save_to_gist()
+    def _set():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO settings (chat_id, key, value) VALUES (?, ?, ?)
+            ''', (chat_id, key, value))
+            conn.commit()
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _set)
 
+# ========== دوال إحصائيات المستخدمين ==========
+async def increment_message_count(user_id: int, chat_id: int, full_name: str = ""):
+    def _inc():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            now = datetime.now(timezone.utc).isoformat()
+            # التحقق إذا كان المستخدم موجوداً
+            cursor.execute('SELECT * FROM user_stats WHERE user_id = ? AND chat_id = ?', (user_id, chat_id))
+            row = cursor.fetchone()
+            if row:
+                cursor.execute('''
+                    UPDATE user_stats SET message_count = message_count + 1, last_seen = ?, full_name = ?
+                    WHERE user_id = ? AND chat_id = ?
+                ''', (now, full_name, user_id, chat_id))
+            else:
+                cursor.execute('''
+                    INSERT INTO user_stats (user_id, chat_id, message_count, first_seen, last_seen, full_name)
+                    VALUES (?, ?, 1, ?, ?, ?)
+                ''', (user_id, chat_id, now, now, full_name))
+            conn.commit()
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _inc)
+
+async def get_message_count(user_id: int, chat_id: int) -> int:
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT message_count FROM user_stats WHERE user_id = ? AND chat_id = ?', (user_id, chat_id))
+            row = cursor.fetchone()
+            return row['message_count'] if row else 0
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
+
+async def get_user_first_seen(user_id: int, chat_id: int) -> Optional[str]:
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT first_seen FROM user_stats WHERE user_id = ? AND chat_id = ?', (user_id, chat_id))
+            row = cursor.fetchone()
+            return row['first_seen'] if row else None
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
 async def get_all_active_chats() -> list:
-    return list(set(s["chat_id"] for s in _cache["user_stats"].values()))
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT DISTINCT chat_id FROM user_stats')
+            return [row['chat_id'] for row in cursor.fetchall()]
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
+async def get_total_members(chat_id: int) -> int:
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT COUNT(*) as count FROM user_stats WHERE chat_id = ?', (chat_id,))
+            row = cursor.fetchone()
+            return row['count'] if row else 0
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
+
+async def get_top_members(chat_id: int, limit: int = 5) -> list:
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT user_id, full_name, message_count FROM user_stats 
+                WHERE chat_id = ? ORDER BY message_count DESC LIMIT ?
+            ''', (chat_id, limit))
+            return [dict(row) for row in cursor.fetchall()]
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
+
+async def get_user_name(chat_id: int, user_id: int) -> str:
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT full_name FROM user_stats WHERE chat_id = ? AND user_id = ?', (chat_id, user_id))
+            row = cursor.fetchone()
+            return row['full_name'] if row else str(user_id)
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
 async def save_chat_name(chat_id: int, chat_name: str):
     await set_setting(chat_id, "chat_name", chat_name)
 
-
 async def get_chat_name(chat_id: int) -> str:
     return await get_setting(chat_id, "chat_name") or str(chat_id)
 
+# ========== دوال سجل الأحداث ==========
+async def log_event(chat_id: int, event_type: str, user_id: int = 0, target_id: int = 0, detail: str = None):
+    def _log():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO ban_log (chat_id, action, user_id, target_id, detail, created_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (chat_id, event_type, user_id or 0, target_id or 0, detail,
+                  datetime.now(timezone.utc).isoformat()))
+            # حذف السجلات القديمة (تبقي آخر 100)
+            cursor.execute('''
+                DELETE FROM ban_log WHERE id NOT IN (
+                    SELECT id FROM ban_log WHERE chat_id = ? ORDER BY created_at DESC LIMIT 100
+                )
+            ''', (chat_id,))
+            conn.commit()
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _log)
+
+async def get_event_log(chat_id: int, limit: int = 10) -> list:
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT action, created_at FROM ban_log 
+                WHERE chat_id = ? ORDER BY created_at DESC LIMIT ?
+            ''', (chat_id, limit))
+            return [dict(row) for row in cursor.fetchall()]
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
+
+async def log_bot_action(chat_id: int, action: str, user_id: int = 0, detail: str = None):
+    def _log():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO bot_actions (chat_id, action, user_id, detail, created_at)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (chat_id, action, user_id or 0, detail, datetime.now(timezone.utc).isoformat()))
+            conn.commit()
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _log)
+
+async def get_bot_actions_since(chat_id: int, since: str) -> list:
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT action, detail, created_at FROM bot_actions 
+                WHERE chat_id = ? AND created_at >= ? ORDER BY created_at DESC
+            ''', (chat_id, since))
+            return [dict(row) for row in cursor.fetchall()]
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
 # ========== دوال الأقفال ==========
 async def set_lock(chat_id: int, lock_type: str, locked: bool):
-    _cache["group_locks"][f"{chat_id}_{lock_type}"] = {
-        "chat_id": chat_id, "lock_type": lock_type, "is_locked": locked,
-        "updated_at": datetime.now(timezone.utc).isoformat()
-    }
-    await _save_to_gist()
-
+    def _set():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT OR REPLACE INTO group_locks (chat_id, lock_type, is_locked, updated_at)
+                VALUES (?, ?, ?, ?)
+            ''', (chat_id, lock_type, 1 if locked else 0, datetime.now(timezone.utc).isoformat()))
+            conn.commit()
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _set)
 
 async def is_locked(chat_id: int, lock_type: str) -> bool:
-    return bool(_cache["group_locks"].get(f"{chat_id}_{lock_type}", {}).get("is_locked"))
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT is_locked FROM group_locks WHERE chat_id = ? AND lock_type = ?', (chat_id, lock_type))
+            row = cursor.fetchone()
+            return bool(row['is_locked']) if row else False
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
-
-async def get_all_locks(chat_id: int) -> Dict[str, bool]:
-    return {v["lock_type"]: v["is_locked"] for k, v in _cache["group_locks"].items() if v["chat_id"] == chat_id}
-
-
-async def reset_locks(chat_id: int, lock_types: List[str], default_locked: bool = False):
-    for lt in lock_types:
-        await set_lock(chat_id, lt, default_locked)
-
-
-# ========== دوال نظام صارحني ==========
+# ========== دوال نظام "صارحني" ==========
 import uuid
 
-
 async def create_anonymous_link(user_id: int) -> str:
-    for key, val in list(_cache["anon_links"].items()):
-        if val.get("user_id") == user_id:
-            del _cache["anon_links"][key]
-    link_id = str(uuid.uuid4())[:8]
-    _cache["anon_links"][link_id] = {
-        "user_id": user_id,
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    await _save_to_gist()
-    return link_id
-
+    def _create():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # حذف الرابط القديم للمستخدم
+            cursor.execute('DELETE FROM anon_links WHERE user_id = ?', (user_id,))
+            link_id = str(uuid.uuid4())[:8]
+            cursor.execute('''
+                INSERT INTO anon_links (link_id, user_id, created_at)
+                VALUES (?, ?, ?)
+            ''', (link_id, user_id, datetime.now(timezone.utc).isoformat()))
+            conn.commit()
+            return link_id
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _create)
 
 async def get_user_by_link(link_id: str) -> Optional[int]:
-    return _cache["anon_links"].get(link_id, {}).get("user_id")
-
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT user_id FROM anon_links WHERE link_id = ?', (link_id,))
+            row = cursor.fetchone()
+            return row['user_id'] if row else None
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
 
 async def save_anonymous_message(link_id: str, message: str, sender_id: int = 0):
-    _cache.setdefault("anon_messages", []).append({
-        "link_id": link_id, "message": message, "sender_id": sender_id,
-        "created_at": datetime.now(timezone.utc).isoformat(), "read": False
-    })
-    await _save_to_gist()
-
+    def _save():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO anon_messages (link_id, message, sender_id, created_at)
+                VALUES (?, ?, ?, ?)
+            ''', (link_id, message, sender_id, datetime.now(timezone.utc).isoformat()))
+            conn.commit()
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _save)
 
 async def get_anonymous_messages(user_id: int, mark_read: bool = True) -> list:
-    link_ids = [lid for lid, data in _cache.get("anon_links", {}).items() if data["user_id"] == user_id]
-    if not link_ids:
-        return []
-    messages = []
-    for msg in _cache.get("anon_messages", []):
-        if msg["link_id"] in link_ids:
-            messages.append(msg)
-            if mark_read and not msg["read"]:
-                msg["read"] = True
-    if mark_read:
-        await _save_to_gist()
-    return sorted(messages, key=lambda x: x["created_at"], reverse=True)
+    def _get():
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # الحصول على جميع link_ids للمستخدم
+            cursor.execute('SELECT link_id FROM anon_links WHERE user_id = ?', (user_id,))
+            links = [row['link_id'] for row in cursor.fetchall()]
+            if not links:
+                return []
+            placeholders = ','.join('?' for _ in links)
+            cursor.execute(f'''
+                SELECT message, created_at, is_read FROM anon_messages 
+                WHERE link_id IN ({placeholders}) ORDER BY created_at DESC
+            ''', links)
+            messages = [dict(row) for row in cursor.fetchall()]
+            if mark_read:
+                cursor.execute(f'''
+                    UPDATE anon_messages SET is_read = 1 
+                    WHERE link_id IN ({placeholders}) AND is_read = 0
+                ''', links)
+                conn.commit()
+            return messages
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _get)
