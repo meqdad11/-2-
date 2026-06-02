@@ -12,7 +12,7 @@ async def cmd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📋 الأوامر", callback_data="menu_commands")],
         [InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games"),
          InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google")],
-        [InlineKeyboardButton("📢 قناة التحديثات", url="https://t.me/shafaqmeqdad"),
+        [InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad"),
          InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
         [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
     ]
