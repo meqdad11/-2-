@@ -215,19 +215,15 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "menu_service_commands":
-        text = (
-            "🛠 **الأوامر الخدمية:**\n"
-            "• ايدي - معرفك\n"
-            "• افتاري - رابط المجموعة\n"
-            "• اهمس @username - رسالة خاصة\n"
-            "• صارحني - تواصل خاص\n"
-            "• سورة [اسم السورة] - آية عشوائية\n"
-            "• قران [رقم الصفحة] - نص الصفحة\n"
-            "• انطقي [النص] - نطق النص\n"
-            "• وش يقول (رد على فويس) - تحويل الصوت لنص\n"
-            "• جيمناي - محادثة ذكاء اصطناعي\n"
-            "• الحد - إدارة الموديلات"
-        )
+    text = (
+        "🛠 **الأوامر الخدمية:**\n"
+        "• ايدي - معرفك\n"
+        "• افتاري - رابط المجموعة\n"
+        "• اهمس @username - رسالة خاصة\n"
+        "• صارحني - رابط لرسائل مجهولة\n"
+        "• سورة [رقم السورة] - معلومات السورة\n"
+        "• المالك - تواصل مع المطور"
+    )
         await msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_commands")]]))
         return
     if data == "menu_admin_commands":
