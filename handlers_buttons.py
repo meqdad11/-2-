@@ -330,19 +330,20 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "menu_user":
-        keyboard = [
-            [InlineKeyboardButton("🪪 معلوماتي", callback_data="exec_id")],
-            [InlineKeyboardButton("📋 القواعد", callback_data="exec_rules")],
-            [InlineKeyboardButton("📚 الموارد", callback_data="exec_resources")],
-            [InlineKeyboardButton("📈 إحصائياتي", callback_data="exec_member_stats")],
-            [InlineKeyboardButton("🎁 هدية عشوائية", callback_data="exec_gift")],
-            [InlineKeyboardButton("🌐 ترجمة", callback_data="exec_translate")],
-            [InlineKeyboardButton("⏰ تذكير", callback_data="exec_remind")],
-            [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
-            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
-        ]
-        await msg.edit_text("👥 للجميع — اختر أمراً:", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
+    keyboard = [
+        [InlineKeyboardButton("🪪 معلوماتي", callback_data="exec_id")],
+        [InlineKeyboardButton("📋 القواعد", callback_data="exec_rules")],
+        [InlineKeyboardButton("📚 الموارد", callback_data="exec_resources")],
+        [InlineKeyboardButton("📈 إحصائياتي", callback_data="exec_member_stats")],
+        [InlineKeyboardButton("🎁 هدية عشوائية", callback_data="exec_gift")],
+        [InlineKeyboardButton("🌐 ترجمة", callback_data="exec_translate")],
+        [InlineKeyboardButton("⏰ تذكير", callback_data="exec_remind")],
+        [InlineKeyboardButton("🔄 تذكير يومي", callback_data="exec_daily_remind")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
+        [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
+    ]
+    await msg.edit_text("👥 للجميع — اختر أمراً:", reply_markup=InlineKeyboardMarkup(keyboard))
+    return
 
     if data == "exec_id":
         first = user.first_name or ""
