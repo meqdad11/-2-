@@ -41,7 +41,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "⚙️ الإدارة:\n• أغلق المجموعة / افتح المجموعة\n• أضف كلمة / احذف كلمة\n• الكلمات المحظورة\n• سجل — آخر الأحداث\n• تقرير — تقرير فوري\n• /setrules — تعيين القواعد\n• أضف مورد العنوان | المحتوى\n• احذف مورد <رقم>\n\n"
         "👥 للجميع\n"
         "━━━━━━━━━━━━━━━\n"
-        "• ايدي — معلوماتك\n• القواعد — قواعد المجموعة\n• الموارد — قائمة الموارد\n• الموارد <كلمة> — بحث في الموارد\n• شفق <سؤال> — اسأل الذكاء الاصطناعي\n• تذكير 20:00 نص — تذكير\n• تذكير يومي 20:00 نص — تذكير يومي\n\n"
+        "• ايدي — معلوماتك\n• القواعد — قواعد المجموعة\n• الموارد — قائمة الموارد\n• الموارد <كلمة> — بحث في الموارد\n• شفق <سؤال> — اسأل الذكاء الاصطناعي\n• تذكير 5 نص — تذكير بعد دقائق\n• تذكير يومي 14:30 نص — تذكير يومي\n\n"
         "🎵 الميديا\n"
         "━━━━━━━━━━━━━━━\n"
         "• أرسل رابط مباشرة — تحميل\n• يوتيوب <اسم> — بحث\n"
@@ -91,47 +91,101 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await update.message.reply_text("لم يتم تعيين قواعد بعد.")
 
+# ========== أوامر التذكير (المرة الواحدة واليومي) ==========
+async def _send_reminder(context: ContextTypes.DEFAULT_TYPE):
+    """إرسال التذكير عند انتهاء الوقت"""
+    await context.bot.send_message(
+        chat_id=context.job.chat_id,
+        text=f"🔔 **تذكير:**\n{context.job.data}",
+        parse_mode="Markdown"
+    )
+
 async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    from telegram import Chat as TGChat
-    if update.effective_chat.type != TGChat.PRIVATE:
-        await update.message.reply_text("أمر التذكير يعمل في الخاص فقط.")
+    """تذكير لمرة واحدة بعد دقائق"""
+    msg = update.message
+    if not msg:
         return
-    args = context.args
-    if not args or len(args) < 2:
-        await update.message.reply_text("الاستخدام:\nتذكير 20:00 نص الرسالة\nتذكير يومي 20:00 نص الرسالة")
+    if not context.args or len(context.args) < 2:
+        await msg.reply_text(
+            "📌 **تذكير لمرة واحدة:**\n"
+            "`تذكير 5 نص التذكير`\n\n"
+            "• الرقم = عدد الدقائق (1-1440)\n"
+            "• مثال: `تذكير 10 شرب الماء`",
+            parse_mode="Markdown"
+        )
         return
-    daily = False
-    if args[0] == "يومي":
-        daily = True
-        args = args[1:]
-    time_str = args[0]
-    text = " ".join(args[1:])
-    if not text:
-        await update.message.reply_text("اكتب نص التذكير بعد الوقت.")
+    try:
+        minutes = int(context.args[0])
+        if minutes <= 0 or minutes > 1440:
+            await msg.reply_text("❌ عدد الدقائق بين 1 و 1440.")
+            return
+    except ValueError:
+        await msg.reply_text("❌ الرقم الأول غير صالح.")
+        return
+    reminder_text = " ".join(context.args[1:])
+    if not reminder_text:
+        await msg.reply_text("❌ اكتب نص التذكير.")
+        return
+    delay = minutes * 60
+    try:
+        context.job_queue.run_once(
+            _send_reminder,
+            when=delay,
+            chat_id=msg.chat.id,
+            name=f"reminder_{msg.chat.id}_{msg.message_id}",
+            data=reminder_text
+        )
+        await msg.reply_text(f"✅ **تم ضبط التذكير:**\n⏰ بعد {minutes} دقيقة\n📝 {reminder_text}", parse_mode="Markdown")
+    except Exception as e:
+        logger.error(f"خطأ في التذكير: {e}")
+        await msg.reply_text("❌ حدث خطأ.")
+
+async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تذكير يومي في وقت محدد"""
+    msg = update.message
+    if not msg:
+        return
+    if not context.args or len(context.args) < 2:
+        await msg.reply_text(
+            "📌 **تذكير يومي:**\n"
+            "`تذكير يومي 14:30 نص التذكير`\n\n"
+            "• الوقت بصيغة HH:MM (24 ساعة)\n"
+            "• مثال: `تذكير يومي 09:00 اجتماع العمل`",
+            parse_mode="Markdown"
+        )
+        return
+    time_str = context.args[0]
+    reminder_text = " ".join(context.args[1:])
+    if not reminder_text:
+        await msg.reply_text("❌ اكتب نص التذكير.")
         return
     try:
         hour, minute = map(int, time_str.split(":"))
-        assert 0 <= hour <= 23 and 0 <= minute <= 59
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError
     except:
-        await update.message.reply_text("صيغة الوقت خاطئة. استخدم 20:00")
+        await msg.reply_text("❌ صيغة الوقت خاطئة. استخدم HH:MM (مثال: 14:30).")
         return
-    user_id = update.effective_user.id
-    now_local = datetime.now(TIMEZONE)
-    if daily:
+    chat_id = msg.chat.id
+    # إزالة أي تذكير يومي سابق للمستخدم في هذه المحادثة
+    for job in context.job_queue.jobs():
+        if job.name == f"daily_{chat_id}":
+            job.schedule_removal()
+    # جدولة التذكير اليومي
+    try:
         from datetime import time as dtime
         target_time = dtime(hour=hour, minute=minute, second=0, tzinfo=TIMEZONE)
-        context.job_queue.run_daily(_send_reminder, time=target_time, chat_id=user_id, name=f"daily_{user_id}", data=text)
-        await update.message.reply_text(f"✅ تم ضبط تذكير يومي الساعة {time_str}:\n{text}")
-    else:
-        target = now_local.replace(hour=hour, minute=minute, second=0, microsecond=0)
-        if target <= now_local:
-            target += datetime.timedelta(days=1)
-        delay = (target - now_local).total_seconds()
-        context.job_queue.run_once(_send_reminder, when=delay, chat_id=user_id, name=f"reminder_{user_id}", data=text)
-        await update.message.reply_text(f"✅ تم ضبط تذكير الساعة {time_str}:\n{text}")
-
-async def _send_reminder(context: ContextTypes.DEFAULT_TYPE):
-    await context.bot.send_message(chat_id=context.job.chat_id, text=f"🔔 تذكير:\n{context.job.data}")
+        context.job_queue.run_daily(
+            _send_reminder,
+            time=target_time,
+            chat_id=chat_id,
+            name=f"daily_{chat_id}",
+            data=reminder_text
+        )
+        await msg.reply_text(f"✅ **تم ضبط التذكير اليومي:**\n⏰ الساعة {time_str}\n📝 {reminder_text}", parse_mode="Markdown")
+    except Exception as e:
+        logger.error(f"خطأ في التذكير اليومي: {e}")
+        await msg.reply_text("❌ حدث خطأ.")
 
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
@@ -161,7 +215,7 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-# ========== الأوامر الجديدة ==========
+# ========== الأوامر الأخرى (موجودة مسبقاً) ==========
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private":
         await update.message.reply_text("❌ هذا الأمر للمجموعات فقط.")
@@ -191,7 +245,6 @@ async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         await update.message.reply_text("❌ لا يمكن إنشاء رابط.")
 
-# ========== أوامر القرآن (API مجاني) ==========
 async def cmd_surah(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("الاستخدام: سورة [رقم السورة]\nمثال: سورة 1")
@@ -234,7 +287,6 @@ async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في قران: {e}")
         await update.message.reply_text("حدث خطأ، تأكد من الرقم.")
 
-# ========== أمر انطقي (محاكاة) ==========
 async def cmd_speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("الاستخدام: انطقي [النص]")
@@ -242,7 +294,6 @@ async def cmd_speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = " ".join(context.args)
     await update.message.reply_text(f"🔊 (محاكاة نطق): {text}")
 
-# ========== أمر وش يقول (تحويل الصوت لنص تجريبي) ==========
 async def cmd_voice_to_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message.reply_to_message or not update.message.reply_to_message.voice:
         await update.message.reply_text("الرجاء الرد على رسالة صوتية (فويس).")
