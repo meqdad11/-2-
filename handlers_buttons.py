@@ -629,7 +629,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     await msg.edit_text("🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:", reply_markup=InlineKeyboardMarkup(keyboard))
     return
-
     if data == "menu_admin":
         keyboard = [
             [InlineKeyboardButton("🚫 الحظر", callback_data="menu_ban")],
