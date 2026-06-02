@@ -624,7 +624,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
             [InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
             [InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google")],
-            [InlineKeyboardButton("📢 قناة التحديثات", url="https://t.me/shafaqmeqdad")],
+            [InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")],
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text("🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:", reply_markup=InlineKeyboardMarkup(keyboard))
