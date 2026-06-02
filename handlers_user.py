@@ -1,6 +1,7 @@
 import logging
 import random
 import uuid
+import aiohttp
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from telegram import Update
