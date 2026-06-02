@@ -157,7 +157,7 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     full_name = f"{user.first_name} {user.last_name or ''}".strip()
-await db.update_user_activity(user.id, chat.id)
+    await db.update_user_activity(user.id, chat.id)
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
@@ -227,13 +227,13 @@ async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return
                 data = await resp.json()
                 verses = data["data"]["verses"]
-                # عرض أول 3 آيات فقط (لأن الآيات كثيرة)
                 lines = [f"{v['text']}" for v in verses[:5]]
                 text = "\n".join(lines)
                 await update.message.reply_text(f"📖 **صفحة {page}**\n\n{text}\n\n...")
     except Exception as e:
         logger.error(f"خطأ في قران: {e}")
         await update.message.reply_text("حدث خطأ، تأكد من الرقم.")
+
 # ========== أمر انطقي (محاكاة) ==========
 async def cmd_speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
