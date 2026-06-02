@@ -40,6 +40,12 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = query.message
     chat_id = msg.chat.id
 
+    class FakeUpdate:
+        def __init__(self, message):
+            self.message = message
+            self.effective_chat = message.chat
+            self.effective_user = message.from_user
+
     if data == "menu_close":
         await msg.delete()
         return
@@ -149,7 +155,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("🔍 **أرسل ما تريد البحث عنه في جوجل:**", parse_mode="Markdown")
         return
 
-    # ================= القسم الجديد: قائمة الأوامر المتقدمة =================
+    # ================= قائمة الأوامر المتقدمة =================
     if data == "menu_commands":
         keyboard = [
             [InlineKeyboardButton("🔐 أوامر القفل والفتح", callback_data="menu_lock_commands")],
@@ -270,7 +276,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_commands")]]))
         return
 
-    # ================= باقي القوائم الأصلية =================
+    # ================= القوائم الرئيسية والأزرار الأخرى =================
     if data == "menu_main":
         keyboard = [
             [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin")],
@@ -498,11 +504,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         from handlers_jobs import cmd_report
         context.args = []
-        class FakeUpdate:
-            def __init__(self, msg):
-                self.message = msg
-                self.effective_chat = msg.chat
-                self.effective_user = msg.from_user
         fake_update = FakeUpdate(msg)
         await cmd_report(fake_update, context)
         return
@@ -553,7 +554,6 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
     text = msg.text.strip()
     chat_id = msg.chat.id
 
-    # معالج البحث في جوجل
     if context.user_data.get('waiting_google') == chat_id:
         del context.user_data['waiting_google']
         query = text.replace(' ', '+')
@@ -561,20 +561,19 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
         await msg.reply_text(f"🔍 **نتائج البحث:**\n[اضغط هنا]({link})", parse_mode="Markdown", disable_web_page_preview=True)
         return
 
-    # ========== معالج المسح (يدعم: حذف رسالة، مسح بعدد، مسح بالرد) ==========
     if context.user_data.get('purge_mode') == chat_id:
         del context.user_data['purge_mode']
-        
-        # خيار 0: حذف رسالة واحدة بالرد عليها وكتابة "حذف"
+        # خيار حذف رسالة واحدة بالرد
         if msg.reply_to_message and text == "حذف":
             try:
                 await context.bot.delete_message(chat_id, msg.reply_to_message.message_id)
-                await msg.reply_text("🗑️ تم حذف الرسالة المحددة.")
-            except Exception as e:
-                await msg.reply_text("❌ لا يمكن حذف هذه الرسالة (قد تكون قديمة أو ليس لدي صلاحية).")
+                temp = await msg.reply_text("🗑️ تم حذف الرسالة.")
+                import asyncio
+                await asyncio.sleep(1)
+                await temp.delete()
+            except:
+                await msg.reply_text("❌ لا يمكن حذف هذه الرسالة.")
             return
-        
-        # خيار 1: مسح بعدد محدد من الرسائل
         if text.isdigit():
             count = int(text)
             if count > 100:
@@ -584,12 +583,9 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
                 for i in range(count):
                     await context.bot.delete_message(chat_id, msg.message_id - i - 1)
                 await msg.reply_text(f"🗑️ تم مسح {count} رسالة.")
-            except Exception as e:
+            except:
                 await msg.reply_text("فشل المسح، ربما الرسائل قديمة.")
-            return
-        
-        # خيار 2: مسح بالرد على رسالة (من تلك الرسالة حتى آخر رسالة)
-        if msg.reply_to_message:
+        elif msg.reply_to_message:
             start_id = msg.reply_to_message.message_id
             deleted = 0
             for mid in range(start_id, msg.message_id):
@@ -599,13 +595,10 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
                 except:
                     pass
             await msg.reply_text(f"🗑️ تم مسح {deleted} رسالة.")
-            return
-        
-        # إذا لم يحدد المستخدم لا عدد ولا رد
-        await msg.reply_text("❌ أرسل عدد الرسائل (مثال: 10) أو رد على رسالة لمسح ما بعدها، أو رد واكتب 'حذف' لحذف رسالة واحدة.")
+        else:
+            await msg.reply_text("أرسل عددًا أو رد على رسالة لمسح ما بعدها.")
         return
 
-    # معالج التذكير
     if context.user_data.get('waiting_remind') == chat_id:
         del context.user_data['waiting_remind']
         parts = text.split(maxsplit=1)
@@ -622,13 +615,11 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
         await msg.reply_text(f"✅ تم ضبط تذكير بعد {minutes} دقيقة.")
         return
 
-    # معالج الترجمة
     if context.user_data.get('waiting_translate') == chat_id:
         del context.user_data['waiting_translate']
         await msg.reply_text("🌐 خدمة الترجمة غير متاحة حالياً بسبب القيود التقنية. جرب يدوياً عبر Google Translate.")
         return
 
-    # معالج البث
     if context.user_data.get('waiting_broadcast') == chat_id:
         del context.user_data['waiting_broadcast']
         if not await is_admin(update, context):
