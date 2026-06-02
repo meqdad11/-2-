@@ -2,19 +2,16 @@ import httpx
 import json
 import os
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict
 
-# ========== المتغيرات العامة (GITHUB_TOKEN, GIST_ID) ==========
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 GIST_ID = os.environ.get("GIST_ID", "")
 
-# ========== إعدادات رؤوس الطلبات (HEADERS) ==========
 HEADERS = {
     "Authorization": f"token {GITHUB_TOKEN}",
     "Accept": "application/vnd.github.v3+json"
 }
 
-# ========== هيكل التخزين المؤقت (_cache) ==========
 _cache = {
     "bans": {},
     "warnings": {},
@@ -23,75 +20,58 @@ _cache = {
     "user_stats": {},
     "ban_log": [],
     "bot_actions": [],
-    "group_locks": {},          # <--- جديد: لتخزين الأقفال
+    "group_locks": {},
+    "anon_links": {},
+    "anon_messages": [],
 }
-# ========== دالة غير متزامنة: _load_from_gist ==========
+
+
 async def _load_from_gist():
     if not GIST_ID:
         return
     try:
         async with httpx.AsyncClient() as client:
-            r = await client.get(
-                f"https://api.github.com/gists/{GIST_ID}",
-                headers=HEADERS
-            )
+            r = await client.get(f"https://api.github.com/gists/{GIST_ID}", headers=HEADERS)
             if r.status_code == 200:
                 files = r.json().get("files", {})
                 for key in _cache:
                     if f"{key}.json" in files:
-                        content = files[f"{key}.json"]["content"]
-                        _cache[key] = json.loads(content)
-    except Exception as e:
+                        _cache[key] = json.loads(files[f"{key}.json"]["content"])
+    except Exception:
         pass
 
 
-# ========== دالة غير متزامنة: _save_to_gist ==========
 async def _save_to_gist():
     global GIST_ID
     try:
         files = {}
         for key in _cache:
-            files[f"{key}.json"] = {
-                "content": json.dumps(_cache[key], ensure_ascii=False, default=str)
-            }
+            files[f"{key}.json"] = {"content": json.dumps(_cache[key], ensure_ascii=False, default=str)}
         async with httpx.AsyncClient() as client:
             if GIST_ID:
-                await client.patch(
-                    f"https://api.github.com/gists/{GIST_ID}",
-                    headers=HEADERS,
-                    json={"files": files}
-                )
+                await client.patch(f"https://api.github.com/gists/{GIST_ID}", headers=HEADERS, json={"files": files})
             else:
-                r = await client.post(
-                    "https://api.github.com/gists",
-                    headers=HEADERS,
-                    json={
-                        "description": "Bot Database",
-                        "public": False,
-                        "files": files
-                    }
-                )
+                r = await client.post("https://api.github.com/gists", headers=HEADERS, json={
+                    "description": "Bot Database", "public": False, "files": files
+                })
                 if r.status_code == 201:
                     GIST_ID = r.json()["id"]
                     os.environ["GIST_ID"] = GIST_ID
-    except Exception as e:
+    except Exception:
         pass
 
 
-# ========== دالة غير متزامنة: init_db ==========
 async def init_db():
     await _load_from_gist()
     if not GIST_ID:
         await _save_to_gist()
 
 
-# ========== دوال الحظر والتحذيرات (موجودة مسبقاً) ==========
-async def add_ban(user_id: int, chat_id: int, reason: str = None,
-                  banned_by: int = 0, expires_at=None):
+# ========== دوال الحظر والتحذيرات ==========
+async def add_ban(user_id: int, chat_id: int, reason: str = None, banned_by: int = 0, expires_at=None):
     key = f"{user_id}_{chat_id}"
     _cache["bans"][key] = {
-        "user_id": user_id, "chat_id": chat_id,
-        "reason": reason, "banned_by": banned_by or 0,
+        "user_id": user_id, "chat_id": chat_id, "reason": reason, "banned_by": banned_by or 0,
         "expires_at": expires_at.isoformat() if expires_at else None,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
@@ -143,8 +123,7 @@ async def add_warning(user_id: int, chat_id: int) -> int:
 
 
 async def get_warnings(user_id: int, chat_id: int) -> int:
-    key = f"{user_id}_{chat_id}"
-    return _cache["warnings"].get(key, {}).get("count", 0)
+    return _cache["warnings"].get(f"{user_id}_{chat_id}", {}).get("count", 0)
 
 
 async def clear_warnings(user_id: int, chat_id: int):
@@ -154,23 +133,18 @@ async def clear_warnings(user_id: int, chat_id: int):
         await _save_to_gist()
 
 
-async def log_event(chat_id: int, event_type: str,
-                    user_id: int = 0, target_id: int = 0, detail: str = None):
+async def log_event(chat_id: int, event_type: str, user_id: int = 0, target_id: int = 0, detail: str = None):
     _cache["ban_log"].append({
-        "chat_id": chat_id, "action": event_type,
-        "user_id": user_id or 0, "target_id": target_id or 0,
-        "detail": detail,
-        "created_at": datetime.now(timezone.utc).isoformat()
+        "chat_id": chat_id, "action": event_type, "user_id": user_id or 0, "target_id": target_id or 0,
+        "detail": detail, "created_at": datetime.now(timezone.utc).isoformat()
     })
     if len(_cache["ban_log"]) > 100:
         _cache["ban_log"] = _cache["ban_log"][-100:]
 
 
-async def log_bot_action(chat_id: int, action: str,
-                         user_id: int = 0, detail: str = None):
+async def log_bot_action(chat_id: int, action: str, user_id: int = 0, detail: str = None):
     _cache["bot_actions"].append({
-        "chat_id": chat_id, "action": action,
-        "user_id": user_id or 0, "detail": detail,
+        "chat_id": chat_id, "action": action, "user_id": user_id or 0, "detail": detail,
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     if len(_cache["bot_actions"]) > 200:
@@ -184,19 +158,15 @@ async def get_event_log(chat_id: int, limit: int = 10) -> list:
 
 
 async def get_bot_actions_since(chat_id: int, since: str) -> list:
-    actions = [a for a in _cache["bot_actions"]
-               if a["chat_id"] == chat_id and a["created_at"] >= since]
-    return sorted(actions, key=lambda x: x["created_at"], reverse=True)
+    return [a for a in _cache["bot_actions"] if a["chat_id"] == chat_id and a["created_at"] >= since]
 
 
 async def get_new_members_since(chat_id: int, since: str) -> int:
-    return sum(1 for s in _cache["user_stats"].values()
-               if s["chat_id"] == chat_id and s.get("first_seen", "") >= since)
+    return sum(1 for s in _cache["user_stats"].values() if s["chat_id"] == chat_id and s.get("first_seen", "") >= since)
 
 
 async def get_total_members(chat_id: int) -> int:
-    return sum(1 for s in _cache["user_stats"].values()
-               if s["chat_id"] == chat_id)
+    return sum(1 for s in _cache["user_stats"].values() if s["chat_id"] == chat_id)
 
 
 async def get_top_members(chat_id: int, limit: int = 5) -> list:
@@ -208,8 +178,7 @@ async def increment_message_count(user_id: int, chat_id: int, full_name: str = "
     key = f"{user_id}_{chat_id}"
     if key not in _cache["user_stats"]:
         _cache["user_stats"][key] = {
-            "user_id": user_id, "chat_id": chat_id,
-            "message_count": 0,
+            "user_id": user_id, "chat_id": chat_id, "message_count": 0,
             "first_seen": datetime.now(timezone.utc).isoformat()
         }
     _cache["user_stats"][key]["message_count"] += 1
@@ -219,8 +188,7 @@ async def increment_message_count(user_id: int, chat_id: int, full_name: str = "
 
 
 async def get_user_name(chat_id: int, user_id: int) -> str:
-    skey = f"{chat_id}_username_{user_id}"
-    return _cache["settings"].get(skey, {}).get("value", str(user_id))
+    return _cache["settings"].get(f"{chat_id}_username_{user_id}", {}).get("value", str(user_id))
 
 
 async def get_message_count(user_id: int, chat_id: int) -> int:
@@ -254,13 +222,11 @@ async def get_banned_words(chat_id: int) -> list:
 
 
 async def get_setting(chat_id: int, key: str) -> Optional[str]:
-    skey = f"{chat_id}_{key}"
-    return _cache["settings"].get(skey, {}).get("value")
+    return _cache["settings"].get(f"{chat_id}_{key}", {}).get("value")
 
 
 async def set_setting(chat_id: int, key: str, value: str):
-    skey = f"{chat_id}_{key}"
-    _cache["settings"][skey] = {"chat_id": chat_id, "key": key, "value": value}
+    _cache["settings"][f"{chat_id}_{key}"] = {"chat_id": chat_id, "key": key, "value": value}
     await _save_to_gist()
 
 
@@ -276,45 +242,67 @@ async def get_chat_name(chat_id: int) -> str:
     return await get_setting(chat_id, "chat_name") or str(chat_id)
 
 
-# ========== دوال الأقفال الجديدة ==========
+# ========== دوال الأقفال ==========
 async def set_lock(chat_id: int, lock_type: str, locked: bool):
-    """تعيين حالة قفل معين لمجموعة (True = مقفل، False = مفتوح)"""
-    key = f"{chat_id}_{lock_type}"
-    _cache["group_locks"][key] = {
-        "chat_id": chat_id,
-        "lock_type": lock_type,
-        "is_locked": locked,
+    _cache["group_locks"][f"{chat_id}_{lock_type}"] = {
+        "chat_id": chat_id, "lock_type": lock_type, "is_locked": locked,
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
     await _save_to_gist()
 
 
 async def is_locked(chat_id: int, lock_type: str) -> bool:
-    """التحقق من حالة قفل معين (يعيد True إذا كان مقفلاً)"""
-    key = f"{chat_id}_{lock_type}"
-    val = _cache["group_locks"].get(key, {}).get("is_locked")
-    return bool(val)
+    return bool(_cache["group_locks"].get(f"{chat_id}_{lock_type}", {}).get("is_locked"))
 
 
 async def get_all_locks(chat_id: int) -> Dict[str, bool]:
-    """إعادة جميع الأقفال الخاصة بمجموعة (نوع القفل → الحالة)"""
-    result = {}
-    for key, val in _cache["group_locks"].items():
-        if val["chat_id"] == chat_id:
-            result[val["lock_type"]] = val["is_locked"]
-    return result
+    return {v["lock_type"]: v["is_locked"] for k, v in _cache["group_locks"].items() if v["chat_id"] == chat_id}
 
 
 async def reset_locks(chat_id: int, lock_types: List[str], default_locked: bool = False):
-    """إعادة تعيين الأقفال إلى حالة افتراضية (يمكن استخدامها لـ 'فتح الكل' أو 'قفل الكل')"""
-    for lock_type in lock_types:
-        await set_lock(chat_id, lock_type, default_locked)
+    for lt in lock_types:
+        await set_lock(chat_id, lt, default_locked)
 
 
-# ========== قائمة أنواع الأقفال المتاحة (يمكن تعديلها لاحقاً) ==========
-ALL_LOCK_TYPES = [
-    "links", "tags", "media", "files", "video", "voice", "gifs",
-    "edit", "editmedia", "repeat", "join", "forward", "id", "badwords",
-    "spam", "replies", "notifications", "persian", "bots", "iranian",
-    "longtext", "quran", "porn", "ai", "autoreply", "games", "marketnews", "whisper"
-]
+# ========== دوال نظام صارحني ==========
+import uuid
+
+
+async def create_anonymous_link(user_id: int) -> str:
+    for key, val in list(_cache["anon_links"].items()):
+        if val.get("user_id") == user_id:
+            del _cache["anon_links"][key]
+    link_id = str(uuid.uuid4())[:8]
+    _cache["anon_links"][link_id] = {
+        "user_id": user_id,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await _save_to_gist()
+    return link_id
+
+
+async def get_user_by_link(link_id: str) -> Optional[int]:
+    return _cache["anon_links"].get(link_id, {}).get("user_id")
+
+
+async def save_anonymous_message(link_id: str, message: str, sender_id: int = 0):
+    _cache.setdefault("anon_messages", []).append({
+        "link_id": link_id, "message": message, "sender_id": sender_id,
+        "created_at": datetime.now(timezone.utc).isoformat(), "read": False
+    })
+    await _save_to_gist()
+
+
+async def get_anonymous_messages(user_id: int, mark_read: bool = True) -> list:
+    link_ids = [lid for lid, data in _cache.get("anon_links", {}).items() if data["user_id"] == user_id]
+    if not link_ids:
+        return []
+    messages = []
+    for msg in _cache.get("anon_messages", []):
+        if msg["link_id"] in link_ids:
+            messages.append(msg)
+            if mark_read and not msg["read"]:
+                msg["read"] = True
+    if mark_read:
+        await _save_to_gist()
+    return sorted(messages, key=lambda x: x["created_at"], reverse=True)
