@@ -487,8 +487,9 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("🚫 **الكلمات المحظورة:**\n" + "\n".join(f"• {w}" for w in words))
         return
 
-    # ========== زر التقرير الفوري مع التحقق المباشر باستخدام ChatMemberStatus ==========
+    # ========== زر التقرير الفوري ==========
     if data == "exec_report":
+        # التحقق من أن المستخدم مشرف أو مالك
         try:
             member = await context.bot.get_chat_member(chat_id, user.id)
             if member.status not in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
@@ -498,10 +499,12 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"خطأ في التحقق من صلاحية التقرير: {e}")
             await query.answer("⛔ لا يمكن التحقق من صلاحيتك.", show_alert=True)
             return
-        from handlers_jobs import cmd_report
-        fake_update = FakeUpdate(msg)
-        context.args = []
-        await cmd_report(fake_update, context)
+        
+        # إرسال تقرير إلى المشرفين (بما فيهم المطور)
+        from handlers_jobs import _get_report_text, _send_report_to_admins
+        report_text = await _get_report_text(chat_id, user.id, "تقرير فوري")
+        await _send_report_to_admins(context.bot, chat_id, report_text)
+        await query.answer("✅ تم إرسال التقرير للمشرفين.", show_alert=True)
         return
 
     if data == "exec_invite":
