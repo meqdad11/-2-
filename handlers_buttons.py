@@ -1,6 +1,7 @@
 import logging
 import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
+from telegram.constants import ChatMemberStatus
 from telegram.ext import ContextTypes
 import database as db
 from helpers import is_admin
@@ -486,12 +487,11 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("🚫 **الكلمات المحظورة:**\n" + "\n".join(f"• {w}" for w in words))
         return
 
-    # ========== زر التقرير الفوري مع التحقق المباشر ==========
+    # ========== زر التقرير الفوري مع التحقق المباشر باستخدام ChatMemberStatus ==========
     if data == "exec_report":
-        # التحقق المباشر من صلاحية المستخدم (مالك أو مشرف)
         try:
             member = await context.bot.get_chat_member(chat_id, user.id)
-            if member.status not in ("administrator", "creator"):
+            if member.status not in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
                 await query.answer("⛔ هذا الأمر للمشرفين فقط.", show_alert=True)
                 return
         except Exception as e:
