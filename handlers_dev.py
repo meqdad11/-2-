@@ -78,3 +78,10 @@ async def cmd_bot_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"📊 **إحصائيات البوت:**\n"
         f"• المجموعات النشطة: {chats}\n"
     )
+async def cmd_active_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عدد المستخدمين النشطين هذا الشهر"""
+    if not await is_owner(update):
+        await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
+        return
+    count = await db.count_active_users()
+    await update.message.reply_text(f"📊 **المستخدمون النشطون هذا الشهر:** {count}")
