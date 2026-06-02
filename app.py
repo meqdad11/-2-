@@ -49,12 +49,10 @@ from music import (
 )
 from handlers_locks import filter_locked_content
 
-# استيرادات الملفات الجديدة المُقسّمة
 from handlers_menu import cmd_menu
 from handlers_buttons import callback_menu
 from handlers_interactive import handle_interactive_messages
 
-# استيرادات الدوال الجديدة (لضمان عدم وجود أخطاء)
 from handlers_admin import (
     cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
     cmd_demote_all, cmd_purge_bans, cmd_purge_muted,
@@ -80,10 +78,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ========== ضبط التوقيت السعودي ==========
+# ========== التوقيت السعودي ==========
 SAUDI_TZ = pytz.timezone('Asia/Riyadh')
 
-# ========== معالج الرسائل النصية (للمجموعات والخاص) ==========
+# ========== معالج الرسائل النصية للمجموعات والخاص ==========
 async def handle_text(update: Update, context):
     msg = update.message
     if not msg or not msg.text:
@@ -154,8 +152,9 @@ async def handle_channel_post(update: Update, context):
     """معالج رسائل القنوات - يقوم بتحميل الروابط فقط"""
     msg = update.channel_post
     if not msg or not msg.text:
+        logger.info("📭 استلام رسالة قناة بدون نص")
         return
-    logger.info(f"📢 رسالة جديدة في القناة: {msg.text[:50]}...")
+    logger.info(f"📢 رسالة جديدة في القناة: {msg.text[:100]}")
     await handle_media_url(update, context)
 
 # ========== تهيئة التطبيق ==========
@@ -206,7 +205,7 @@ def register_handlers(app):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text))
 
-    # معالج رسائل القنوات (مهم جداً للقنوات)
+    # ⭐ معالج رسائل القنوات (مهم جداً للقنوات) ⭐
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
 
     # فلترة المحتوى للمجموعات فقط
@@ -236,8 +235,9 @@ def main():
     register_handlers(app)
     register_jobs(app)
 
+    # ⭐ إضافة channel_post و edited_channel_post إلى allowed_updates ⭐
     app.run_polling(
-        allowed_updates=["message", "channel_post", "chat_member", "callback_query"],
+        allowed_updates=["message", "channel_post", "edited_channel_post", "chat_member", "callback_query"],
         drop_pending_updates=True,
     )
 
