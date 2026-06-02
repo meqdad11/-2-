@@ -151,6 +151,11 @@ async def handle_text(update: Update, context):
 
 # ========== معالج رسائل القنوات (لتحميل الميديا فقط) ==========
 async def handle_channel_post(update: Update, context):
+    """معالج رسائل القنوات - يقوم بتحميل الروابط فقط"""
+    msg = update.channel_post
+    if not msg or not msg.text:
+        return
+    logger.info(f"📢 رسالة جديدة في القناة: {msg.text[:50]}...")
     await handle_media_url(update, context)
 
 # ========== تهيئة التطبيق ==========
@@ -201,7 +206,7 @@ def register_handlers(app):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text))
 
-    # معالج رسائل القنوات
+    # معالج رسائل القنوات (مهم جداً للقنوات)
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
 
     # فلترة المحتوى للمجموعات فقط
