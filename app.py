@@ -45,9 +45,14 @@ from music import (
     handle_media_url, callback_download,
     callback_sc_download, callback_yt_pick,
 )
-from handlers_menu import callback_menu, handle_interactive_messages, cmd_menu
 from handlers_locks import filter_locked_content
 
+# استيرادات الملفات الجديدة المُقسّمة
+from handlers_menu import cmd_menu
+from handlers_buttons import callback_menu
+from handlers_interactive import handle_interactive_messages
+
+# استيرادات الدوال الجديدة (لضمان عدم وجود أخطاء)
 from handlers_admin import (
     cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
     cmd_demote_all, cmd_purge_bans, cmd_purge_muted,
@@ -80,14 +85,13 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
-    # ===== أمر حذف رسالة بالرد (للمشرفين فقط) =====
+    # أمر حذف رسالة بالرد (للمشرفين فقط)
     if msg.reply_to_message and text == "حذف":
         if not await is_admin(update, context):
             await msg.reply_text("⛔ هذا الأمر للمشرفين فقط.")
             return
         try:
             await context.bot.delete_message(chat_id, msg.reply_to_message.message_id)
-            # رسالة تأكيد تختفي بعد ثانية واحدة
             temp_msg = await msg.reply_text("🗑️ تم حذف الرسالة.")
             await asyncio.sleep(1)
             await temp_msg.delete()
@@ -101,7 +105,6 @@ async def handle_text(update: Update, context):
         context.user_data.get('waiting_remind') == chat_id or
         context.user_data.get('waiting_translate') == chat_id or
         context.user_data.get('waiting_broadcast') == chat_id):
-        from handlers_menu import handle_interactive_messages
         await handle_interactive_messages(update, context)
         return
 
