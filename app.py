@@ -15,7 +15,7 @@ from telegram import Update
 import database as db
 from config import TELEGRAM_BOT_TOKEN
 from commands import ARABIC_COMMANDS
-from helpers import is_admin   # <-- أضفنا هذا الاستيراد
+from helpers import is_admin
 
 from handlers_admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
@@ -86,6 +86,22 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
+    # ===== معالج الرسائل المرسلة عبر رابط "صارحني" =====
+    if context.user_data.get("anon_target"):
+        target_id = context.user_data.pop("anon_target")
+        await db.save_anonymous_message("", text, update.effective_user.id)  # نمرر رابط فارغ مؤقتاً
+        try:
+            await context.bot.send_message(
+                target_id,
+                f"📨 **رسالة جديدة (صارحني):**\n\n{text}\n\n"
+                f"لعرض جميع رسائلك: استخدم أمر `رسائلي`.",
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"فشل إرسال إشعار الرسالة المجهولة: {e}")
+        await update.message.reply_text("✅ تم إرسال رسالتك المجهولة.")
+        return
+
     # أمر حذف رسالة بالرد (للمشرفين فقط)
     if msg.reply_to_message and text == "حذف":
         if not await is_admin(update, context):
@@ -140,7 +156,7 @@ async def post_init(app):
 def register_handlers(app):
 
     # أوامر سلاش
-    app.add_handler(CommandHandler("start", cmd_menu))
+    app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("id",         cmd_id))
     app.add_handler(CommandHandler("ban",        cmd_ban))
     app.add_handler(CommandHandler("unban",      cmd_unban))
