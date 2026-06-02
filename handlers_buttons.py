@@ -132,7 +132,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("🔍 **أرسل ما تريد البحث عنه في جوجل:**", parse_mode="Markdown")
         return
 
-    # قائمة الأوامر المتقدمة
+    # ================= قائمة الأوامر المتقدمة =================
     if data == "menu_commands":
         keyboard = [
             [InlineKeyboardButton("🔐 أوامر القفل والفتح", callback_data="menu_lock_commands")],
@@ -253,7 +253,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_commands")]]))
         return
 
-    # القوائم الرئيسية
+    # ================= القوائم الرئيسية =================
     if data == "menu_main":
         keyboard = [
             [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin")],
@@ -353,7 +353,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text("👥 للجميع — اختر أمراً:", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # الأوامر التنفيذية
     if data == "exec_id":
         first = user.first_name or ""
         username = f"@{user.username}" if user.username else ""
@@ -487,9 +486,17 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("🚫 **الكلمات المحظورة:**\n" + "\n".join(f"• {w}" for w in words))
         return
 
+    # ========== زر التقرير الفوري مع التحقق المباشر ==========
     if data == "exec_report":
-        if not await is_admin(update, context):
-            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+        # التحقق المباشر من صلاحية المستخدم (مالك أو مشرف)
+        try:
+            member = await context.bot.get_chat_member(chat_id, user.id)
+            if member.status not in ("administrator", "creator"):
+                await query.answer("⛔ هذا الأمر للمشرفين فقط.", show_alert=True)
+                return
+        except Exception as e:
+            logger.error(f"خطأ في التحقق من صلاحية التقرير: {e}")
+            await query.answer("⛔ لا يمكن التحقق من صلاحيتك.", show_alert=True)
             return
         from handlers_jobs import cmd_report
         fake_update = FakeUpdate(msg)
