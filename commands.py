@@ -60,7 +60,7 @@ from handlers_user import (
     cmd_speak, cmd_voice_to_text, cmd_kickme,
     cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
     cmd_create_anon_link, cmd_my_messages,
-    cmd_daily_reminder,
+    cmd_daily_reminder, cmd_reminder,
 )
 
 ARABIC_COMMANDS = {
