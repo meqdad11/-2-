@@ -66,7 +66,6 @@ async def get_expired_bans() -> list:
 # ========== دوال التحذيرات ==========
 async def add_warning(user_id: int, chat_id: int) -> int:
     if not supabase: return 0
-    # جلب العدد الحالي
     result = await asyncio.get_event_loop().run_in_executor(
         None, lambda: supabase.table("warnings").select("count").eq("user_id", user_id).eq("chat_id", chat_id).execute()
     )
@@ -135,7 +134,6 @@ async def set_setting(chat_id: int, key: str, value: str):
 # ========== دوال إحصائيات المستخدمين ==========
 async def increment_message_count(user_id: int, chat_id: int, full_name: str = ""):
     if not supabase: return
-    # جلب العدد الحالي
     result = await asyncio.get_event_loop().run_in_executor(
         None, lambda: supabase.table("user_stats").select("message_count").eq("user_id", user_id).eq("chat_id", chat_id).execute()
     )
@@ -265,7 +263,6 @@ import uuid
 
 async def create_anonymous_link(user_id: int) -> str:
     if not supabase: return ""
-    # حذف الرابط القديم
     await asyncio.get_event_loop().run_in_executor(
         None, lambda: supabase.table("anon_links").delete().eq("user_id", user_id).execute()
     )
@@ -295,14 +292,12 @@ async def save_anonymous_message(link_id: str, message: str, sender_id: int = 0)
 
 async def get_anonymous_messages(user_id: int, mark_read: bool = True) -> list:
     if not supabase: return []
-    # الحصول على جميع link_ids الخاصة بالمستخدم
     result_links = await asyncio.get_event_loop().run_in_executor(
         None, lambda: supabase.table("anon_links").select("link_id").eq("user_id", user_id).execute()
     )
     link_ids = [row["link_id"] for row in result_links.data]
     if not link_ids:
         return []
-    # جلب الرسائل
     result_msgs = await asyncio.get_event_loop().run_in_executor(
         None, lambda: supabase.table("anon_messages").select("*").in_("link_id", link_ids).order("created_at", desc=True).execute()
     )
@@ -314,9 +309,40 @@ async def get_anonymous_messages(user_id: int, mark_read: bool = True) -> list:
                 )
     return result_msgs.data
 
+# ========== دوال المستخدمين النشطين ==========
+async def update_user_activity(user_id: int, chat_id: int):
+    """تحديث آخر نشاط للمستخدم (شهرياً)"""
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
+    if not supabase:
+        return
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("user_activity").upsert({
+                "user_id": user_id,
+                "chat_id": chat_id,
+                "last_active_month": current_month
+            }).execute()
+        )
+    except Exception as e:
+        print(f"خطأ في update_user_activity: {e}")
+
+async def count_active_users() -> int:
+    """عدد المستخدمين النشطين هذا الشهر"""
+    current_month = datetime.now(timezone.utc).strftime("%Y-%m")
+    if not supabase:
+        return 0
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("user_activity").select("user_id").eq("last_active_month", current_month).execute()
+        )
+        unique_users = set(row["user_id"] for row in result.data)
+        return len(unique_users)
+    except Exception as e:
+        print(f"خطأ في count_active_users: {e}")
+        return 0
+
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
-    """تأكد من الاتصال بـ Supabase (الجدول سبق إنشاؤه يدوياً)"""
     if supabase:
         print("✅ Supabase جاهز للعمل")
     else:
