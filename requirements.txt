@@ -4,3 +4,4 @@ yt-dlp>=2025.1.0
 requests
 httpx[socks]
 aiohttp>=3.9.0
+supabase
