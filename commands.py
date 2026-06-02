@@ -129,6 +129,6 @@ ARABIC_COMMANDS = {
     "رسائلي": cmd_my_messages,
 
     "مستخدمين نشطين": cmd_active_users,
-    "تذكير": cmd_reminder,
+    "تذكر": cmd_reminder,
     "تذكير يومي": cmd_daily_reminder,
 }
