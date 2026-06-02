@@ -7,7 +7,7 @@ import asyncio
 from contextlib import contextmanager
 
 # ========== مسار قاعدة البيانات ==========
-DB_PATH = "bot_data.db"  # تم التعديل: ملف محلي بدلاً من متغير بيئة
+DB_PATH = os.environ.get("DATABASE_PATH", "bot_data.db")  # تم التعديل: ملف محلي بدلاً من متغير بيئة
 
 # ========== التأكد من وجود الملف ==========
 def ensure_db_file():
