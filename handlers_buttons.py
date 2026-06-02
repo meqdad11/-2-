@@ -391,9 +391,9 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text(
             "📌 **تذكير لمرة واحدة:**\n"
             "أرسل الأمر التالي:\n"
-            "`تذكير 5 نص التذكير`\n\n"
+            "`تذكر 5 نص التذكير`\n\n"
             "• الرقم = عدد الدقائق (1-1440)\n"
-            "• مثال: `تذكير 10 شرب الماء`\n"
+            "• مثال: `تذكر 10 شرب الماء`\n"
             "• يعمل في الخاص والمجموعات",
             parse_mode="Markdown"
         )
