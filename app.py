@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import datetime
+import pytz
 
 from telegram.ext import (
     ApplicationBuilder,
@@ -79,6 +80,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ========== ضبط التوقيت السعودي ==========
+SAUDI_TZ = pytz.timezone('Asia/Riyadh')
+
 # ========== معالج الرسائل النصية (للمجموعات والخاص) ==========
 async def handle_text(update: Update, context):
     msg = update.message
@@ -90,7 +94,6 @@ async def handle_text(update: Update, context):
     # معالج الرسائل المرسلة عبر رابط "صارحني"
     if context.user_data.get("anon_target"):
         target_id = context.user_data.pop("anon_target")
-        # نحتاج إلى معرف link_id، لكن نمرر قيمة فارغة مؤقتاً
         await db.save_anonymous_message("", text, update.effective_user.id)
         try:
             await context.bot.send_message(
@@ -210,7 +213,7 @@ def register_jobs(app):
     jq.run_repeating(job_expire_bans, interval=300, first=10)
     jq.run_daily(
         job_daily_quote,
-        time=datetime.time(hour=9, minute=0, tzinfo=datetime.timezone.utc)
+        time=datetime.time(hour=9, minute=0, second=0, tzinfo=SAUDI_TZ)
     )
 
 # ========== نقطة الدخول الرئيسية ==========
