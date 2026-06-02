@@ -87,10 +87,10 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
-    # ✅ معالج الرسائل المرسلة عبر رابط "صارحني" (يجب أن يكون الأول)
+    # معالج الرسائل المرسلة عبر رابط "صارحني"
     if context.user_data.get("anon_target"):
         target_id = context.user_data.pop("anon_target")
-        # نحتاج إلى link_id حقيقي، لكننا نمرر قيمة فارغة مؤقتاً (سيتم تعديلها لاحقاً)
+        # نحتاج إلى معرف link_id، لكن نمرر قيمة فارغة مؤقتاً
         await db.save_anonymous_message("", text, update.effective_user.id)
         try:
             await context.bot.send_message(
