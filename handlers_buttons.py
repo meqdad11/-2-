@@ -330,20 +330,20 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "menu_user":
-    keyboard = [
-        [InlineKeyboardButton("🪪 معلوماتي", callback_data="exec_id")],
-        [InlineKeyboardButton("📋 القواعد", callback_data="exec_rules")],
-        [InlineKeyboardButton("📚 الموارد", callback_data="exec_resources")],
-        [InlineKeyboardButton("📈 إحصائياتي", callback_data="exec_member_stats")],
-        [InlineKeyboardButton("🎁 هدية عشوائية", callback_data="exec_gift")],
-        [InlineKeyboardButton("🌐 ترجمة", callback_data="exec_translate")],
-        [InlineKeyboardButton("⏰ تذكير", callback_data="exec_remind")],
-        [InlineKeyboardButton("🔄 تذكير يومي", callback_data="exec_daily_remind")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
-        [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
-    ]
-    await msg.edit_text("👥 للجميع — اختر أمراً:", reply_markup=InlineKeyboardMarkup(keyboard))
-    return
+        keyboard = [
+            [InlineKeyboardButton("🪪 معلوماتي", callback_data="exec_id")],
+            [InlineKeyboardButton("📋 القواعد", callback_data="exec_rules")],
+            [InlineKeyboardButton("📚 الموارد", callback_data="exec_resources")],
+            [InlineKeyboardButton("📈 إحصائياتي", callback_data="exec_member_stats")],
+            [InlineKeyboardButton("🎁 هدية عشوائية", callback_data="exec_gift")],
+            [InlineKeyboardButton("🌐 ترجمة", callback_data="exec_translate")],
+            [InlineKeyboardButton("⏰ تذكير", callback_data="exec_remind")],
+            [InlineKeyboardButton("🔄 تذكير يومي", callback_data="exec_daily_remind")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
+        ]
+        await msg.edit_text("👥 للجميع — اختر أمراً:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
 
     if data == "exec_id":
         first = user.first_name or ""
@@ -388,8 +388,26 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "exec_remind":
-        await msg.reply_text("⏰ **أرسل عدد الدقائق ثم نص التذكير (مثال: 5 تذكير بالاجتماع)**", parse_mode="Markdown")
-        context.user_data['waiting_remind'] = chat_id
+        await msg.reply_text(
+            "📌 **تذكير لمرة واحدة:**\n"
+            "أرسل الأمر التالي:\n"
+            "`تذكير 5 نص التذكير`\n\n"
+            "• الرقم = عدد الدقائق (1-1440)\n"
+            "• مثال: `تذكير 10 شرب الماء`\n"
+            "• يعمل في الخاص والمجموعات",
+            parse_mode="Markdown"
+        )
+        return
+
+    if data == "exec_daily_remind":
+        await msg.reply_text(
+            "📌 **تذكير يومي:**\n"
+            "أرسل الأمر التالي:\n"
+            "`تذكير يومي 14:30 نص التذكير`\n\n"
+            "• الوقت بصيغة HH:MM (مثال: 09:00، 20:30)\n"
+            "• يعمل في الخاص والمجموعات",
+            parse_mode="Markdown"
+        )
         return
 
     if data == "menu_media":
