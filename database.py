@@ -7,11 +7,18 @@ import asyncio
 from contextlib import contextmanager
 
 # ========== مسار قاعدة البيانات ==========
-DB_PATH = os.environ.get("DATABASE_PATH", "bot_data.db")
+DB_PATH = "bot_data.db"  # تم التعديل: ملف محلي بدلاً من متغير بيئة
 
-# ========== دبورات مساعدة للتعامل مع SQLite ==========
+# ========== التأكد من وجود الملف ==========
+def ensure_db_file():
+    """إنشاء ملف قاعدة البيانات إذا لم يكن موجوداً"""
+    if not os.path.exists(DB_PATH):
+        open(DB_PATH, 'a').close()
+
+# ========== دوال مساعدة للتعامل مع SQLite ==========
 def get_connection():
     """إنشاء اتصال بقاعدة البيانات مع Row factory"""
+    ensure_db_file()
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -287,7 +294,6 @@ async def increment_message_count(user_id: int, chat_id: int, full_name: str = "
         with get_connection() as conn:
             cursor = conn.cursor()
             now = datetime.now(timezone.utc).isoformat()
-            # التحقق إذا كان المستخدم موجوداً
             cursor.execute('SELECT * FROM user_stats WHERE user_id = ? AND chat_id = ?', (user_id, chat_id))
             row = cursor.fetchone()
             if row:
@@ -381,7 +387,6 @@ async def log_event(chat_id: int, event_type: str, user_id: int = 0, target_id: 
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (chat_id, event_type, user_id or 0, target_id or 0, detail,
                   datetime.now(timezone.utc).isoformat()))
-            # حذف السجلات القديمة (تبقي آخر 100)
             cursor.execute('''
                 DELETE FROM ban_log WHERE id NOT IN (
                     SELECT id FROM ban_log WHERE chat_id = ? ORDER BY created_at DESC LIMIT 100
@@ -457,7 +462,6 @@ async def create_anonymous_link(user_id: int) -> str:
     def _create():
         with get_connection() as conn:
             cursor = conn.cursor()
-            # حذف الرابط القديم للمستخدم
             cursor.execute('DELETE FROM anon_links WHERE user_id = ?', (user_id,))
             link_id = str(uuid.uuid4())[:8]
             cursor.execute('''
@@ -495,7 +499,6 @@ async def get_anonymous_messages(user_id: int, mark_read: bool = True) -> list:
     def _get():
         with get_connection() as conn:
             cursor = conn.cursor()
-            # الحصول على جميع link_ids للمستخدم
             cursor.execute('SELECT link_id FROM anon_links WHERE user_id = ?', (user_id,))
             links = [row['link_id'] for row in cursor.fetchall()]
             if not links:
