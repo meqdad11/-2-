@@ -5,3 +5,4 @@ requests
 httpx[socks]
 aiohttp>=3.9.0
 supabase
+pytz
