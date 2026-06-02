@@ -12,7 +12,7 @@ from handlers_moderation import (
 from handlers_jobs import cmd_report
 from handlers_ai import cmd_shafaq, cmd_gemini, cmd_limit
 from handlers_resources import cmd_add_resource, cmd_list_resources, cmd_delete_resource
-from handlers_menu import cmd_menu   # فقط cmd_menu، لا حاجة لـ callback_menu هنا
+from handlers_menu import cmd_menu
 from music import cmd_sc_search, cmd_yt_search, cmd_download
 
 # دوال القفل
@@ -58,11 +58,12 @@ from handlers_admin import (
     cmd_tag_all, cmd_my_rank, cmd_his_rank,
 )
 
-# دوال المستخدم الجديدة
+# دوال المستخدم الجديدة (بما فيها صارحني ورسائلي)
 from handlers_user import (
     cmd_whisper, cmd_get_invite, cmd_surah, cmd_quran_page,
     cmd_speak, cmd_voice_to_text, cmd_kickme,
     cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
+    cmd_create_anon_link, cmd_my_messages,
 )
 
 ARABIC_COMMANDS = {
@@ -133,4 +134,8 @@ ARABIC_COMMANDS = {
     # ──── أوامر الردود والاختصارات ────
     "اضف رد": cmd_add_reply, "حذف رد": cmd_remove_reply, "الردود المضافه": cmd_list_replies,
     "اضف امر": cmd_add_command, "حذف امر": cmd_remove_command, "الاوامر المضافه": cmd_list_commands,
+
+    # ──── نظام "صارحني" ────
+    "صارحني": cmd_create_anon_link,
+    "رسائلي": cmd_my_messages,
 }
