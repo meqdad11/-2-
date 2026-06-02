@@ -24,7 +24,7 @@ AUTO_REPLIES = {
 
 # ================================================
 
- async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # معالج رابط "صارحني" (يجب أن يكون أولاً)
     if context.args and context.args[0].startswith("anon_"):
         link_id = context.args[0].replace("anon_", "")
