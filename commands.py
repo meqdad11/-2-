@@ -12,7 +12,7 @@ from handlers_moderation import (
 from handlers_jobs import cmd_report
 from handlers_ai import cmd_shafaq, cmd_gemini, cmd_limit
 from handlers_resources import cmd_add_resource, cmd_list_resources, cmd_delete_resource
-from handlers_menu import cmd_menu, callback_menu
+from handlers_menu import cmd_menu   # فقط cmd_menu، لا حاجة لـ callback_menu هنا
 from music import cmd_sc_search, cmd_yt_search, cmd_download
 
 # دوال القفل
@@ -113,7 +113,7 @@ ARABIC_COMMANDS = {
     # ──── أوامر المطور ────
     "رفع مطور": cmd_add_dev, "تنزيل مطور": cmd_remove_dev,
     "اذاعه": cmd_broadcast,
-    "احصائيات": cmd_bot_stats,   # ✅ تم التصحيح
+    "احصائيات": cmd_bot_stats,
 
     # ──── أوامر المشرفين الإضافية ────
     "رفع مشرف": cmd_promote_admin, "تنزيل مشرف": cmd_demote_admin,
