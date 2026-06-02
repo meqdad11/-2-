@@ -15,6 +15,7 @@ from telegram import Update
 import database as db
 from config import TELEGRAM_BOT_TOKEN
 from commands import ARABIC_COMMANDS
+from helpers import is_admin   # <-- أضفنا هذا الاستيراد
 
 from handlers_admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
@@ -77,7 +78,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ========== معالج الرسائل النصية في المجموعات ==========
+# ========== معالج الرسائل النصية (للمجموعات والخاص) ==========
 async def handle_text(update: Update, context):
     msg = update.message
     if not msg or not msg.text:
@@ -175,10 +176,13 @@ def register_handlers(app):
     # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # معالج الرسائل النصية في المجموعات
+    # معالج الرسائل النصية للمجموعات والخاص
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text))
+
     # معالج رسائل القنوات
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
+
     # فلترة المحتوى للمجموعات فقط
     app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
 
