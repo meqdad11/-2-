@@ -1,5 +1,6 @@
 import logging
-from telegram import Update
+from telegram import Update, ChatPermissions
+from telegram.constants import ChatMemberStatus
 from telegram.ext import ContextTypes
 import database as db
 from helpers import is_admin
@@ -266,18 +267,14 @@ async def cmd_unlock_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # قفل وفتح الكل
 # ================================================
 async def cmd_lock_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update, context):
-        await update.message.reply_text("⛔ للمشرفين فقط.")
-        return
+    if not await is_admin(update, context): return await update.message.reply_text("⛔ للمشرفين فقط.")
     types = ["links","tags","media","files","video","voice","gifs","edit","editmedia","repeat","join","forward","id","badwords","spam","replies","notifications","persian","bots","iranian","longtext","quran","porn","ai","autoreply","games","marketnews","whisper"]
     for lt in types:
         await db.set_lock(update.effective_chat.id, lt, True)
     await update.message.reply_text("🔒 تم قفل جميع الحمايات.")
 
 async def cmd_unlock_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_admin(update, context):
-        await update.message.reply_text("⛔ للمشرفين فقط.")
-        return
+    if not await is_admin(update, context): return await update.message.reply_text("⛔ للمشرفين فقط.")
     types = ["links","tags","media","files","video","voice","gifs","edit","editmedia","repeat","join","forward","id","badwords","spam","replies","notifications","persian","bots","iranian","longtext","quran","porn","ai","autoreply","games","marketnews","whisper"]
     for lt in types:
         await db.set_lock(update.effective_chat.id, lt, False)
@@ -291,6 +288,17 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
     if not msg:
         return
     chat_id = msg.chat.id
+    user = msg.from_user
+
+    # تجاهل البوتات والمشرفين
+    if user and user.is_bot:
+        return
+    try:
+        member = await context.bot.get_chat_member(chat_id, user.id)
+        if member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
+            return
+    except:
+        pass
 
     # --- نصوص ---
     if msg.text:
@@ -301,7 +309,7 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
                 await msg.delete()
                 await msg.reply_text("🚫 الروابط مقفلة.")
                 return
-        # التاك (منشن)
+        # التاك
         if "@" in text and await db.is_locked(chat_id, "tags"):
             await msg.delete()
             await msg.reply_text("🚫 التاك مقفل.")
@@ -310,49 +318,56 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
         banned_words = await db.get_banned_words(chat_id)
         if any(word in text for word in banned_words) and await db.is_locked(chat_id, "badwords"):
             await msg.delete()
-            await msg.reply_text("🚫 الكلمات الممنوعة غير مسموحة.")
+            await msg.reply_text("🚫 كلمات ممنوعة.")
             return
         # النص الطويل
         if len(text) > 300 and await db.is_locked(chat_id, "longtext"):
             await msg.delete()
             await msg.reply_text("🚫 الكلام الكثير مقفل.")
             return
-        # الفارسية (كشف بسيط)
+        # الفارسية
         if any("\u0600" <= c <= "\u06FF" for c in text) and await db.is_locked(chat_id, "persian"):
             await msg.delete()
             await msg.reply_text("🚫 الكتابة بالفارسية مقفلة.")
             return
-        # قفل التكرار (يمكن إضافته لاحقاً)
-        # قفل الرد التلقائي (يمكن إضافته)
-        # قفل الذكاء الاصطناعي (يمكن إضافته)
-        # قفل القرآن (لا نمنعه عادة)
-        # قفل الاباحي (فلترة حسب كلمات)
 
-    # --- ميديا ---
+    # --- صور ---
     if msg.photo and await db.is_locked(chat_id, "media"):
         await msg.delete()
         await msg.reply_text("🚫 الصور مقفلة.")
         return
+
+    # --- فيديو ---
     if msg.video and await db.is_locked(chat_id, "video"):
         await msg.delete()
         await msg.reply_text("🚫 الفيديو مقفل.")
         return
+
+    # --- صوت ---
     if msg.audio and await db.is_locked(chat_id, "voice"):
         await msg.delete()
         await msg.reply_text("🚫 الصوتيات مقفلة.")
         return
+
+    # --- ملفات ---
     if msg.document and await db.is_locked(chat_id, "files"):
         await msg.delete()
         await msg.reply_text("🚫 الملفات مقفلة.")
         return
+
+    # --- ملصقات / متحركات ---
     if msg.sticker and await db.is_locked(chat_id, "gifs"):
         await msg.delete()
         await msg.reply_text("🚫 الملصقات والمتحركات مقفلة.")
         return
-    if msg.forward_origin and await db.is_locked(chat_id, "forward"):
+
+    # --- توجيه (إعادة إرسال) ---
+    if msg.forward_date and await db.is_locked(chat_id, "forward"):
         await msg.delete()
         await msg.reply_text("🚫 التوجيه مقفل.")
         return
+
+    # --- ألعاب ---
     if msg.game and await db.is_locked(chat_id, "games"):
         await msg.delete()
         await msg.reply_text("🚫 الألعاب مقفلة.")
