@@ -63,6 +63,7 @@ from handlers_user import (
     cmd_whisper, cmd_get_invite, cmd_surah, cmd_quran_page,
     cmd_speak, cmd_voice_to_text, cmd_kickme,
     cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
+    cmd_create_anon_link, cmd_my_messages,
 )
 from handlers_moderation import (
     cmd_add_reply, cmd_remove_reply, cmd_list_replies,
@@ -86,10 +87,11 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
 
-    # ===== معالج الرسائل المرسلة عبر رابط "صارحني" =====
+    # ✅ معالج الرسائل المرسلة عبر رابط "صارحني" (يجب أن يكون الأول)
     if context.user_data.get("anon_target"):
         target_id = context.user_data.pop("anon_target")
-        await db.save_anonymous_message("", text, update.effective_user.id)  # نمرر رابط فارغ مؤقتاً
+        # نحتاج إلى link_id حقيقي، لكننا نمرر قيمة فارغة مؤقتاً (سيتم تعديلها لاحقاً)
+        await db.save_anonymous_message("", text, update.effective_user.id)
         try:
             await context.bot.send_message(
                 target_id,
