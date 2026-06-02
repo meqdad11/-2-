@@ -10,7 +10,7 @@ from handlers_moderation import (
     cmd_add_command, cmd_remove_command, cmd_list_commands,
 )
 from handlers_jobs import cmd_report
-from handlers_ai import cmd_shafaq, cmd_gemini, cmd_limit
+from handlers_ai import cmd_shafaq
 from handlers_resources import cmd_add_resource, cmd_list_resources, cmd_delete_resource
 from handlers_menu import cmd_menu
 from music import cmd_sc_search, cmd_yt_search, cmd_download
@@ -56,9 +56,8 @@ from handlers_admin import (
 )
 
 from handlers_user import (
-    cmd_whisper, cmd_get_invite, cmd_surah, cmd_quran_page,
-    cmd_speak, cmd_voice_to_text, cmd_kickme,
-    cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
+    cmd_whisper, cmd_get_invite, cmd_surah,
+    cmd_kickme, cmd_bio, cmd_owner,
     cmd_create_anon_link, cmd_my_messages,
 )
 
@@ -115,11 +114,8 @@ ARABIC_COMMANDS = {
     "تاك للكل": cmd_tag_all, "رتبتي": cmd_my_rank, "رتبته": cmd_his_rank,
 
     "اهمس": cmd_whisper, "افتاري": cmd_get_invite,
-    "سورة": cmd_surah, "قران": cmd_quran_page,
-    "انطقي": cmd_speak, "وش يقول": cmd_voice_to_text,
-    "جيمناي": cmd_gemini, "الحد": cmd_limit,
+    "سورة": cmd_surah,
     "اطردني": cmd_kickme,
-    "تفعيل الترحيب": cmd_enable_welcome, "تعطيل الترحيب": cmd_disable_welcome,
     "بايـو": cmd_bio, "المالك": cmd_owner,
 
     "اضف رد": cmd_add_reply, "حذف رد": cmd_remove_reply, "الردود المضافه": cmd_list_replies,
