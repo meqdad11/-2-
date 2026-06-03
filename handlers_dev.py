@@ -1,7 +1,13 @@
 import logging
+import json
+import tempfile
+import asyncio
+import os
+from datetime import datetime
 from telegram import Update
 from telegram.ext import ContextTypes
 import database as db
+from database import supabase
 
 logger = logging.getLogger(__name__)
 
@@ -66,18 +72,17 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
     await update.message.reply_text(f"✅ تم الإرسال إلى {success} من {len(chats)} مجموعة.")
 
-# ========== إحصائيات البوت (بدون استخدام _cache) ==========
+# ========== إحصائيات البوت ==========
 async def cmd_bot_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_owner(update):
         await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
         return
     chats = len(await db.get_all_active_chats())
-    # إحصائيات إضافية من قاعدة البيانات
-    # يمكنك إضافة المزيد من الاستعلامات حسب الحاجة
     await update.message.reply_text(
         f"📊 **إحصائيات البوت:**\n"
         f"• المجموعات النشطة: {chats}\n"
     )
+
 async def cmd_active_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عدد المستخدمين النشطين هذا الشهر"""
     if not await is_owner(update):
@@ -85,3 +90,62 @@ async def cmd_active_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     count = await db.count_active_users()
     await update.message.reply_text(f"📊 **المستخدمون النشطون هذا الشهر:** {count}")
+
+# ========== نسخ احتياطي للمطور ==========
+async def cmd_backup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """نسخ احتياطي لجميع جداول قاعدة البيانات (للمطور فقط)"""
+    if not await is_owner(update):
+        await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
+        return
+    
+    status_msg = await update.message.reply_text("⏳ جاري إنشاء النسخة الاحتياطية...")
+    
+    # قائمة الجداول المراد نسخها
+    tables = [
+        "bans", "warnings", "settings", "user_stats", "group_locks",
+        "anon_links", "anon_messages", "user_activity", "crisis_words",
+        "crisis_settings", "custom_replies", "custom_commands", "ban_log"
+    ]
+    
+    backup_data = {}
+    
+    for table in tables:
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, lambda t=table: supabase.table(t).select("*").execute()
+            )
+            backup_data[table] = result.data
+        except Exception as e:
+            backup_data[table] = {"error": str(e)}
+    
+    # إضافة معلومات النسخة
+    backup_data["_metadata"] = {
+        "backup_date": datetime.now().isoformat(),
+        "bot_version": "شفق 1.0",
+        "tables_count": len(tables)
+    }
+    
+    # إنشاء ملف JSON مؤقت
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        json.dump(backup_data, f, ensure_ascii=False, indent=2)
+        temp_path = f.name
+    
+    # إرسال الملف للمطور
+    await status_msg.edit_text("📤 جاري إرسال الملف...")
+    
+    with open(temp_path, 'rb') as f:
+        await context.bot.send_document(
+            chat_id=update.effective_user.id,
+            document=f,
+            filename=f"shafaq_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            caption="📦 **نسخة احتياطية لقاعدة البيانات**\n"
+                    f"📅 التاريخ: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    f"📊 عدد الجداول: {len(tables)}\n\n"
+                    "⚠️ احتفظ بهذا الملف في مكان آمن.",
+            parse_mode="Markdown"
+        )
+    
+    # حذف الملف المؤقت
+    os.unlink(temp_path)
+    
+    await status_msg.edit_text("✅ تم إنشاء وإرسال النسخة الاحتياطية بنجاح.")
