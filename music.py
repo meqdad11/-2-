@@ -45,6 +45,7 @@ def fmt_dur(seconds) -> str:
         return ""
 
 def _get_common_opts():
+    """خيارات مشتركة لتجنب حظر يوتيوب"""
     opts = {
         "quiet": True,
         "no_warnings": True,
