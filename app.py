@@ -25,7 +25,7 @@ from handlers_admin import (
 )
 from handlers_user import (
     cmd_start, cmd_id, cmd_rules,
-    auto_reply, track_message,
+    auto_reply, track_message, handle_private_messages,
 )
 from handlers_moderation import (
     cmd_add_word, cmd_remove_word, cmd_list_words,
@@ -231,6 +231,9 @@ def register_handlers(app):
     # معالج الرسائل النصية للمجموعات والخاص
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text))
+    
+    # ⭐ معالج الرسائل في الخاص لـ (صارحني + الهمسة) ⭐
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_private_messages))
 
     # ⭐ معالج رسائل القنوات (مهم جداً للقنوات) ⭐
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
