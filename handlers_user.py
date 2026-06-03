@@ -4,7 +4,7 @@ import uuid
 import aiohttp
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import database as db
 from config import TIMEZONE
@@ -108,9 +108,9 @@ async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args or len(context.args) < 2:
         await msg.reply_text(
             "📌 **تذكير لمرة واحدة:**\n"
-            "`تذكير 5 نص التذكير`\n\n"
+            "`تذكر 5 نص التذكير`\n\n"
             "• الرقم = عدد الدقائق (1-1440)\n"
-            "• مثال: `تذكير 10 شرب الماء`",
+            "• مثال: `تذكر 10 شرب الماء`",
             parse_mode="Markdown"
         )
         return
@@ -215,34 +215,74 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-# ========== الأوامر الأخرى ==========
+# ========== الهمسة المقفلة الجديدة ==========
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إرسال همسة مقفلة (تظهر فقط للشخص المقصود)"""
+    msg = update.message
+    
+    # التأكد أن الأمر في مجموعة
     if update.effective_chat.type == "private":
-        await update.message.reply_text("❌ هذا الأمر للمجموعات فقط.")
+        await msg.reply_text("❌ هذا الأمر للمجموعات فقط.")
         return
-    if not context.args:
-        await update.message.reply_text("❗️ الاستخدام: اهمس @username الرسالة")
+    
+    # التأكد من وجود منشن
+    if not msg.reply_to_message and not context.args:
+        await msg.reply_text("❗️ الاستخدام: اهمس @username الرسالة\nأو رد على رسالة الشخص ثم اكتب اهمس")
         return
-    target_username = context.args[0].replace('@', '')
-    whisper_text = " ".join(context.args[1:])
-    if not whisper_text:
-        await update.message.reply_text("❌ لا يمكن إرسال همسة فارغة.")
-        return
-    try:
-        target_user = await context.bot.get_chat(target_username)
+    
+    # تحديد المستلم
+    recipient = None
+    if msg.reply_to_message:
+        recipient = msg.reply_to_message.from_user
+    elif context.args:
+        target_username = context.args[0].replace('@', '')
         try:
-            await context.bot.send_message(target_user.id, f"🔊 لديك همسة من {update.effective_user.mention_html()}:\n\n{whisper_text}", parse_mode="HTML")
-            await update.message.reply_text(f"✅ تم الإرسال إلى {target_user.mention_html()}!", parse_mode="HTML")
-        except Exception as e:
-            error_message = str(e)
-            if "bot was blocked" in error_message:
-                await update.message.reply_text(f"❌ المستخدم {target_user.mention_html()} قام بحظر البوت.", parse_mode="HTML")
-            elif "chat not found" in error_message:
-                await update.message.reply_text(f"❌ لا يمكن إرسال الهمسة، ربما المستخدم {target_user.mention_html()} لم يبدأ البوت من قبل.", parse_mode="HTML")
-            else:
-                await update.message.reply_text(f"❌ فشل الإرسال: {error_message[:100]}")
-    except Exception as e:
-        await update.message.reply_text(f"❌ لم أستطع العثور على المستخدم @{target_username}")
+            recipient = await context.bot.get_chat(target_username)
+        except:
+            await msg.reply_text(f"❌ لم أستطع العثور على المستخدم {target_username}")
+            return
+    
+    if not recipient or recipient.is_bot:
+        await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
+        return
+    
+    # استخراج نص الهمسة
+    whisper_text = ""
+    if msg.reply_to_message and len(context.args) > 0:
+        whisper_text = " ".join(context.args)
+    elif context.args and len(context.args) > 1:
+        whisper_text = " ".join(context.args[1:])
+    
+    # إذا ما كتب نص، نطلبه في الخاص
+    if not whisper_text:
+        context.user_data['whisper_recipient'] = recipient.id
+        context.user_data['whisper_group'] = update.effective_chat.id
+        await msg.reply_text("📝 أرسل نص الهمسة في الخاص خلال 60 ثانية.")
+        return
+    
+    # حفظ الهمسة في قاعدة البيانات
+    whisper_id = await db.save_whisper(
+        sender_id=update.effective_user.id,
+        recipient_id=recipient.id,
+        group_id=update.effective_chat.id,
+        message=whisper_text
+    )
+    
+    if whisper_id:
+        # إرسال رسالة مقفلة في المجموعة
+        await msg.reply_text(
+            f"🔒 **همسة مقفلة من {update.effective_user.first_name}**\n"
+            f"👤 إلى: {recipient.first_name}\n"
+            f"📌 اضغط على الزر لفتح الهمسة",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔓 فتح الهمسة", callback_data=f"open_whisper_{whisper_id}")
+            ]]),
+            parse_mode="Markdown"
+        )
+    else:
+        await msg.reply_text("❌ حدث خطأ في حفظ الهمسة، حاول مرة أخرى.")
+
+# ========== الأوامر الأخرى ==========
 async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ للمشرفين فقط.")
