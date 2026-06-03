@@ -354,3 +354,27 @@ async def cmd_my_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for i, msg in enumerate(messages[:10], 1):
         text += f"{i}. {msg['message']}\n   _({msg['created_at'][:16]})_\n\n"
     await update.message.reply_text(text, parse_mode="Markdown")
+
+async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """ترجمة رسالة تم الرد عليها"""
+    msg = update.message
+    if not msg.reply_to_message or not msg.reply_to_message.text:
+        await msg.reply_text("❌ قم بالرد على رسالة نصية لترجمتها.")
+        return
+    
+    original_text = msg.reply_to_message.text
+    target_lang = "ar"  # العربية
+    
+    try:
+        from googletrans import Translator
+        translator = Translator()
+        result = await translator.translate(original_text, dest=target_lang)
+        translated = result.text
+        await msg.reply_text(
+            f"🌐 **الترجمة إلى العربية:**\n\n{translated}\n\n"
+            f"_الرسالة الأصلية:_ {original_text[:100]}...",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"خطأ في الترجمة: {e}")
+        await msg.reply_text("❌ خدمة الترجمة غير متاحة حالياً، حاول لاحقاً.")
