@@ -561,11 +561,10 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.answer("🔓 همسة لك", show_alert=True)
         await context.bot.send_message(
             user_id,
-            f"🔓 **همسة سرية من {whisper['sender_name']}**\n\n📝 {whisper['text']}",
+            f"🔓 **همسة من {whisper['sender_name']}**\n\n📝 {whisper['text']}",
             parse_mode="Markdown"
         )
         
-        # حذف الهمسة من الذاكرة بعد عرضها
         del context.bot_data[f'whisper_{whisper_id}']
         await msg.delete()
         return
