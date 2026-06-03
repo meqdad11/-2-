@@ -1,5 +1,5 @@
 """
-ملف المستخدم - نسخة كاملة مع نظام همسة يعمل بالرابط
+ملف المستخدم - نسخة كاملة مع نظام همسة يعمل بالرابط (بدون قاعدة بيانات)
 """
 
 import logging
@@ -237,7 +237,14 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-# ==================== WHISPER (NEW - WORKING WITH LINK) ====================
+# ==================== WHISPER (بدون قاعدة بيانات) ====================
+
+async def delete_whisper_job(context: ContextTypes.DEFAULT_TYPE, whisper_id: str):
+    """حذف الهمسة من الذاكرة بعد انتهاء الوقت"""
+    if hasattr(context.bot, 'whisper_storage'):
+        if whisper_id in context.bot.whisper_storage:
+            del context.bot.whisper_storage[whisper_id]
+            print(f"🗑️ تم حذف الهمسة {whisper_id} (انتهت صلاحيتها)")
 
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إنشاء همسة لشخص معين - طريقة الرابط (علنية)"""
@@ -265,20 +272,29 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # إنشاء معرف فريد للهمسة
     whisper_id = str(uuid.uuid4())[:12]
 
-    # حفظ الهمسة في قاعدة البيانات
-    success = await db.save_whisper_link(
-        whisper_id=whisper_id,
-        sender_id=msg.from_user.id,
-        sender_name=msg.from_user.first_name,
-        target_id=target.id,
-        target_name=target.first_name,
-        chat_id=update.effective_chat.id,
-        chat_title=update.effective_chat.title or "المجموعة"
-    )
+    # حفظ بيانات الهمسة في الذاكرة المؤقتة
+    whisper_data = {
+        "sender_id": msg.from_user.id,
+        "sender_name": msg.from_user.first_name,
+        "target_id": target.id,
+        "target_name": target.first_name,
+        "chat_id": update.effective_chat.id,
+        "chat_title": update.effective_chat.title or "المجموعة",
+        "created_at": datetime.now().isoformat()
+    }
+    
+    # تخزين في user_data الخاص بالبوت (مؤقت)
+    if not hasattr(context.bot, 'whisper_storage'):
+        context.bot.whisper_storage = {}
+    context.bot.whisper_storage[whisper_id] = whisper_data
 
-    if not success:
-        await msg.reply_text("❌ حدث خطأ في حفظ الهمسة، حاول لاحقاً.")
-        return
+    # جدولة حذف الهمسة بعد 5 دقائق
+    if context.job_queue:
+        context.job_queue.run_once(
+            lambda ctx: delete_whisper_job(ctx, whisper_id),
+            when=300,
+            name=f"del_whisper_{whisper_id}"
+        )
 
     # إنشاء الرابط
     bot_username = (await context.bot.get_me()).username
@@ -288,7 +304,7 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔒 **همسة لـ {target.first_name}**\n\n"
         f"اضغط على الرابط وأرسل الهمسة:\n"
         f"{link}\n\n"
-        f"⏳ الرابط صالح لمرة واحدة فقط.\n"
+        f"⏳ الرابط صالح لمدة 5 دقائق فقط.\n"
         f"📌 سيُرسل الهمس باسمك: **{msg.from_user.first_name}**",
         parse_mode="Markdown"
     )
@@ -303,10 +319,12 @@ async def handle_whisper_start(update: Update, context: ContextTypes.DEFAULT_TYP
 
     whisper_id = context.args[0].replace("whisper_", "")
 
-    # التحقق من صحة الهمسة
-    whisper_data = await db.get_whisper_link(whisper_id)
+    # التحقق من صحة الهمسة من الذاكرة
+    whisper_storage = getattr(context.bot, 'whisper_storage', {})
+    whisper_data = whisper_storage.get(whisper_id)
+
     if not whisper_data:
-        await msg.reply_text("❌ انتهت صلاحية الهمسة أو الرابط غير صالح.")
+        await msg.reply_text("❌ انتهت صلاحية الهمسة أو الرابط غير صالح (الهمسة صالحة لمدة 5 دقائق).")
         return
 
     # التحقق من أن المستخدم هو المرسل الأصلي
@@ -371,8 +389,10 @@ async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode="Markdown"
         )
 
-        # حذف الهمسة بعد الاستخدام
-        await db.delete_whisper_link(whisper_id)
+        # حذف الهمسة من الذاكرة بعد الاستخدام
+        whisper_storage = getattr(context.bot, 'whisper_storage', {})
+        if whisper_id in whisper_storage:
+            del whisper_storage[whisper_id]
 
     except Exception as e:
         logger.error(f"خطأ في إرسال الهمسة: {e}")
@@ -544,7 +564,7 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في الترجمة: {e}")
         await msg.reply_text("❌ خدمة الترجمة غير متاحة حالياً، حاول لاحقاً.")
 
-# ==================== HANDLE PRIVATE MESSAGES (ANON + WHISPER) ====================
+# ==================== HANDLE PRIVATE MESSAGES ====================
 
 async def handle_private_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالج الرسائل في الخاص (صارحني + همسة)"""
