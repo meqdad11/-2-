@@ -366,6 +366,7 @@ async def add_crisis_word(chat_id: int, word: str) -> bool:
         print(f"Error adding crisis word: {e}")
         return False
 
+
 async def remove_crisis_word(chat_id: int, word: str) -> bool:
     """حذف كلمة أزمة"""
     if not supabase:
@@ -378,6 +379,7 @@ async def remove_crisis_word(chat_id: int, word: str) -> bool:
     except Exception as e:
         print(f"Error removing crisis word: {e}")
         return False
+
 
 async def get_crisis_words(chat_id: int) -> list:
     """جلب جميع كلمات الأزمات للمجموعة"""
@@ -392,10 +394,12 @@ async def get_crisis_words(chat_id: int) -> list:
         print(f"Error getting crisis words: {e}")
         return []
 
+
 async def get_crisis_words_count(chat_id: int) -> int:
     """جلب عدد كلمات الأزمات"""
     words = await get_crisis_words(chat_id)
     return len(words)
+
 
 async def set_crisis_reply(chat_id: int, reply_text: str) -> bool:
     """تعيين رسالة الرد التلقائي"""
@@ -423,6 +427,7 @@ async def set_crisis_reply(chat_id: int, reply_text: str) -> bool:
         print(f"Error setting crisis reply: {e}")
         return False
 
+
 async def get_crisis_reply(chat_id: int) -> str:
     """جلب رسالة الرد التلقائي"""
     if not supabase:
@@ -437,6 +442,7 @@ async def get_crisis_reply(chat_id: int) -> str:
     except Exception as e:
         print(f"Error getting crisis reply: {e}")
         return ""
+
 
 async def set_crisis_enabled(chat_id: int, enabled: bool) -> bool:
     """تفعيل/تعطيل النظام"""
@@ -464,6 +470,7 @@ async def set_crisis_enabled(chat_id: int, enabled: bool) -> bool:
         print(f"Error setting crisis enabled: {e}")
         return False
 
+
 async def get_crisis_enabled(chat_id: int) -> bool:
     """جلب حالة التفعيل"""
     if not supabase:
@@ -478,6 +485,7 @@ async def get_crisis_enabled(chat_id: int) -> bool:
     except Exception as e:
         print(f"Error getting crisis enabled: {e}")
         return False
+
 
 async def log_crisis_alert(chat_id: int, word: str, user_id: int):
     """تسجيل تنبيه أزمة في سجل الأحداث"""
@@ -523,6 +531,7 @@ async def add_custom_reply(chat_id: int, keyword: str, reply: str) -> bool:
         print(f"Error adding custom reply: {e}")
         return False
 
+
 async def remove_custom_reply(chat_id: int, keyword: str) -> bool:
     """حذف رد تلقائي"""
     if not supabase:
@@ -535,6 +544,7 @@ async def remove_custom_reply(chat_id: int, keyword: str) -> bool:
     except Exception as e:
         print(f"Error removing custom reply: {e}")
         return False
+
 
 async def get_custom_replies(chat_id: int) -> dict:
     """جلب جميع الردود التلقائية للمجموعة {keyword: reply}"""
@@ -575,6 +585,7 @@ async def add_custom_command(chat_id: int, shortcut: str, target_command: str) -
         print(f"Error adding custom command: {e}")
         return False
 
+
 async def remove_custom_command(chat_id: int, shortcut: str) -> bool:
     """حذف اختصار"""
     if not supabase:
@@ -588,6 +599,7 @@ async def remove_custom_command(chat_id: int, shortcut: str) -> bool:
         print(f"Error removing custom command: {e}")
         return False
 
+
 async def get_custom_commands(chat_id: int) -> dict:
     """جلب جميع الاختصارات للمجموعة {shortcut: target_command}"""
     if not supabase:
@@ -600,6 +612,76 @@ async def get_custom_commands(chat_id: int) -> dict:
     except Exception as e:
         print(f"Error getting custom commands: {e}")
         return {}
+
+# ==================== دوال المخالفات ====================
+
+async def add_violation(user_id: int, chat_id: int, violation_type: str, message_text: str = None):
+    """تسجيل مخالفة جديدة"""
+    if not supabase:
+        return
+    try:
+        data = {
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "violation_type": violation_type,
+            "message_text": message_text,
+            "created_at": now_iso()
+        }
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("user_violations").insert(data).execute()
+        )
+        
+        # تنظيف المخالفات القديمة (نحتفظ بآخر 20 مخالفة فقط لكل مستخدم)
+        await cleanup_old_violations(user_id, chat_id)
+        
+    except Exception as e:
+        print(f"Error adding violation: {e}")
+
+
+async def cleanup_old_violations(user_id: int, chat_id: int, keep: int = 20):
+    """حذف المخالفات القديمة، نحتفظ بآخر keep مخالفة"""
+    if not supabase:
+        return
+    try:
+        # جلب جميع المخالفات للمستخدم
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("user_violations")
+            .select("id")
+            .eq("user_id", user_id)
+            .eq("chat_id", chat_id)
+            .order("created_at", desc=True)
+            .execute()
+        )
+        
+        if len(result.data) > keep:
+            # احذف القديمة (ما بعد الـ keep الأولى)
+            ids_to_delete = [row["id"] for row in result.data[keep:]]
+            for vid in ids_to_delete:
+                await asyncio.get_event_loop().run_in_executor(
+                    None, lambda: supabase.table("user_violations").delete().eq("id", vid).execute()
+                )
+    except Exception as e:
+        print(f"Error cleaning violations: {e}")
+
+
+async def get_user_violations(user_id: int, chat_id: int, limit: int = 5) -> list:
+    """جلب آخر مخالفات المستخدم (مرتبة من الأحدث للأقدم)"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("user_violations")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("chat_id", chat_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data
+    except Exception as e:
+        print(f"Error getting violations: {e}")
+        return []
 
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
