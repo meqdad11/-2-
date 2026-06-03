@@ -33,7 +33,6 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     report_text = msg.text.replace("/report", "").replace("تقرير", "").strip() if msg.text else ""
     if not report_text:
-        # إرسال رسالة خطأ في الخاص (بدون ظهور في المجموعة)
         try:
             await context.bot.send_message(
                 user.id,
@@ -41,14 +40,12 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         except:
             pass
-        # حذف رسالة المستخدم الخاطئة
         try:
             await msg.delete()
         except:
             pass
         return
     
-    # الرد على رسالة العضو
     if not msg.reply_to_message:
         try:
             await context.bot.send_message(
@@ -65,7 +62,6 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     target = msg.reply_to_message.from_user
     
-    # حذف رسالة المستخدم (للسرية)
     try:
         await msg.delete()
     except Exception as e:
@@ -92,7 +88,6 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
     
-    # إرسال تأكيد في الخاص فقط (بدون رسالة في المجموعة)
     if sent > 0:
         try:
             await context.bot.send_message(
@@ -110,7 +105,6 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
     
-    # تسجيل في سجل الأحداث
     await db.log_event(chat.id, "report", user_id=user.id, target_id=target.id, detail=report_text[:100])
 
 # ========== دالة انتهاء صلاحية الحظر ==========
@@ -134,7 +128,6 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     
-    # التأكد من وجود رد على رسالة عضو
     if not msg.reply_to_message:
         try:
             await context.bot.send_message(
@@ -164,10 +157,8 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         return
     
-    # سبب التقرير
     reason = " ".join(context.args) if context.args else "لم يحدد سبب"
     
-    # حذف رسالة المستخدم (للسرية)
     try:
         await msg.delete()
     except Exception as e:
@@ -175,21 +166,16 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # ========== جلب المعلومات ==========
     
-    # 1. التحذيرات
     warnings_count = await db.get_warnings(target.id, chat.id)
     
-    # 2. الحظر السابق
     old_ban = await db.get_ban(target.id, chat.id)
     was_banned = "✅ نعم" if old_ban else "❌ لا"
     
-    # 3. أول ظهور
     first_seen = await db.get_user_first_seen(target.id, chat.id)
     first_seen_str = first_seen[:10] if first_seen else "غير معروف"
     
-    # 4. عدد الرسائل
     msg_count = await db.get_message_count(target.id, chat.id)
     
-    # 5. حالة الكتم الحالية
     is_muted = "❌ لا"
     try:
         member = await context.bot.get_chat_member(chat.id, target.id)
@@ -198,7 +184,6 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
     
-    # 6. معرفة إذا كان مشرفاً
     is_admin_user = "❌ لا"
     try:
         member = await context.bot.get_chat_member(chat.id, target.id)
@@ -209,37 +194,8 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
     
-    # 7. آخر المخالفات
-    violations = await db.get_user_violations(target.id, chat.id, limit=5)
-    violations_text = ""
-    if violations:
-        violations_lines = []
-        v_type_map = {
-            "banned_word": "🚫 كلمة محظورة",
-            "link": "🔗 رابط",
-            "tag": "📌 تاك",
-            "longtext": "📝 نص طويل",
-            "persian": "🇮🇷 كتابة فارسية",
-            "media": "🖼️ صورة",
-            "video": "🎥 فيديو",
-            "audio": "🎵 صوت",
-            "file": "📁 ملف",
-            "sticker": "🏷️ ملصق",
-            "forward": "↪️ إعادة توجيه",
-            "game": "🎮 لعبة"
-        }
-        for i, v in enumerate(violations, 1):
-            v_type = v_type_map.get(v.get("violation_type"), v.get("violation_type"))
-            v_time = v.get("created_at", "")[:16] if v.get("created_at") else ""
-            v_text = v.get("message_text", "")[:50] if v.get("message_text") else ""
-            violations_lines.append(f"{i}. {v_type} - {v_time}\n   {v_text}")
-        violations_text = "\n".join(violations_lines)
-    else:
-        violations_text = "✅ لا توجد مخالفات مسجلة"
-    
     # ========== إنشاء التقرير ==========
     
-    # معلومات العضو الأساسية
     target_name = target.full_name or target.first_name
     target_username = f"@{target.username}" if target.username else "لا يوجد يوزر"
     
@@ -259,9 +215,6 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         f"📊 **النشاط:**\n"
         f"• عدد الرسائل: {msg_count} رسالة\n\n"
-        
-        f"⚠️ **آخر المخالفات (5 الأخيرة):**\n"
-        f"{violations_text}\n\n"
         
         f"📝 **سبب التقرير:**\n"
         f"{reason}\n\n"
@@ -290,7 +243,6 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     logger.error(f"فشل إرسال التقرير للمشرف {admin.user.id}: {e}")
         
-        # إرسال تأكيد في الخاص فقط (بدون رسالة في المجموعة)
         if sent_count > 0:
             try:
                 await context.bot.send_message(
@@ -318,5 +270,4 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
     
-    # تسجيل في سجل الأحداث
     await db.log_event(chat.id, "deep_report", user_id=user.id, target_id=target.id, detail=reason[:100])
