@@ -5,7 +5,7 @@
 import logging
 import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, MessageHandler, filters, ContextTypes  # ⭐ هذا السطر كان ناقصاً
+from telegram.ext import CommandHandler, MessageHandler, filters, ContextTypes
 import database as db
 from helpers import is_admin
 
