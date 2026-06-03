@@ -114,7 +114,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     count = await db.add_warning(user_id, chat_id)
     reason_text = f"\nالسبب: {reason}" if reason else ""
-    await db.log_event(chat_id, "warn", user_id=warner_id, target_id=user_id)
+    await db.log_event(chat_id, "warn", user_id=warner_id, target_id=user_id, detail=reason)
     if count >= MAX_WARNINGS:
         await db.add_ban(user_id, chat_id, f"حظر تلقائي بعد {MAX_WARNINGS} تحذيرات", warner_id)
         try:
@@ -340,16 +340,84 @@ async def cmd_checkban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_eventlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """سجل مفصل بالأحداث (من، على من، السبب، الوقت)"""
     if not await require_admin(update, context):
         return
+    
     chat_id = update.effective_chat.id
     limit = int(context.args[0]) if context.args and context.args[0].isdigit() else 10
+    
     events = await db.get_event_log(chat_id, limit)
     if not events:
-        await update.message.reply_text("لا توجد أحداث مسجلة.")
+        await update.message.reply_text("📭 لا توجد أحداث مسجلة.")
         return
-    lines = [f"• {e['action']} — {e['created_at'][:16]}" for e in events]
-    await update.message.reply_text("📋 سجل الأحداث:\n" + "\n".join(lines))
+    
+    # قاموس لتخزين أسماء المستخدمين (لتجنب الطلب المتكرر)
+    users_cache = {}
+    
+    async def get_user_info(user_id):
+        if user_id == 0 or not user_id:
+            return "❓ نظام"
+        if user_id in users_cache:
+            return users_cache[user_id]
+        try:
+            user = await context.bot.get_chat(user_id)
+            name = user.full_name or user.first_name or str(user_id)
+            username = f"@{user.username}" if user.username else ""
+            info = f"{name} {username} (`{user_id}`)"
+            users_cache[user_id] = info
+            return info
+        except:
+            info = f"❓ مستخدم (`{user_id}`)"
+            users_cache[user_id] = info
+            return info
+    
+    action_names = {
+        "ban": "🚫 حظر",
+        "unban": "✅ رفع حظر",
+        "warn": "⚠️ تحذير",
+        "mute": "🔇 كتم",
+        "unmute": "🔊 رفع كتم",
+        "lock": "🔒 إغلاق المجموعة",
+        "unlock": "🔓 فتح المجموعة",
+        "pin": "📌 تثبيت",
+        "unpin": "📌 إلغاء تثبيت",
+        "report": "📢 تقرير",
+        "deep_report": "📊 تقرير متقدم",
+        "promote": "⬆️ رفع مشرف",
+        "demote": "⬇️ تنزيل مشرف",
+        "crisis_alert": "🆘 تنبيه أزمة",
+        "add_resource": "📚 إضافة مورد",
+        "delete_resource": "🗑️ حذف مورد",
+        "warn_user": "🔔 تنبيه مستخدم",
+    }
+    
+    lines = []
+    for i, event in enumerate(events, 1):
+        action = event.get("action", "unknown")
+        action_name = action_names.get(action, f"🔹 {action}")
+        event_time = event.get("created_at", "")[:16] if event.get("created_at") else "وقت غير معروف"
+        
+        user_id = event.get("user_id", 0)
+        target_id = event.get("target_id", 0)
+        detail = event.get("detail", "")
+        
+        user_info = await get_user_info(user_id)
+        
+        text = f"{i}. {action_name}\n   👤 بواسطة: {user_info}"
+        
+        if target_id and target_id != 0:
+            target_info = await get_user_info(target_id)
+            text += f"\n   🎯 على: {target_info}"
+        
+        if detail:
+            text += f"\n   📝 السبب: {detail}"
+        
+        text += f"\n   🕒 الوقت: {event_time}"
+        
+        lines.append(text)
+    
+    await update.message.reply_text("📋 **سجل الأحداث المفصل:**\n\n" + "\n\n".join(lines), parse_mode="Markdown")
 
 
 async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -558,6 +626,8 @@ async def cmd_his_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"رتبة العضو: {rank_map.get(rank, rank)}")
     except Exception as e:
         await update.message.reply_text(f"❌ لا يمكن جلب الرتبة: {e}")
+
+
 # ========== أوامر التثبيت والتنبيه ==========
 
 async def cmd_pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
