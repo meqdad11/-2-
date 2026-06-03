@@ -9,7 +9,7 @@ from handlers_moderation import (
     cmd_add_reply, cmd_remove_reply, cmd_list_replies,
     cmd_add_command, cmd_remove_command, cmd_list_commands,
 )
-from handlers_jobs import cmd_report
+from handlers_jobs import cmd_report, cmd_deep_report
 from handlers_ai import cmd_shafaq
 from handlers_resources import cmd_add_resource, cmd_list_resources, cmd_delete_resource
 from handlers_menu import cmd_menu
@@ -82,6 +82,7 @@ ARABIC_COMMANDS = {
     "كتم": cmd_mute, "رفع الكتم": cmd_unmute,
     "أغلق المجموعة": cmd_lock, "افتح المجموعة": cmd_unlock,
     "سجل": cmd_eventlog, "تقرير": cmd_report,
+    "تقرير متقدم": cmd_deep_report,
     "أضف كلمة": cmd_add_word, "احذف كلمة": cmd_remove_word, "الكلمات المحظورة": cmd_list_words,
     "أضف مورد": cmd_add_resource, "الموارد": cmd_list_resources, "احذف مورد": cmd_delete_resource,
     "ايدي": cmd_id, "القواعد": cmd_rules, "شفق": cmd_shafaq,
