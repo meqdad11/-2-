@@ -145,6 +145,9 @@ ARABIC_COMMANDS = {
     "مستخدمين نشطين": cmd_active_users,
     "تذكر": cmd_reminder,
     "تذكير يومي": cmd_daily_reminder,
+"ثبت": cmd_pin,
+"الغاء تثبيت": cmd_unpin,
+"تنبيه": cmd_warn_user,
 
     # ========== أوامر نظام الأزمات الجديدة ==========
     "اضف كلمة ازمة": cmd_add_crisis_words,
