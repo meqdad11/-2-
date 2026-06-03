@@ -244,6 +244,79 @@ async def cmd_owner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👨‍💻 المطور: Me8dad")
 
 
+# ==================== TRANSLATE COMMAND (ADDED) ====================
+
+async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    ترجمة النص باستخدام Google Translate API (بدون مفتاح API)
+    الاستخدام: /translate <النص>  أو /tr <النص>
+    """
+    msg = update.message
+    if not msg.reply_to_message and not context.args:
+        await msg.reply_text("❌ استخدم: /translate <النص> أو رد على رسالة")
+        return
+
+    # تحديد النص المراد ترجمته
+    if msg.reply_to_message and msg.reply_to_message.text:
+        text_to_translate = msg.reply_to_message.text
+    else:
+        text_to_translate = " ".join(context.args)
+
+    if not text_to_translate:
+        await msg.reply_text("❌ لا يوجد نص للترجمة.")
+        return
+
+    # تحديد اللغة المصدر والهدف (افتراضي: إنكليزي <-> عربي)
+    # إذا أضاف المستخدم رمز اللغة، مثلاً: /translate ar:en Hello
+    target_lang = "ar"  # العربية
+    source_lang = "en"  # الإنجليزية
+
+    parts = text_to_translate.split(" ", 1)
+    if len(parts) == 2 and ":" in parts[0]:
+        lang_pair = parts[0].split(":")
+        if len(lang_pair) == 2:
+            source_lang = lang_pair[0].strip()
+            target_lang = lang_pair[1].strip()
+            text_to_translate = parts[1]
+
+    # طلب الترجمة
+    try:
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {
+            "client": "gtx",
+            "sl": source_lang,
+            "tl": target_lang,
+            "dt": "t",
+            "q": text_to_translate
+        }
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params, timeout=10) as resp:
+                if resp.status != 200:
+                    await msg.reply_text("❌ فشل الاتصال بخدمة الترجمة.")
+                    return
+                data = await resp.json()
+
+        # استخراج الترجمة
+        translated_text = ""
+        for part in data[0]:
+            if part[0]:
+                translated_text += part[0]
+
+        if not translated_text:
+            await msg.reply_text("❌ لم يتم الحصول على ترجمة.")
+            return
+
+        await msg.reply_text(
+            f"🌐 الترجمة:\n\n{translated_text}\n\n"
+            f"({source_lang.upper()} → {target_lang.upper()})"
+        )
+
+    except Exception as e:
+        logger.error(f"Translation error: {e}")
+        await msg.reply_text("❌ حدث خطأ أثناء الترجمة.")
+
+
 # ==================== REGISTER (IMPORTANT) ====================
 
 def register_user_handlers(app):
