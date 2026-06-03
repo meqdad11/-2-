@@ -558,3 +558,94 @@ async def cmd_his_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"رتبة العضو: {rank_map.get(rank, rank)}")
     except Exception as e:
         await update.message.reply_text(f"❌ لا يمكن جلب الرتبة: {e}")
+# ========== أوامر التثبيت والتنبيه ==========
+
+async def cmd_pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تثبيت الرسالة التي تم الرد عليها (للمشرفين فقط)"""
+    if not await require_admin(update, context):
+        return
+    
+    msg = update.message
+    if not msg.reply_to_message:
+        await msg.reply_text("❌ قم بالرد على الرسالة التي تريد تثبيتها.")
+        return
+    
+    try:
+        await msg.reply_to_message.pin()
+        await msg.reply_text("📌 تم تثبيت الرسالة.")
+        await db.log_event(update.effective_chat.id, "pin", user_id=update.effective_user.id)
+    except Exception as e:
+        await msg.reply_text(f"❌ لا يمكن تثبيت الرسالة: {e}")
+
+
+async def cmd_unpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إلغاء تثبيت الرسالة المثبتة (للمشرفين فقط)"""
+    if not await require_admin(update, context):
+        return
+    
+    chat_id = update.effective_chat.id
+    try:
+        await context.bot.unpin_chat_message(chat_id)
+        await update.message.reply_text("📌 تم إلغاء تثبيت الرسالة.")
+        await db.log_event(chat_id, "unpin", user_id=update.effective_user.id)
+    except Exception as e:
+        await update.message.reply_text(f"❌ لا يمكن إلغاء التثبيت: {e}")
+
+
+async def cmd_warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إرسال تنبيه للمستخدم المخالف على الخاص + إشعار للمشرفين"""
+    if not await require_admin(update, context):
+        return
+    
+    msg = update.message
+    if not msg.reply_to_message:
+        await msg.reply_text("❌ قم بالرد على رسالة العضو المخالف.")
+        return
+    
+    target = msg.reply_to_message.from_user
+    if target.is_bot:
+        await msg.reply_text("❌ لا يمكن إرسال تنبيه لبوت.")
+        return
+    
+    reason = " ".join(context.args) if context.args else "بدون سبب محدد"
+    chat_title = update.effective_chat.title or "المجموعة"
+    admin_name = update.effective_user.full_name or update.effective_user.first_name
+    
+    # رسالة للمستخدم المخالف
+    user_warning = (
+        f"⚠️ **تنبيه من المشرفين** ⚠️\n\n"
+        f"📌 المجموعة: {chat_title}\n"
+        f"👮 المشرف: {admin_name}\n"
+        f"📝 السبب: {reason}\n\n"
+        f"يرجى الالتزام بقواعد المجموعة لتجنب الحظر أو الكتم."
+    )
+    
+    # رسالة تأكيد للمشرفين
+    admin_confirm = (
+        f"✅ **تم إرسال تنبيه للمستخدم**\n\n"
+        f"👤 المستخدم: {target.full_name or target.first_name} (`{target.id}`)\n"
+        f"📝 السبب: {reason}\n"
+        f"🕒 الوقت: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    )
+    
+    # إرسال التنبيه للمستخدم
+    try:
+        await context.bot.send_message(target.id, user_warning, parse_mode="Markdown")
+        
+        # إرسال تأكيد للمشرفين
+        admins = await context.bot.get_chat_administrators(update.effective_chat.id)
+        sent_count = 0
+        for admin in admins:
+            if not admin.user.is_bot:
+                try:
+                    await context.bot.send_message(admin.user.id, admin_confirm, parse_mode="Markdown")
+                    sent_count += 1
+                except:
+                    pass
+        
+        await msg.reply_text(f"✅ تم إرسال التنبيه للمستخدم وإشعار {sent_count} من المشرفين.")
+        await db.log_event(update.effective_chat.id, "warn_user", user_id=update.effective_user.id, target_id=target.id, detail=reason)
+        
+    except Exception as e:
+        await msg.reply_text(f"❌ لا يمكن إرسال التنبيه (ربما قام المستخدم بحظر البوت).")
+        logger.error(f"خطأ في إرسال تنبيه للمستخدم {target.id}: {e}")
