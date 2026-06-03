@@ -366,7 +366,6 @@ async def add_crisis_word(chat_id: int, word: str) -> bool:
         print(f"Error adding crisis word: {e}")
         return False
 
-
 async def remove_crisis_word(chat_id: int, word: str) -> bool:
     """حذف كلمة أزمة"""
     if not supabase:
@@ -379,7 +378,6 @@ async def remove_crisis_word(chat_id: int, word: str) -> bool:
     except Exception as e:
         print(f"Error removing crisis word: {e}")
         return False
-
 
 async def get_crisis_words(chat_id: int) -> list:
     """جلب جميع كلمات الأزمات للمجموعة"""
@@ -394,12 +392,10 @@ async def get_crisis_words(chat_id: int) -> list:
         print(f"Error getting crisis words: {e}")
         return []
 
-
 async def get_crisis_words_count(chat_id: int) -> int:
     """جلب عدد كلمات الأزمات"""
     words = await get_crisis_words(chat_id)
     return len(words)
-
 
 async def set_crisis_reply(chat_id: int, reply_text: str) -> bool:
     """تعيين رسالة الرد التلقائي"""
@@ -427,7 +423,6 @@ async def set_crisis_reply(chat_id: int, reply_text: str) -> bool:
         print(f"Error setting crisis reply: {e}")
         return False
 
-
 async def get_crisis_reply(chat_id: int) -> str:
     """جلب رسالة الرد التلقائي"""
     if not supabase:
@@ -442,7 +437,6 @@ async def get_crisis_reply(chat_id: int) -> str:
     except Exception as e:
         print(f"Error getting crisis reply: {e}")
         return ""
-
 
 async def set_crisis_enabled(chat_id: int, enabled: bool) -> bool:
     """تفعيل/تعطيل النظام"""
@@ -470,7 +464,6 @@ async def set_crisis_enabled(chat_id: int, enabled: bool) -> bool:
         print(f"Error setting crisis enabled: {e}")
         return False
 
-
 async def get_crisis_enabled(chat_id: int) -> bool:
     """جلب حالة التفعيل"""
     if not supabase:
@@ -485,7 +478,6 @@ async def get_crisis_enabled(chat_id: int) -> bool:
     except Exception as e:
         print(f"Error getting crisis enabled: {e}")
         return False
-
 
 async def log_crisis_alert(chat_id: int, word: str, user_id: int):
     """تسجيل تنبيه أزمة في سجل الأحداث"""
@@ -504,7 +496,6 @@ async def log_crisis_alert(chat_id: int, word: str, user_id: int):
         )
     except Exception as e:
         print(f"Error logging crisis alert: {e}")
-
 
 # ==================== دوال الردود التلقائية (قاعدة البيانات) ====================
 
@@ -532,7 +523,6 @@ async def add_custom_reply(chat_id: int, keyword: str, reply: str) -> bool:
         print(f"Error adding custom reply: {e}")
         return False
 
-
 async def remove_custom_reply(chat_id: int, keyword: str) -> bool:
     """حذف رد تلقائي"""
     if not supabase:
@@ -546,7 +536,6 @@ async def remove_custom_reply(chat_id: int, keyword: str) -> bool:
         print(f"Error removing custom reply: {e}")
         return False
 
-
 async def get_custom_replies(chat_id: int) -> dict:
     """جلب جميع الردود التلقائية للمجموعة {keyword: reply}"""
     if not supabase:
@@ -559,13 +548,6 @@ async def get_custom_replies(chat_id: int) -> dict:
     except Exception as e:
         print(f"Error getting custom replies: {e}")
         return {}
-
-
-async def get_custom_reply(chat_id: int, keyword: str) -> str:
-    """جلب رد معين"""
-    replies = await get_custom_replies(chat_id)
-    return replies.get(keyword, "")
-
 
 # ==================== دوال الاختصارات (قاعدة البيانات) ====================
 
@@ -593,7 +575,6 @@ async def add_custom_command(chat_id: int, shortcut: str, target_command: str) -
         print(f"Error adding custom command: {e}")
         return False
 
-
 async def remove_custom_command(chat_id: int, shortcut: str) -> bool:
     """حذف اختصار"""
     if not supabase:
@@ -607,7 +588,6 @@ async def remove_custom_command(chat_id: int, shortcut: str) -> bool:
         print(f"Error removing custom command: {e}")
         return False
 
-
 async def get_custom_commands(chat_id: int) -> dict:
     """جلب جميع الاختصارات للمجموعة {shortcut: target_command}"""
     if not supabase:
@@ -620,7 +600,6 @@ async def get_custom_commands(chat_id: int) -> dict:
     except Exception as e:
         print(f"Error getting custom commands: {e}")
         return {}
-
 
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
