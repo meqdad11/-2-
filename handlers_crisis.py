@@ -198,7 +198,8 @@ async def check_crisis_words(update: Update, context: ContextTypes.DEFAULT_TYPE)
         word = item['word'].lower()
         pattern = r'\b' + re.escape(word) + r'\b'
         if re.search(pattern, text_lower):
-            await message.reply_text(reply_text)
+            # ✅ تم التعديل هنا: إضافة parse_mode="HTML" لمنع تكسر الأسطر
+            await message.reply_text(f"🚨 {reply_text}", parse_mode="HTML")
             await db.log_crisis_alert(chat_id, word, message.from_user.id if message.from_user else 0)
             logger.info(f"Crisis word '{word}' detected in chat {chat_id}")
             break
