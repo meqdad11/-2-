@@ -71,6 +71,12 @@ from handlers_moderation import (
 from handlers_ai import cmd_gemini, cmd_limit
 from handlers_dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 
+# ========== نظام الأزمات الجديد ==========
+from handlers_crisis import (
+    register_crisis_handlers,
+    check_crisis_words,
+)
+
 # ========== إعداد التسجيل ==========
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -146,6 +152,9 @@ async def handle_text(update: Update, context):
     await filter_banned_words(update, context)
     await auto_reply(update, context)
     await track_message(update, context)
+    
+    # ⭐ فحص كلمات الأزمات (يأتي بعد المعالجات الأخرى) ⭐
+    await check_crisis_words(update, context)
 
 # ========== معالج رسائل القنوات (لتحميل الميديا فقط) ==========
 async def handle_channel_post(update: Update, context):
@@ -210,6 +219,9 @@ def register_handlers(app):
 
     # فلترة المحتوى للمجموعات فقط
     app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
+    
+    # ⭐ تسجيل أوامر ومعالج نظام الأزمات ⭐
+    register_crisis_handlers(app)
 
 # ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
