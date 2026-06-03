@@ -1,11 +1,12 @@
 """
 نظام كلمات الأزمات - لكل مجموعة كلماتها وردها الخاص
+ملاحظة: هذا الملف لا يحتوي على CommandHandler، الأوامر مسجلة في commands.py
 """
 
 import logging
 import re
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update
+from telegram.ext import ContextTypes
 import database as db
 from helpers import is_admin
 
@@ -24,8 +25,8 @@ async def cmd_add_crisis_words(update: Update, context: ContextTypes.DEFAULT_TYP
     if not context.args:
         await update.message.reply_text(
             "📌 **الاستخدام:**\n"
-            "• فردي: `/اضف_كلمة_ازمة انتحار`\n"
-            "• جماعي: `/اضف_كلمات_ازمة انتحار, أذى النفس, اموت`\n\n"
+            "• فردي: `اضف كلمة ازمة انتحار`\n"
+            "• جماعي: `اضف كلمات ازمة انتحار, أذى النفس, اموت`\n\n"
             "📝 الكلمات تفصل بفاصلة بينها.",
             parse_mode="Markdown"
         )
@@ -66,7 +67,7 @@ async def cmd_remove_crisis_word(update: Update, context: ContextTypes.DEFAULT_T
         return
     
     if not context.args:
-        await update.message.reply_text("📌 **الاستخدام:** `/حذف_كلمة_ازمة انتحار`", parse_mode="Markdown")
+        await update.message.reply_text("📌 **الاستخدام:** `حذف كلمة ازمة انتحار`", parse_mode="Markdown")
         return
     
     word = " ".join(context.args).lower()
@@ -85,7 +86,7 @@ async def cmd_list_crisis_words(update: Update, context: ContextTypes.DEFAULT_TY
     words = await db.get_crisis_words(chat_id)
     
     if not words:
-        await update.message.reply_text("📭 لا توجد كلمات أزمة مسجلة في هذه المجموعة.\n\nلإضافة كلمة: `/اضف_كلمة_ازمة كلمة`", parse_mode="Markdown")
+        await update.message.reply_text("📭 لا توجد كلمات أزمة مسجلة في هذه المجموعة.\n\nلإضافة كلمة: `اضف كلمة ازمة كلمة`", parse_mode="Markdown")
         return
     
     all_words = [w['word'] for w in words]
@@ -106,9 +107,9 @@ async def cmd_set_crisis_reply(update: Update, context: ContextTypes.DEFAULT_TYP
     
     if not context.args:
         await update.message.reply_text(
-            "📌 **الاستخدام:** `/رد_الازمة نص رسالة الدعم`\n\n"
+            "📌 **الاستخدام:** `رد الازمة نص رسالة الدعم`\n\n"
             "مثال:\n"
-            "`/رد_الازمة 🚨 إذا كنت تمر بأزمة، تواصل مع الدعم: 12345678`",
+            "`رد الازمة 🚨 إذا كنت تمر بأزمة، تواصل مع الدعم: 12345678`",
             parse_mode="Markdown"
         )
         return
@@ -161,7 +162,7 @@ async def cmd_crisis_status(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(reply_text) > 200:
             text += "..."
     else:
-        text += "⚠️ لم يتم تعيين رسالة رد بعد.\nاستخدم `/رد_الازمة نص الرسالة`"
+        text += "⚠️ لم يتم تعيين رسالة رد بعد.\nاستخدم `رد الازمة نص الرسالة`"
     
     await update.message.reply_text(text, parse_mode="Markdown")
 
@@ -176,26 +177,21 @@ async def check_crisis_words(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     chat_id = message.chat_id
     
-    # تجاهل رسائل البوت نفسه
     if message.from_user and message.from_user.is_bot:
         return
     
-    # التحقق من تفعيل النظام
     enabled = await db.get_crisis_enabled(chat_id)
     if not enabled:
         return
     
-    # جلب كلمات الأزمات
     crisis_words = await db.get_crisis_words(chat_id)
     if not crisis_words:
         return
     
-    # جلب رسالة الرد
     reply_text = await db.get_crisis_reply(chat_id)
     if not reply_text:
         return
     
-    # فحص النص
     text_lower = message.text.lower()
     
     for item in crisis_words:
@@ -208,16 +204,8 @@ async def check_crisis_words(update: Update, context: ContextTypes.DEFAULT_TYPE)
             break
 
 
-# ==================== تسجيل المعالج ====================
+# ==================== تسجيل الدوال (بدون CommandHandler) ====================
 
 def register_crisis_handlers(app):
-    """تسجيل جميع أوامر ومعالجات نظام الأزمات"""
-    
-    app.add_handler(CommandHandler("اضف_كلمة_ازمة", cmd_add_crisis_words))
-    app.add_handler(CommandHandler("اضف_كلمات_ازمة", cmd_add_crisis_words))
-    app.add_handler(CommandHandler("حذف_كلمة_ازمة", cmd_remove_crisis_word))
-    app.add_handler(CommandHandler("كلمات_الازمة", cmd_list_crisis_words))
-    app.add_handler(CommandHandler("رد_الازمة", cmd_set_crisis_reply))
-    app.add_handler(CommandHandler("تفعيل_الازمة", cmd_enable_crisis))
-    app.add_handler(CommandHandler("تعطيل_الازمة", cmd_disable_crisis))
-    app.add_handler(CommandHandler("حالة_الازمة", cmd_crisis_status))
+    """هذه الدالة فارغة لأن الأوامر مسجلة في commands.py"""
+    pass
