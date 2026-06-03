@@ -215,7 +215,7 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-# ========== الأوامر الأخرى (موجودة مسبقاً) ==========
+# ========== الأوامر الأخرى ==========
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private":
         await update.message.reply_text("❌ هذا الأمر للمجموعات فقط.")
