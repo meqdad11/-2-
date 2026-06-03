@@ -48,7 +48,7 @@ from handlers_locks import (
     cmd_lock_all, cmd_unlock_all,
 )
 
-from handlers_dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats, cmd_active_users
+from handlers_dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats, cmd_active_users, cmd_backup
 
 from handlers_admin import (
     cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
@@ -122,6 +122,7 @@ ARABIC_COMMANDS = {
     "رفع مطور": cmd_add_dev, "تنزيل مطور": cmd_remove_dev,
     "اذاعه": cmd_broadcast,
     "احصائيات": cmd_bot_stats,
+    "نسخ احتياطي": cmd_backup,
 
     "رفع مشرف": cmd_promote_admin, "تنزيل مشرف": cmd_demote_admin,
     "المشرفين": cmd_list_admins, "تنزيل الكل": cmd_demote_all,
