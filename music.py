@@ -51,12 +51,14 @@ def _get_common_opts():
         "no_warnings": True,
         "noplaylist": True,
         "socket_timeout": 30,
-        "retries": 3,
+        "retries": 5,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "web"],
+                "player_client": ["android", "ios", "web"],
+                "skip": ["hls", "dash"],
             }
-        }
+        },
+        "user_agent": "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
     }
     if os.path.exists("cookies.txt"):
         opts["cookiefile"] = "cookies.txt"
@@ -129,7 +131,8 @@ async def send_media(message, path: str, info: dict, audio_only: bool):
     os.remove(path)
 
 async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
+    # الحصول على الرسالة سواء من مجموعة أو قناة
+    msg = update.message or update.channel_post
     if not msg or not msg.text:
         return
     url = extract_url(msg.text)
@@ -230,9 +233,11 @@ def _search_youtube(query: str) -> List[Dict]:
             'playlistend': 5,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'web'],
+                    'player_client': ['android', 'ios', 'web'],
+                    'skip': ['hls', 'dash'],
                 }
-            }
+            },
+            'user_agent': "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
         }
         if os.path.exists("cookies.txt"):
             ydl_opts['cookiefile'] = 'cookies.txt'
