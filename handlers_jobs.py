@@ -209,6 +209,34 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
     
+    # 7. آخر المخالفات
+    violations = await db.get_user_violations(target.id, chat.id, limit=5)
+    violations_text = ""
+    if violations:
+        violations_lines = []
+        v_type_map = {
+            "banned_word": "🚫 كلمة محظورة",
+            "link": "🔗 رابط",
+            "tag": "📌 تاك",
+            "longtext": "📝 نص طويل",
+            "persian": "🇮🇷 كتابة فارسية",
+            "media": "🖼️ صورة",
+            "video": "🎥 فيديو",
+            "audio": "🎵 صوت",
+            "file": "📁 ملف",
+            "sticker": "🏷️ ملصق",
+            "forward": "↪️ إعادة توجيه",
+            "game": "🎮 لعبة"
+        }
+        for i, v in enumerate(violations, 1):
+            v_type = v_type_map.get(v.get("violation_type"), v.get("violation_type"))
+            v_time = v.get("created_at", "")[:16] if v.get("created_at") else ""
+            v_text = v.get("message_text", "")[:50] if v.get("message_text") else ""
+            violations_lines.append(f"{i}. {v_type} - {v_time}\n   {v_text}")
+        violations_text = "\n".join(violations_lines)
+    else:
+        violations_text = "✅ لا توجد مخالفات مسجلة"
+    
     # ========== إنشاء التقرير ==========
     
     # معلومات العضو الأساسية
@@ -231,6 +259,9 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         f"📊 **النشاط:**\n"
         f"• عدد الرسائل: {msg_count} رسالة\n\n"
+        
+        f"⚠️ **آخر المخالفات (5 الأخيرة):**\n"
+        f"{violations_text}\n\n"
         
         f"📝 **سبب التقرير:**\n"
         f"{reason}\n\n"
