@@ -45,7 +45,6 @@ def fmt_dur(seconds) -> str:
         return ""
 
 def _get_common_opts():
-    """خيارات مشتركة لتجنب حظر يوتيوب"""
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -109,7 +108,6 @@ async def send_media(message, path: str, info: dict, audio_only: bool):
         os.remove(path)
         raise Exception(f"الملف أكبر من {MAX_FILE_MB}MB")
     
-    # زر قناة التحديثات
     channel_button = [[InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")]]
     reply_markup = InlineKeyboardMarkup(channel_button)
     
@@ -131,7 +129,6 @@ async def send_media(message, path: str, info: dict, audio_only: bool):
     os.remove(path)
 
 async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # الحصول على الرسالة سواء من مجموعة أو قناة
     msg = update.message or update.channel_post
     if not msg or not msg.text:
         return
