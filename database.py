@@ -486,7 +486,7 @@ async def log_crisis_alert(chat_id: int, word: str, user_id: int):
     except Exception as e:
         print(f"Error logging crisis alert: {e}")
 
-# ==================== دوال الردود التلقائية (قاعدة البيانات) ====================
+# ==================== دوال الردود التلقائية ====================
 
 async def add_custom_reply(chat_id: int, keyword: str, reply: str) -> bool:
     if not supabase:
@@ -535,7 +535,7 @@ async def get_custom_replies(chat_id: int) -> dict:
         print(f"Error getting custom replies: {e}")
         return {}
 
-# ==================== دوال الاختصارات (قاعدة البيانات) ====================
+# ==================== دوال الاختصارات ====================
 
 async def add_custom_command(chat_id: int, shortcut: str, target_command: str) -> bool:
     if not supabase:
