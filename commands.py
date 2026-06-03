@@ -64,6 +64,17 @@ from handlers_user import (
     cmd_daily_reminder, cmd_reminder,
 )
 
+# ========== نظام الأزمات الجديد ==========
+from handlers_crisis import (
+    cmd_add_crisis_words,
+    cmd_remove_crisis_word,
+    cmd_list_crisis_words,
+    cmd_set_crisis_reply,
+    cmd_enable_crisis,
+    cmd_disable_crisis,
+    cmd_crisis_status,
+)
+
 ARABIC_COMMANDS = {
     "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
     "قائمة": cmd_banlist, "معلومات": cmd_baninfo, "تحقق": cmd_checkban,
@@ -122,7 +133,7 @@ ARABIC_COMMANDS = {
     "اطردني": cmd_kickme,
     "تفعيل الترحيب": cmd_enable_welcome, "تعطيل الترحيب": cmd_disable_welcome,
     "بايـو": cmd_bio, "المالك": cmd_owner,
-"ترجم": cmd_translate,
+    "ترجم": cmd_translate,
     "اضف رد": cmd_add_reply, "حذف رد": cmd_remove_reply, "الردود المضافه": cmd_list_replies,
     "اضف امر": cmd_add_command, "حذف امر": cmd_remove_command, "الاوامر المضافه": cmd_list_commands,
 
@@ -132,4 +143,14 @@ ARABIC_COMMANDS = {
     "مستخدمين نشطين": cmd_active_users,
     "تذكر": cmd_reminder,
     "تذكير يومي": cmd_daily_reminder,
+
+    # ========== أوامر نظام الأزمات الجديدة ==========
+    "اضف كلمة ازمة": cmd_add_crisis_words,
+    "اضف كلمات ازمة": cmd_add_crisis_words,
+    "حذف كلمة ازمة": cmd_remove_crisis_word,
+    "كلمات الازمة": cmd_list_crisis_words,
+    "رد الازمة": cmd_set_crisis_reply,
+    "تفعيل الازمة": cmd_enable_crisis,
+    "تعطيل الازمة": cmd_disable_crisis,
+    "حالة الازمة": cmd_crisis_status,
 }
