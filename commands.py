@@ -2,9 +2,9 @@ from handlers_admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
     cmd_banlist, cmd_baninfo, cmd_checkban, cmd_eventlog,
     cmd_setrules, cmd_mute, cmd_unmute, cmd_lock, cmd_unlock,
-    cmd_pin, cmd_unpin, cmd_warn_user,  # <-- أضفت هذي
+    cmd_pin, cmd_unpin, cmd_warn_user,
 )
-from handlers_user import cmd_id, cmd_rules
+from handlers_user import cmd_id, cmd_rules, cmd_whisper
 from handlers_moderation import (
     cmd_add_word, cmd_remove_word, cmd_list_words,
     cmd_add_reply, cmd_remove_reply, cmd_list_replies,
@@ -130,7 +130,7 @@ ARABIC_COMMANDS = {
     "مسح المحظورين": cmd_purge_bans, "مسح المكتومين": cmd_purge_muted,
     "تاك للكل": cmd_tag_all, "رتبتي": cmd_my_rank, "رتبته": cmd_his_rank,
 
-     "افتاري": cmd_get_invite,
+    "اهمس": cmd_whisper, "افتاري": cmd_get_invite,
     "سورة": cmd_surah, "قران": cmd_quran_page,
     "انطقي": cmd_speak, "وش يقول": cmd_voice_to_text,
     "اطردني": cmd_kickme,
