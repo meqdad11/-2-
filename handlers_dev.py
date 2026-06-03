@@ -55,23 +55,33 @@ async def cmd_remove_dev(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== إذاعة لكل المجموعات ==========
 async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_owner(update):
+    """إذاعة لكل المجموعات (للمطور فقط)"""
+    user = update.effective_user
+    
+    # تحقق إذا كان المرسل هو المطور
+    if user.id not in DEVELOPERS:
         await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
         return
+    
     if not context.args:
-        await update.message.reply_text("استخدام: اذاعه <النص>")
+        await update.message.reply_text("📢 **الاستخدام:**\nاذاعه <النص>\n\nمثال: اذاعه مرحباً جميعاً", parse_mode="Markdown")
         return
+    
     text = " ".join(context.args)
     chats = await db.get_all_active_chats()
     success = 0
+    
+    await update.message.reply_text(f"⏳ جاري الإرسال إلى {len(chats)} مجموعة...")
+    
     for chat_id in chats:
         try:
-            await context.bot.send_message(chat_id, f"📢 **إذاعة من المطور:**\n{text}", parse_mode="Markdown")
+            await context.bot.send_message(chat_id, f"📢 **إذاعة من المطور:**\n\n{text}", parse_mode="Markdown")
             success += 1
-        except:
-            pass
+            await asyncio.sleep(0.05)  # تأخير بسيط عشان لا يصير تجاوز للحد
+        except Exception as e:
+            logger.error(f"فشل الإرسال للمجموعة {chat_id}: {e}")
+    
     await update.message.reply_text(f"✅ تم الإرسال إلى {success} من {len(chats)} مجموعة.")
-
 # ========== إحصائيات البوت ==========
 async def cmd_bot_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_owner(update):
