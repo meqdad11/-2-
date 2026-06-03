@@ -93,6 +93,7 @@ async def handle_text(update: Update, context):
         return
     text = msg.text.strip()
     chat_id = msg.chat.id
+    user = update.effective_user
 
     # معالج الرسائل المرسلة عبر رابط "صارحني"
     if context.user_data.get("anon_target"):
@@ -110,18 +111,36 @@ async def handle_text(update: Update, context):
         await update.message.reply_text("✅ تم إرسال رسالتك المجهولة.")
         return
 
-    # أمر حذف رسالة بالرد (للمشرفين فقط)
+    # أمر حذف رسالة بالرد (للمشرفين فقط) - بدون رسالة تأكيد
     if msg.reply_to_message and text == "حذف":
         if not await is_admin(update, context):
-            await msg.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+            try:
+                await context.bot.send_message(
+                    user.id,
+                    "⛔ هذا الأمر للمشرفين فقط."
+                )
+            except:
+                pass
+            try:
+                await msg.delete()
+            except:
+                pass
             return
         try:
             await context.bot.delete_message(chat_id, msg.reply_to_message.message_id)
-            temp_msg = await msg.reply_text("🗑️ تم حذف الرسالة.")
-            await asyncio.sleep(1)
-            await temp_msg.delete()
+            await msg.delete()
         except Exception as e:
-            await msg.reply_text("❌ لا يمكن حذف هذه الرسالة (قد تكون قديمة أو ليس لدي صلاحية).")
+            try:
+                await context.bot.send_message(
+                    user.id,
+                    "❌ لا يمكن حذف هذه الرسالة (قد تكون قديمة أو ليس لدي صلاحية)."
+                )
+            except:
+                pass
+            try:
+                await msg.delete()
+            except:
+                pass
         return
 
     # طلبات معلقة (بحث، مسح، تذكير...)
