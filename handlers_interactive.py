@@ -85,36 +85,33 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
         await msg.reply_text("✅ تم إرسال البث.")
         return
 
-    # ========== استقبال نص الهمسة في الخاص ==========
-    if context.user_data.get('waiting_whisper_text'):
-        recipient_id = context.user_data.pop('whisper_recipient')
+    # ========== استقبال الهمسة في الخاص ==========
+    if context.user_data.get('waiting_whisper'):
+        target_id = context.user_data.pop('whisper_target')
+        target_name = context.user_data.pop('whisper_target_name')
         group_id = context.user_data.pop('whisper_group')
-        del context.user_data['waiting_whisper_text']
+        del context.user_data['waiting_whisper']
         
-        # حفظ الهمسة في قاعدة البيانات
-        whisper_id = await db.save_whisper(
-            sender_id=update.effective_user.id,
-            recipient_id=recipient_id,
-            group_id=group_id,
-            message=text
-        )
+        # تخزين الهمسة مؤقتاً في الذاكرة
+        whisper_id = msg.message_id
+        context.bot_data[f'whisper_{whisper_id}'] = {
+            'text': text,
+            'target': target_id,
+            'sender': update.effective_user.id,
+            'sender_name': update.effective_user.first_name
+        }
         
-        if whisper_id:
-            # إرسال رسالة مقفلة في المجموعة
-            try:
-                await context.bot.send_message(
-                    group_id,
-                    f"🔒 **همسة مقفلة من {update.effective_user.first_name}**\n"
-                    f"👤 إلى: `<a href='tg://user?id={recipient_id}'>المستخدم</a>`\n"
-                    f"📌 اضغط على الزر لفتح الهمسة",
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🔓 فتح الهمسة", callback_data=f"open_whisper_{whisper_id}")
-                    ]]),
-                    parse_mode="HTML"
-                )
-                await msg.reply_text("✅ تم إرسال الهمسة المقفلة إلى المجموعة.")
-            except Exception as e:
-                await msg.reply_text(f"❌ حدث خطأ: {e}")
-        else:
-            await msg.reply_text("❌ حدث خطأ في حفظ الهمسة.")
+        # إرسال رسالة مقفلة في المجموعة
+        try:
+            await context.bot.send_message(
+                group_id,
+                f"🔒 **همسة سرية من {update.effective_user.first_name}**\n📌 خاصة بـ {target_name}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("👁️ عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
+                ]]),
+                parse_mode="Markdown"
+            )
+            await msg.reply_text("✅ تم إرسال الهمسة إلى المجموعة.")
+        except Exception as e:
+            await msg.reply_text(f"❌ حدث خطأ: {e}")
         return
