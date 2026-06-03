@@ -9,41 +9,6 @@ from config import MAX_WARNINGS
 
 logger = logging.getLogger(__name__)
 
-CRISIS_KEYWORDS = [
-    "انتحار", "انتحرت", "أنتحر", "بنتحر", "بينتحر", "سأنتحر", "راح انتحر",
-    "اقتل نفسي", "أقتل نفسي", "بقتل نفسي", "يقتل نفسه", "يقتل نفسي", "سأقتل نفسي",
-    "أذيت", "أذيت نفسي", "اذيت نفسي", "أضر نفسي", "اضر نفسي", "أضر بنفسي",
-    "أموت", "بموت", "ابي اموت", "أبي أموت", "ابغى اموت", "أبغى أموت",
-    "ودي أموت", "اتمنى الموت", "اخنق نفسي", "أخنق نفسي",
-    "suicide", "kill myself", "end my life", "want to die", "self harm",
-]
-
-CRISIS_REPLY = """
-يبدو أنك تمر بلحظة صعبة 🆘
-
-أنت لست وحدك 🤍
-
-📞 أرقام الدعم والمساعدة في السعودية:
-
-- 937 - وزارة الصحة (استشارات ودعم صحي ونفسي)
-
-- 920033360 - مركز الاستشارات والدعم النفسي
-
-- 1919 - بلاغات العنف الأسري والحماية الاجتماعية
-
-- 116111 - خط حماية الطفل
-
-- 999 - الشرطة
-
-- 997 - الهلال الأحمر (الإسعاف)
-
-- 998 - الدفاع المدني
-
-- 911 - الطوارئ العامة
-
-أو تحدث مع أحد المشرفين أو الأعضاء، نحن معك. 💙
-"""
-
 # ================================================
 # الأوامر القديمة (الكلمات المحظورة)
 # ================================================
@@ -96,14 +61,6 @@ async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = update.effective_chat.id
     user = update.effective_user
     text = msg.text.lower()
-
-    for keyword in CRISIS_KEYWORDS:
-        if keyword.lower() in text:
-            try:
-                await msg.reply_text(CRISIS_REPLY)
-            except Exception as e:
-                logger.error("خطأ في إرسال رسالة الأزمة: %s", e)
-            return
 
     if await is_admin(update, context):
         return
