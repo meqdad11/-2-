@@ -25,7 +25,7 @@ async def cmd_add_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if added:
         await update.message.reply_text(f"✅ تمت إضافة الكلمة: {word}")
     else:
-        await update.message.reply_text(f"الكلمة '{word}' موجودة مسبقاً.")
+        await update.message.reply_text(f"⚠️ الكلمة '{word}' موجودة مسبقاً.")
 
 async def cmd_remove_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
@@ -39,7 +39,7 @@ async def cmd_remove_word(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if removed:
         await update.message.reply_text(f"✅ تمت إزالة الكلمة: {word}")
     else:
-        await update.message.reply_text(f"الكلمة '{word}' غير موجودة.")
+        await update.message.reply_text(f"⚠️ الكلمة '{word}' غير موجودة.")
 
 async def cmd_list_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
@@ -47,7 +47,7 @@ async def cmd_list_words(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     words = await db.get_banned_words(chat_id)
     if not words:
-        await update.message.reply_text("لا توجد كلمات محظورة.")
+        await update.message.reply_text("📭 لا توجد كلمات محظورة.")
         return
     await update.message.reply_text("🚫 الكلمات المحظورة:\n" + "\n".join(f"• {w}" for w in words))
 
@@ -72,6 +72,10 @@ async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await msg.delete()
             except Exception:
                 pass
+            
+            # ✅ تسجيل المخالفة (كلمة محظورة)
+            await db.add_violation(user.id, chat_id, "banned_word", text[:200])
+            
             count = await db.add_warning(user.id, chat_id)
             if count >= MAX_WARNINGS:
                 await db.add_ban(user.id, chat_id, f"حظر تلقائي بعد {MAX_WARNINGS} تحذيرات", 0)
@@ -138,7 +142,7 @@ async def cmd_list_replies(update: Update, context: ContextTypes.DEFAULT_TYPE):
     replies = await db.get_custom_replies(chat_id)
     
     if not replies:
-        await update.message.reply_text("لا توجد ردود مضافه.")
+        await update.message.reply_text("📭 لا توجد ردود مضافه.")
         return
     lines = [f"• {key} -> {value}" for key, value in replies.items()]
     await update.message.reply_text("📝 الردود المضافه:\n" + "\n".join(lines))
@@ -184,7 +188,7 @@ async def cmd_list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cmds = await db.get_custom_commands(chat_id)
     
     if not cmds:
-        await update.message.reply_text("لا توجد أوامر مضافه.")
+        await update.message.reply_text("📭 لا توجد أوامر مضافه.")
         return
     lines = [f"• {shortcut} -> {target}" for shortcut, target in cmds.items()]
     await update.message.reply_text("📌 الأوامر المضافه:\n" + "\n".join(lines))
