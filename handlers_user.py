@@ -167,11 +167,9 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.reply_text("❌ صيغة الوقت خاطئة. استخدم HH:MM (مثال: 14:30).")
         return
     chat_id = msg.chat.id
-    # إزالة أي تذكير يومي سابق للمستخدم في هذه المحادثة
     for job in context.job_queue.jobs():
         if job.name == f"daily_{chat_id}":
             job.schedule_removal()
-    # جدولة التذكير اليومي
     try:
         from datetime import time as dtime
         target_time = dtime(hour=hour, minute=minute, second=0, tzinfo=TIMEZONE)
@@ -215,42 +213,36 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-# ========== الهمسة السرية ==========
+# ========== الهمسة السرية (طريقة الزر) ==========
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إنشاء همسة سرية لشخص معين"""
     msg = update.message
     
-    # التأكد من أن الأمر في مجموعة (مع استثناء إذا كان في انتظار همسة)
-    if update.effective_chat.type == "private" and not context.user_data.get('waiting_whisper'):
+    # فقط في المجموعات
+    if update.effective_chat.type == "private":
         await msg.reply_text("❌ هذا الأمر للمجموعات فقط.")
         return
     
-    # التأكد من وجود رد على رسالة (فقط في المجموعات)
-    if update.effective_chat.type != "private" and not msg.reply_to_message:
-        await msg.reply_text("❗️ قم بالرد على رسالة الشخص الذي تريد إرسال همسة سرية له.")
+    if not msg.reply_to_message:
+        await msg.reply_text("❗️ قم بالرد على رسالة الشخص ثم اكتب: اهمس")
         return
     
-    if update.effective_chat.type != "private":
-        target = msg.reply_to_message.from_user
-        if target.is_bot:
-            await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
-            return
-        
-        # تخزين معلومات مؤقتة
-        context.user_data['whisper_target'] = target.id
-        context.user_data['whisper_target_name'] = target.first_name
-        context.user_data['whisper_group'] = update.effective_chat.id
-        
-        bot_username = (await context.bot.get_me()).username
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("✍️ كتابة الهمسة", url=f"https://t.me/{bot_username}")
-        ]])
-        
-        await msg.reply_text(
-            f"🔒 **همسة سرية لـ {target.first_name}**\n\nاضغط الزر واكتب همستك في الخاص.",
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
+    target = msg.reply_to_message.from_user
+    if target.is_bot:
+        await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
+        return
+    
+    # تخزين معلومات مؤقتة
+    context.user_data['whisper_target'] = target.id
+    context.user_data['whisper_target_name'] = target.first_name
+    context.user_data['whisper_group'] = update.effective_chat.id
+    context.user_data['waiting_whisper'] = True
+    
+    await msg.reply_text(
+        f"🔒 **همسة لـ {target.first_name}**\n\n"
+        f"✍️ أرسل نص الهمسة الآن في الخاص.",
+        parse_mode="Markdown"
+    )
 
 # ========== الأوامر الأخرى ==========
 async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -374,14 +366,13 @@ async def cmd_my_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="Markdown")
 
 async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ترجمة رسالة تم الرد عليها"""
     msg = update.message
     if not msg.reply_to_message or not msg.reply_to_message.text:
         await msg.reply_text("❌ قم بالرد على رسالة نصية لترجمتها.")
         return
     
     original_text = msg.reply_to_message.text
-    target_lang = "ar"  # العربية
+    target_lang = "ar"
     
     try:
         from googletrans import Translator
