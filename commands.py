@@ -2,6 +2,7 @@ from handlers_admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
     cmd_banlist, cmd_baninfo, cmd_checkban, cmd_eventlog,
     cmd_setrules, cmd_mute, cmd_unmute, cmd_lock, cmd_unlock,
+    cmd_pin, cmd_unpin, cmd_warn_user,  # <-- أضفت هذي
 )
 from handlers_user import cmd_id, cmd_rules
 from handlers_moderation import (
@@ -145,9 +146,10 @@ ARABIC_COMMANDS = {
     "مستخدمين نشطين": cmd_active_users,
     "تذكر": cmd_reminder,
     "تذكير يومي": cmd_daily_reminder,
-"ثبت": cmd_pin,
-"الغاء تثبيت": cmd_unpin,
-"تنبيه": cmd_warn_user,
+    
+    "ثبت": cmd_pin,
+    "الغاء تثبيت": cmd_unpin,
+    "تنبيه": cmd_warn_user,
 
     # ========== أوامر نظام الأزمات الجديدة ==========
     "اضف كلمة ازمة": cmd_add_crisis_words,
