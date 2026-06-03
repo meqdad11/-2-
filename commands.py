@@ -14,6 +14,7 @@ from handlers_ai import cmd_shafaq
 from handlers_resources import cmd_add_resource, cmd_list_resources, cmd_delete_resource
 from handlers_menu import cmd_menu
 from music import cmd_sc_search, cmd_yt_search, cmd_download
+from handlers_user import cmd_translate
 
 from handlers_locks import (
     cmd_lock_links, cmd_unlock_links,
