@@ -130,7 +130,7 @@ ARABIC_COMMANDS = {
     "مسح المحظورين": cmd_purge_bans, "مسح المكتومين": cmd_purge_muted,
     "تاك للكل": cmd_tag_all, "رتبتي": cmd_my_rank, "رتبته": cmd_his_rank,
 
-    "اهمس": cmd_whisper, "افتاري": cmd_get_invite,
+     "افتاري": cmd_get_invite,
     "سورة": cmd_surah, "قران": cmd_quran_page,
     "انطقي": cmd_speak, "وش يقول": cmd_voice_to_text,
     "اطردني": cmd_kickme,
