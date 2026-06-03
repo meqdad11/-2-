@@ -6,3 +6,4 @@ httpx[socks]
 aiohttp>=3.9.0
 supabase
 pytz
+googletrans==4.0.0-rc1
