@@ -1,5 +1,5 @@
 """
-ملف المستخدم - نسخة كاملة تحتوي على جميع الدوال المطلوبة
+ملف المستخدم - نسخة كاملة مع نظام همسة يعمل بالرابط
 """
 
 import logging
@@ -30,6 +30,12 @@ AUTO_REPLIES = {
 # ==================== START ====================
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ===== معالج رابط الهمسة =====
+    if context.args and context.args[0].startswith("whisper_"):
+        await handle_whisper_start(update, context)
+        return
+
+    # ===== معالج رابط صارحني =====
     if context.args and context.args[0].startswith("anon_"):
         link_id = context.args[0].replace("anon_", "")
         target_user_id = await db.get_user_by_link(link_id)
@@ -39,6 +45,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["anon_target"] = target_user_id
         await update.message.reply_text("📝 أرسل رسالتك المجهولة الآن.")
         return
+
     await update.message.reply_text(
         "بوت شفق 🌅\n\n"
         "👮 أوامر المشرفين + أوامر المستخدمين مفعلة"
@@ -230,34 +237,152 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-# ==================== WHISPER ====================
+# ==================== WHISPER (NEW - WORKING WITH LINK) ====================
 
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إنشاء همسة لشخص معين - طريقة الرابط (علنية)"""
     msg = update.message
 
-    if update.effective_chat.type == "private":
+    from telegram import Chat as TGChat
+    if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
         await msg.reply_text("❌ هذا الأمر للمجموعات فقط.")
         return
 
     if not msg.reply_to_message:
-        await msg.reply_text("❗️ قم بالرد على رسالة الشخص ثم اكتب: اهمس")
+        await msg.reply_text("❗️ رد على رسالة الشخص ثم اكتب: اهمس")
         return
 
     target = msg.reply_to_message.from_user
+
     if target.is_bot:
         await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
         return
 
-    context.user_data['whisper_target'] = target.id
-    context.user_data['whisper_target_name'] = target.first_name
-    context.user_data['whisper_group'] = update.effective_chat.id
-    context.user_data['waiting_whisper'] = True
+    if target.id == msg.from_user.id:
+        await msg.reply_text("❌ لا يمكنك إرسال همسة لنفسك.")
+        return
+
+    # إنشاء معرف فريد للهمسة
+    whisper_id = str(uuid.uuid4())[:12]
+
+    # حفظ الهمسة في قاعدة البيانات
+    success = await db.save_whisper_link(
+        whisper_id=whisper_id,
+        sender_id=msg.from_user.id,
+        sender_name=msg.from_user.first_name,
+        target_id=target.id,
+        target_name=target.first_name,
+        chat_id=update.effective_chat.id,
+        chat_title=update.effective_chat.title or "المجموعة"
+    )
+
+    if not success:
+        await msg.reply_text("❌ حدث خطأ في حفظ الهمسة، حاول لاحقاً.")
+        return
+
+    # إنشاء الرابط
+    bot_username = (await context.bot.get_me()).username
+    link = f"https://t.me/{bot_username}?start=whisper_{whisper_id}"
 
     await msg.reply_text(
         f"🔒 **همسة لـ {target.first_name}**\n\n"
-        f"✍️ أرسل نص الهمسة الآن في الخاص.",
+        f"اضغط على الرابط وأرسل الهمسة:\n"
+        f"{link}\n\n"
+        f"⏳ الرابط صالح لمرة واحدة فقط.\n"
+        f"📌 سيُرسل الهمس باسمك: **{msg.from_user.first_name}**",
         parse_mode="Markdown"
     )
+
+
+async def handle_whisper_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالج رابط الهمسة - يطلب من المستخدم كتابة الهمسة"""
+    msg = update.message
+
+    if not context.args or not context.args[0].startswith("whisper_"):
+        return
+
+    whisper_id = context.args[0].replace("whisper_", "")
+
+    # التحقق من صحة الهمسة
+    whisper_data = await db.get_whisper_link(whisper_id)
+    if not whisper_data:
+        await msg.reply_text("❌ انتهت صلاحية الهمسة أو الرابط غير صالح.")
+        return
+
+    # التحقق من أن المستخدم هو المرسل الأصلي
+    if whisper_data["sender_id"] != msg.from_user.id:
+        await msg.reply_text(
+            f"❌ هذا الرابط مخصص لـ {whisper_data['sender_name']}.\n"
+            f"لا يمكنك استخدامه لأنك لست المرسل."
+        )
+        return
+
+    # تخزين معرف الهمسة في الجلسة
+    context.user_data["active_whisper_id"] = whisper_id
+    context.user_data["whisper_target_id"] = whisper_data["target_id"]
+    context.user_data["whisper_target_name"] = whisper_data["target_name"]
+    context.user_data["whisper_sender_name"] = whisper_data["sender_name"]
+
+    await msg.reply_text(
+        f"🔒 **همسة إلى {whisper_data['target_name']}**\n\n"
+        f"✍️ اكتب الهمسة الآن.\n"
+        f"(ستُرسل باسمك: {whisper_data['sender_name']})",
+        parse_mode="Markdown"
+    )
+
+
+async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالج الهمسة المرسلة في الخاص"""
+    msg = update.message
+
+    if not msg or update.effective_chat.type != "private":
+        return
+
+    # التحقق من وجود همسة نشطة
+    whisper_id = context.user_data.get("active_whisper_id")
+    if not whisper_id:
+        return
+
+    target_id = context.user_data.get("whisper_target_id")
+    target_name = context.user_data.get("whisper_target_name")
+    sender_name = context.user_data.get("whisper_sender_name")
+
+    if not target_id:
+        await msg.reply_text("❌ حدث خطأ، يرجى المحاولة مرة أخرى.")
+        context.user_data.pop("active_whisper_id", None)
+        return
+
+    # إرسال الهمسة إلى الهدف
+    try:
+        await context.bot.send_message(
+            chat_id=target_id,
+            text=(
+                f"🔒 **همسة جديدة**\n\n"
+                f"📤 من: **{sender_name}**\n"
+                f"💬 الهمسة:\n"
+                f"_{msg.text}_"
+            ),
+            parse_mode="Markdown"
+        )
+
+        await msg.reply_text(
+            f"✅ **تم إرسال الهمسة بنجاح إلى {target_name}**\n\n"
+            f"📝 نص همستك:\n_{msg.text}_",
+            parse_mode="Markdown"
+        )
+
+        # حذف الهمسة بعد الاستخدام
+        await db.delete_whisper_link(whisper_id)
+
+    except Exception as e:
+        logger.error(f"خطأ في إرسال الهمسة: {e}")
+        await msg.reply_text("❌ فشل إرسال الهمسة. تأكد من أن البوت ليس محظوراً من قبل المستخدم.")
+
+    # تنظيف البيانات
+    context.user_data.pop("active_whisper_id", None)
+    context.user_data.pop("whisper_target_id", None)
+    context.user_data.pop("whisper_target_name", None)
+    context.user_data.pop("whisper_sender_name", None)
 
 # ==================== GET INVITE ====================
 
@@ -419,35 +544,32 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في الترجمة: {e}")
         await msg.reply_text("❌ خدمة الترجمة غير متاحة حالياً، حاول لاحقاً.")
 
-# ==================== HANDLE PRIVATE WHISPER ====================
+# ==================== HANDLE PRIVATE MESSAGES (ANON + WHISPER) ====================
 
-async def handle_private_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_private_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالج الرسائل في الخاص (صارحني + همسة)"""
     msg = update.message
     if not msg or update.effective_chat.type != "private":
         return
 
-    if context.user_data.get('waiting_whisper'):
-        target_id = context.user_data.get('whisper_target')
-        target_name = context.user_data.get('whisper_target_name')
-        group_id = context.user_data.get('whisper_group')
-
-        if target_id and group_id:
-            await context.bot.send_message(
-                chat_id=target_id,
-                text=f"🔒 **همسة جديدة من {msg.from_user.first_name}:**\n\n{msg.text}",
-                parse_mode="Markdown"
-            )
-            await msg.reply_text(f"✅ تم إرسال الهمسة إلى {target_name}.")
-
-        context.user_data.pop('waiting_whisper', None)
-        context.user_data.pop('whisper_target', None)
-        context.user_data.pop('whisper_target_name', None)
-        context.user_data.pop('whisper_group', None)
+    # ===== أولاً: معالج الهمسة =====
+    if context.user_data.get("active_whisper_id"):
+        await handle_whisper_message(update, context)
         return
 
+    # ===== ثانياً: معالج صارحني =====
     anon_target = context.user_data.get("anon_target")
     if anon_target:
-        await db.save_anonymous_message(anon_target, msg.from_user.id, msg.text)
+        await db.save_anonymous_message("", msg.text, update.effective_user.id)
+        try:
+            await context.bot.send_message(
+                anon_target,
+                f"📨 **رسالة جديدة (صارحني):**\n\n{msg.text}\n\n"
+                f"لعرض جميع رسائلك: استخدم أمر `رسائلي`.",
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"فشل إرسال إشعار الرسالة المجهولة: {e}")
         await msg.reply_text("✅ تم إرسال رسالتك المجهولة.")
         context.user_data.pop("anon_target", None)
         return
@@ -456,4 +578,4 @@ async def handle_private_whisper(update: Update, context: ContextTypes.DEFAULT_T
 
 def register_user_handlers(app):
     from telegram.ext import MessageHandler, filters
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_private_whisper))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_private_messages))
