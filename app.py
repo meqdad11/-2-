@@ -67,22 +67,16 @@ from handlers_admin import (
 from handlers_ai import cmd_gemini, cmd_limit
 from handlers_dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 
-# ========== نظام الأزمات الجديد ==========
-from handlers_crisis import (
-    check_crisis_words,
-)
+from handlers_crisis import check_crisis_words
 
-# ========== إعداد التسجيل ==========
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
 
-# ========== التوقيت السعودي ==========
 SAUDI_TZ = pytz.timezone('Asia/Riyadh')
 
-# ========== معالج الرسائل النصية للمجموعات فقط ==========
 async def handle_group_text(update: Update, context):
     msg = update.message
     if not msg or not msg.text:
@@ -91,7 +85,6 @@ async def handle_group_text(update: Update, context):
     chat_id = msg.chat.id
     user = update.effective_user
 
-    # أمر حذف رسالة بالرد (للمشرفين فقط)
     if msg.reply_to_message and text == "حذف":
         if not await is_admin(update, context):
             try:
@@ -117,7 +110,6 @@ async def handle_group_text(update: Update, context):
                 pass
         return
 
-    # طلبات معلقة
     if (context.user_data.get('waiting_google') == chat_id or
         context.user_data.get('purge_mode') == chat_id or
         context.user_data.get('waiting_remind') == chat_id or
@@ -126,12 +118,10 @@ async def handle_group_text(update: Update, context):
         await handle_interactive_messages(update, context)
         return
 
-    # تأكيد تنزيل الكل
     if text == "تأكيد" and context.user_data.get('awaiting_demote_all') == chat_id:
         await confirm_demote_all(update, context)
         return
 
-    # الأوامر العربية
     for arabic_cmd, handler in ARABIC_COMMANDS.items():
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
             args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
@@ -146,21 +136,17 @@ async def handle_group_text(update: Update, context):
     await track_message(update, context)
     await check_crisis_words(update, context)
 
-# ========== معالج رسائل القنوات ==========
 async def handle_channel_post(update: Update, context):
     msg = update.channel_post
     if not msg or not msg.text:
         return
     await handle_media_url(update, context)
 
-# ========== تهيئة التطبيق ==========
 async def post_init(app):
     await db.init_db()
 
-# ========== تسجيل الهاندلرز ==========
 def register_handlers(app):
 
-    # أوامر سلاش
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("id", cmd_id))
     app.add_handler(CommandHandler("ban", cmd_ban))
@@ -188,57 +174,21 @@ def register_handlers(app):
     app.add_handler(CommandHandler("model", cmd_choose_model))
     app.add_handler(CommandHandler("translate", cmd_translate))
 
-    # أزرار inline
     app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
     app.add_handler(CallbackQueryHandler(callback_yt_pick, pattern=r"^yt_pick\|"))
     app.add_handler(CallbackQueryHandler(callback_choose_model, pattern=r"^model_"))
     app.add_handler(CallbackQueryHandler(callback_menu))
 
-    # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # ⭐ معالج المجموعات فقط ⭐
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_group_text))
-    
-    # ⭐ معالج الخاص فقط (صارحني + همسة) ⭐
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_private_messages))
-
-    # معالج القنوات
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
-
-    # فلترة المحتوى للمجموعات
     app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
 
-# ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
     jq = app.job_queue
     if jq:
         jq.run_repeating(job_expire_bans, interval=300, first=10)
-        jq.run_daily(
-            job_daily_quote,
-            time=datetime.time(hour=9, minute=0, second=0, tzinfo=SAUDI_TZ)
-        )
-
-# ========== نقطة الدخول الرئيسية ==========
-def main():
-    if not TELEGRAM_BOT_TOKEN:
-        raise RuntimeError("TELEGRAM_BOT_TOKEN غير محدد")
-
-    app = (
-        ApplicationBuilder()
-        .token(TELEGRAM_BOT_TOKEN)
-        .post_init(post_init)
-        .build()
-    )
-
-    register_handlers(app)
-    register_jobs(app)
-
-    app.run_polling(
-        allowed_updates=["message", "channel_post", "edited_channel_post", "chat_member", "callback_query"],
-        drop_pending_updates=True,
-    )
-
-if __name__ == "__main__":
-    main()
+        jq
