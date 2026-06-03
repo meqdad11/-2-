@@ -220,36 +220,37 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """إنشاء همسة سرية لشخص معين"""
     msg = update.message
     
-    # التأكد من أن الأمر في مجموعة
-    if update.effective_chat.type == "private":
+    # التأكد من أن الأمر في مجموعة (مع استثناء إذا كان في انتظار همسة)
+    if update.effective_chat.type == "private" and not context.user_data.get('waiting_whisper'):
         await msg.reply_text("❌ هذا الأمر للمجموعات فقط.")
         return
     
-    # التأكد من وجود رد على رسالة
-    if not msg.reply_to_message:
+    # التأكد من وجود رد على رسالة (فقط في المجموعات)
+    if update.effective_chat.type != "private" and not msg.reply_to_message:
         await msg.reply_text("❗️ قم بالرد على رسالة الشخص الذي تريد إرسال همسة سرية له.")
         return
     
-    target = msg.reply_to_message.from_user
-    if target.is_bot:
-        await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
-        return
-    
-    # تخزين معلومات مؤقتة
-    context.user_data['whisper_target'] = target.id
-    context.user_data['whisper_target_name'] = target.first_name
-    context.user_data['whisper_group'] = update.effective_chat.id
-    
-    bot_username = (await context.bot.get_me()).username
-    keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✍️ كتابة الهمسة", url=f"https://t.me/{bot_username}")
-    ]])
-    
-    await msg.reply_text(
-        f"🔒 **همسة سرية لـ {target.first_name}**\n\nاضغط الزر واكتب همستك في الخاص.",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
+    if update.effective_chat.type != "private":
+        target = msg.reply_to_message.from_user
+        if target.is_bot:
+            await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
+            return
+        
+        # تخزين معلومات مؤقتة
+        context.user_data['whisper_target'] = target.id
+        context.user_data['whisper_target_name'] = target.first_name
+        context.user_data['whisper_group'] = update.effective_chat.id
+        
+        bot_username = (await context.bot.get_me()).username
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("✍️ كتابة الهمسة", url=f"https://t.me/{bot_username}")
+        ]])
+        
+        await msg.reply_text(
+            f"🔒 **همسة سرية لـ {target.first_name}**\n\nاضغط الزر واكتب همستك في الخاص.",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
 
 # ========== الأوامر الأخرى ==========
 async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
