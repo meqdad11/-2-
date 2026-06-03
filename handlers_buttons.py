@@ -330,20 +330,20 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "menu_user":
-    keyboard = [
-        [InlineKeyboardButton("🪪 معلوماتي", callback_data="exec_id")],
-        [InlineKeyboardButton("📋 القواعد", callback_data="exec_rules")],
-        [InlineKeyboardButton("📚 الموارد", callback_data="exec_resources")],
-        [InlineKeyboardButton("📈 إحصائياتي", callback_data="exec_member_stats")],
-        [InlineKeyboardButton("🎁 هدية عشوائية", callback_data="exec_gift")],
-        [InlineKeyboardButton("🌐 ترجمة", callback_data="exec_translate_msg")],  # <-- أضف هذا
-        [InlineKeyboardButton("⏰ تذكير", callback_data="exec_remind")],
-        [InlineKeyboardButton("🔄 تذكير يومي", callback_data="exec_daily_remind")],
-        [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
-        [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
-    ]
-    await msg.edit_text("👥 للجميع — اختر أمراً:", reply_markup=InlineKeyboardMarkup(keyboard))
-    return
+        keyboard = [
+            [InlineKeyboardButton("🪪 معلوماتي", callback_data="exec_id")],
+            [InlineKeyboardButton("📋 القواعد", callback_data="exec_rules")],
+            [InlineKeyboardButton("📚 الموارد", callback_data="exec_resources")],
+            [InlineKeyboardButton("📈 إحصائياتي", callback_data="exec_member_stats")],
+            [InlineKeyboardButton("🎁 هدية عشوائية", callback_data="exec_gift")],
+            [InlineKeyboardButton("🌐 ترجمة", callback_data="exec_translate_msg")],
+            [InlineKeyboardButton("⏰ تذكير", callback_data="exec_remind")],
+            [InlineKeyboardButton("🔄 تذكير يومي", callback_data="exec_daily_remind")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
+        ]
+        await msg.edit_text("👥 للجميع — اختر أمراً:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
 
     if data == "exec_id":
         first = user.first_name or ""
@@ -385,6 +385,10 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "exec_translate":
         await msg.reply_text("🌐 **أرسل النص الذي تريد ترجمته إلى العربية:**", parse_mode="Markdown")
         context.user_data['waiting_translate'] = chat_id
+        return
+
+    if data == "exec_translate_msg":
+        await msg.reply_text("📌 **الاستخدام:** رد على أي رسالة واكتب `ترجم`", parse_mode="Markdown")
         return
 
     if data == "exec_remind":
@@ -530,9 +534,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("📨 **أرسل عدد الرسائل أو رد على رسالة لمسح كل الرسائل بعدها.**", parse_mode="Markdown")
         context.user_data['purge_mode'] = chat_id
         return
-if data == "exec_translate_msg":
-    await msg.reply_text("📌 **الاستخدام:** رد على أي رسالة واكتب `ترجم`", parse_mode="Markdown")
-    return
 
     if data == "exec_broadcast":
         if not await is_admin(update, context):
