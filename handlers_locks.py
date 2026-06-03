@@ -307,68 +307,85 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
         if ("http://" in text or "https://" in text or "www." in text or ".com" in text):
             if await db.is_locked(chat_id, "links"):
                 await msg.delete()
+                # ✅ تسجيل المخالفة (رابط)
+                await db.add_violation(user.id, chat_id, "link", text[:200])
                 await msg.reply_text("🚫 الروابط مقفلة.")
                 return
         # التاك
         if "@" in text and await db.is_locked(chat_id, "tags"):
             await msg.delete()
+            # ✅ تسجيل المخالفة (تاك)
+            await db.add_violation(user.id, chat_id, "tag", text[:200])
             await msg.reply_text("🚫 التاك مقفل.")
             return
         # الكلمات المحظورة
         banned_words = await db.get_banned_words(chat_id)
         if any(word in text for word in banned_words) and await db.is_locked(chat_id, "badwords"):
             await msg.delete()
+            # ✅ تسجيل المخالفة (كلمة محظورة)
+            await db.add_violation(user.id, chat_id, "banned_word", text[:200])
             await msg.reply_text("🚫 كلمات ممنوعة.")
             return
         # النص الطويل
         if len(text) > 300 and await db.is_locked(chat_id, "longtext"):
             await msg.delete()
+            # ✅ تسجيل المخالفة (نص طويل)
+            await db.add_violation(user.id, chat_id, "longtext", text[:200])
             await msg.reply_text("🚫 الكلام الكثير مقفل.")
             return
         # الفارسية
         if any("\u0600" <= c <= "\u06FF" for c in text) and await db.is_locked(chat_id, "persian"):
             await msg.delete()
+            # ✅ تسجيل المخالفة (كتابة فارسية)
+            await db.add_violation(user.id, chat_id, "persian", text[:200])
             await msg.reply_text("🚫 الكتابة بالفارسية مقفلة.")
             return
 
     # --- صور ---
     if msg.photo and await db.is_locked(chat_id, "media"):
         await msg.delete()
+        await db.add_violation(user.id, chat_id, "media", "صورة")
         await msg.reply_text("🚫 الصور مقفلة.")
         return
 
     # --- فيديو ---
     if msg.video and await db.is_locked(chat_id, "video"):
         await msg.delete()
+        await db.add_violation(user.id, chat_id, "video", "فيديو")
         await msg.reply_text("🚫 الفيديو مقفل.")
         return
 
     # --- صوت ---
     if msg.audio and await db.is_locked(chat_id, "voice"):
         await msg.delete()
+        await db.add_violation(user.id, chat_id, "audio", "صوت")
         await msg.reply_text("🚫 الصوتيات مقفلة.")
         return
 
     # --- ملفات ---
     if msg.document and await db.is_locked(chat_id, "files"):
         await msg.delete()
+        await db.add_violation(user.id, chat_id, "file", "ملف")
         await msg.reply_text("🚫 الملفات مقفلة.")
         return
 
     # --- ملصقات / متحركات ---
     if msg.sticker and await db.is_locked(chat_id, "gifs"):
         await msg.delete()
+        await db.add_violation(user.id, chat_id, "sticker", "ملصق")
         await msg.reply_text("🚫 الملصقات والمتحركات مقفلة.")
         return
 
     # --- توجيه (إعادة إرسال) ---
     if msg.forward_date and await db.is_locked(chat_id, "forward"):
         await msg.delete()
+        await db.add_violation(user.id, chat_id, "forward", "إعادة توجيه")
         await msg.reply_text("🚫 التوجيه مقفل.")
         return
 
     # --- ألعاب ---
     if msg.game and await db.is_locked(chat_id, "games"):
         await msg.delete()
+        await db.add_violation(user.id, chat_id, "game", "لعبة")
         await msg.reply_text("🚫 الألعاب مقفلة.")
         return
