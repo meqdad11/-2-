@@ -1,5 +1,6 @@
 import os
 import json
+import uuid
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import asyncio
@@ -259,7 +260,6 @@ async def is_locked(chat_id: int, lock_type: str) -> bool:
     return result.data[0]["is_locked"] if result.data else False
 
 # ========== دوال نظام "صارحني" ==========
-import uuid
 
 async def create_anonymous_link(user_id: int) -> str:
     if not supabase: return ""
@@ -340,6 +340,174 @@ async def count_active_users() -> int:
     except Exception as e:
         print(f"خطأ في count_active_users: {e}")
         return 0
+
+# ==================== دوال نظام الأزمات ====================
+
+async def add_crisis_word(chat_id: int, word: str) -> bool:
+    """إضافة كلمة أزمة - تعيد True إذا نجحت، False إذا موجودة"""
+    if not supabase:
+        return False
+    try:
+        # التحقق من الوجود
+        existing = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("crisis_words").select("word").eq("chat_id", chat_id).eq("word", word).execute()
+        )
+        if existing.data:
+            return False
+        
+        # الإضافة
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("crisis_words").insert({
+                "chat_id": chat_id,
+                "word": word,
+                "created_at": now_iso()
+            }).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"Error adding crisis word: {e}")
+        return False
+
+
+async def remove_crisis_word(chat_id: int, word: str) -> bool:
+    """حذف كلمة أزمة"""
+    if not supabase:
+        return False
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("crisis_words").delete().eq("chat_id", chat_id).eq("word", word).execute()
+        )
+        return len(result.data) > 0
+    except Exception as e:
+        print(f"Error removing crisis word: {e}")
+        return False
+
+
+async def get_crisis_words(chat_id: int) -> list:
+    """جلب جميع كلمات الأزمات للمجموعة"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("crisis_words").select("word").eq("chat_id", chat_id).execute()
+        )
+        return result.data
+    except Exception as e:
+        print(f"Error getting crisis words: {e}")
+        return []
+
+
+async def get_crisis_words_count(chat_id: int) -> int:
+    """جلب عدد كلمات الأزمات"""
+    words = await get_crisis_words(chat_id)
+    return len(words)
+
+
+async def set_crisis_reply(chat_id: int, reply_text: str) -> bool:
+    """تعيين رسالة الرد التلقائي"""
+    if not supabase:
+        return False
+    try:
+        # تحديث أو إدراج
+        existing = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("crisis_settings").select("chat_id").eq("chat_id", chat_id).execute()
+        )
+        if existing.data:
+            await asyncio.get_event_loop().run_in_executor(
+                None, lambda: supabase.table("crisis_settings").update({"reply_text": reply_text, "updated_at": now_iso()}).eq("chat_id", chat_id).execute()
+            )
+        else:
+            await asyncio.get_event_loop().run_in_executor(
+                None, lambda: supabase.table("crisis_settings").insert({
+                    "chat_id": chat_id,
+                    "reply_text": reply_text,
+                    "enabled": False,
+                    "updated_at": now_iso()
+                }).execute()
+            )
+        return True
+    except Exception as e:
+        print(f"Error setting crisis reply: {e}")
+        return False
+
+
+async def get_crisis_reply(chat_id: int) -> str:
+    """جلب رسالة الرد التلقائي"""
+    if not supabase:
+        return ""
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("crisis_settings").select("reply_text").eq("chat_id", chat_id).execute()
+        )
+        if result.data:
+            return result.data[0].get("reply_text", "")
+        return ""
+    except Exception as e:
+        print(f"Error getting crisis reply: {e}")
+        return ""
+
+
+async def set_crisis_enabled(chat_id: int, enabled: bool) -> bool:
+    """تفعيل/تعطيل النظام"""
+    if not supabase:
+        return False
+    try:
+        existing = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("crisis_settings").select("chat_id").eq("chat_id", chat_id).execute()
+        )
+        if existing.data:
+            await asyncio.get_event_loop().run_in_executor(
+                None, lambda: supabase.table("crisis_settings").update({"enabled": enabled, "updated_at": now_iso()}).eq("chat_id", chat_id).execute()
+            )
+        else:
+            await asyncio.get_event_loop().run_in_executor(
+                None, lambda: supabase.table("crisis_settings").insert({
+                    "chat_id": chat_id,
+                    "enabled": enabled,
+                    "reply_text": "",
+                    "updated_at": now_iso()
+                }).execute()
+            )
+        return True
+    except Exception as e:
+        print(f"Error setting crisis enabled: {e}")
+        return False
+
+
+async def get_crisis_enabled(chat_id: int) -> bool:
+    """جلب حالة التفعيل"""
+    if not supabase:
+        return False
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("crisis_settings").select("enabled").eq("chat_id", chat_id).execute()
+        )
+        if result.data:
+            return result.data[0].get("enabled", False)
+        return False
+    except Exception as e:
+        print(f"Error getting crisis enabled: {e}")
+        return False
+
+
+async def log_crisis_alert(chat_id: int, word: str, user_id: int):
+    """تسجيل تنبيه أزمة في سجل الأحداث"""
+    if not supabase:
+        return
+    try:
+        data = {
+            "chat_id": chat_id,
+            "action": "crisis_alert",
+            "user_id": user_id,
+            "detail": f"word:{word}",
+            "created_at": now_iso()
+        }
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("ban_log").insert(data).execute()
+        )
+    except Exception as e:
+        print(f"Error logging crisis alert: {e}")
+
 
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
