@@ -244,7 +244,7 @@ async def cmd_owner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👨‍💻 المطور: Me8dad")
 
 
-# ==================== TRANSLATE COMMAND (ADDED) ====================
+# ==================== TRANSLATE COMMAND ====================
 
 async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -267,9 +267,8 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # تحديد اللغة المصدر والهدف (افتراضي: إنكليزي <-> عربي)
-    # إذا أضاف المستخدم رمز اللغة، مثلاً: /translate ar:en Hello
-    target_lang = "ar"  # العربية
-    source_lang = "en"  # الإنجليزية
+    target_lang = "ar"
+    source_lang = "en"
 
     parts = text_to_translate.split(" ", 1)
     if len(parts) == 2 and ":" in parts[0]:
@@ -297,7 +296,6 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     return
                 data = await resp.json()
 
-        # استخراج الترجمة
         translated_text = ""
         for part in data[0]:
             if part[0]:
@@ -317,7 +315,46 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ حدث خطأ أثناء الترجمة.")
 
 
-# ==================== REGISTER (IMPORTANT) ====================
+# ==================== GET INVITE COMMAND (ADDED) ====================
+
+async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    الحصول على رابط دعوة للمجموعة (للمشرفين فقط)
+    الاستخدام: /get_invite
+    """
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # التأكد من أن الأمر في مجموعة
+    from telegram import Chat as TGChat
+    if chat.type == "private":
+        await update.message.reply_text(
+            "⚠️ هذا الأمر للمجموعات فقط.\n\n"
+            "استخدمه في المجموعة التي تريد الحصول على رابطها."
+        )
+        return
+
+    # التحقق من صلاحيات المشرف
+    if not await is_admin(update, context):
+        await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+        return
+
+    try:
+        invite_link = await chat.export_invite_link()
+        await update.message.reply_text(
+            f"🔗 رابط دعوة المجموعة:\n\n{invite_link}\n\n"
+            f"⏳ الصلاحية: غير محدودة (حتى يتم تغييره)"
+        )
+    except Exception as e:
+        logger.error(f"Failed to get invite link: {e}")
+        await update.message.reply_text(
+            "❌ فشل في الحصول على رابط الدعوة.\n\n"
+            "تأكد من أن البوت لديه الصلاحيات التالية:\n"
+            "• دعوة المستخدمين عبر الرابط (Invite Users)"
+        )
+
+
+# ==================== REGISTER ====================
 
 def register_user_handlers(app):
     from telegram.ext import MessageHandler, filters
