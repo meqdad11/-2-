@@ -97,11 +97,7 @@ async def filter_banned_words(update: Update, context: ContextTypes.DEFAULT_TYPE
 # ========== الأوامر الجديدة (الردود والاختصارات) ==========
 # ================================================
 
-# هيكل تخزين الردود والاختصارات (مؤقت، يمكن نقلها إلى قاعدة البيانات لاحقاً)
-_custom_replies = {}   # {chat_id: {keyword: reply}}
-_custom_commands = {}  # {chat_id: {command_word: target_command}}
-
-# 1. إضافة رد
+# 1. إضافة رد (مخزن في قاعدة البيانات)
 async def cmd_add_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
@@ -111,10 +107,12 @@ async def cmd_add_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyword = context.args[0].lower()
     reply = " ".join(context.args[1:])
     chat_id = update.effective_chat.id
-    if chat_id not in _custom_replies:
-        _custom_replies[chat_id] = {}
-    _custom_replies[chat_id][keyword] = reply
-    await update.message.reply_text(f"✅ تم إضافة رد تلقائي للكلمة '{keyword}'.")
+    
+    added = await db.add_custom_reply(chat_id, keyword, reply)
+    if added:
+        await update.message.reply_text(f"✅ تم إضافة رد تلقائي للكلمة '{keyword}'.")
+    else:
+        await update.message.reply_text(f"⚠️ الرد للكلمة '{keyword}' موجود مسبقاً.")
 
 # 2. حذف رد
 async def cmd_remove_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -125,18 +123,20 @@ async def cmd_remove_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     keyword = context.args[0].lower()
     chat_id = update.effective_chat.id
-    if chat_id in _custom_replies and keyword in _custom_replies[chat_id]:
-        del _custom_replies[chat_id][keyword]
+    
+    removed = await db.remove_custom_reply(chat_id, keyword)
+    if removed:
         await update.message.reply_text(f"✅ تم حذف الرد التلقائي للكلمة '{keyword}'.")
     else:
-        await update.message.reply_text("الرد غير موجود.")
+        await update.message.reply_text("⚠️ الرد غير موجود.")
 
 # 3. عرض الردود المضافه
 async def cmd_list_replies(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
     chat_id = update.effective_chat.id
-    replies = _custom_replies.get(chat_id, {})
+    replies = await db.get_custom_replies(chat_id)
+    
     if not replies:
         await update.message.reply_text("لا توجد ردود مضافه.")
         return
@@ -153,10 +153,12 @@ async def cmd_add_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     shortcut = context.args[0].lower()
     target = " ".join(context.args[1:]).lower()
     chat_id = update.effective_chat.id
-    if chat_id not in _custom_commands:
-        _custom_commands[chat_id] = {}
-    _custom_commands[chat_id][shortcut] = target
-    await update.message.reply_text(f"✅ تم إضافة اختصار '{shortcut}' للأمر '{target}'.")
+    
+    added = await db.add_custom_command(chat_id, shortcut, target)
+    if added:
+        await update.message.reply_text(f"✅ تم إضافة اختصار '{shortcut}' للأمر '{target}'.")
+    else:
+        await update.message.reply_text(f"⚠️ الاختصار '{shortcut}' موجود مسبقاً.")
 
 # 5. حذف أمر اختصار
 async def cmd_remove_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -167,18 +169,20 @@ async def cmd_remove_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     shortcut = context.args[0].lower()
     chat_id = update.effective_chat.id
-    if chat_id in _custom_commands and shortcut in _custom_commands[chat_id]:
-        del _custom_commands[chat_id][shortcut]
+    
+    removed = await db.remove_custom_command(chat_id, shortcut)
+    if removed:
         await update.message.reply_text(f"✅ تم حذف الاختصار '{shortcut}'.")
     else:
-        await update.message.reply_text("الاختصار غير موجود.")
+        await update.message.reply_text("⚠️ الاختصار غير موجود.")
 
 # 6. عرض الأوامر المضافه
 async def cmd_list_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
     chat_id = update.effective_chat.id
-    cmds = _custom_commands.get(chat_id, {})
+    cmds = await db.get_custom_commands(chat_id)
+    
     if not cmds:
         await update.message.reply_text("لا توجد أوامر مضافه.")
         return
@@ -193,21 +197,20 @@ async def process_custom_replies_and_commands(update: Update, context: ContextTy
     text = msg.text.strip().lower()
     chat_id = update.effective_chat.id
 
-    # الردود التلقائية
-    if chat_id in _custom_replies:
-        for keyword, reply in _custom_replies[chat_id].items():
-            if keyword in text:
-                await msg.reply_text(reply)
-                return
+    # الردود التلقائية من قاعدة البيانات
+    replies = await db.get_custom_replies(chat_id)
+    for keyword, reply in replies.items():
+        if keyword in text:
+            await msg.reply_text(reply)
+            return
 
-    # الاختصارات (تبدأ مثلاً بـ '!' أو بدون)
-    if text.startswith('!'):  # مثلاً !سجل
+    # الاختصارات (تبدأ بـ '!')
+    if text.startswith('!'):
         cmd = text[1:].split()[0] if ' ' in text else text[1:]
-        if chat_id in _custom_commands and cmd in _custom_commands[chat_id]:
-            target_cmd = _custom_commands[chat_id][cmd]
-            # محاكاة تنفيذ الأمر المستهدف (يمكن تحسينها)
+        commands = await db.get_custom_commands(chat_id)
+        if cmd in commands:
+            target_cmd = commands[cmd]
             context.args = target_cmd.split()[1:] if ' ' in target_cmd else []
-            # نحتاج إلى إيجاد الدالة المناسبة في ARABIC_COMMANDS
             from commands import ARABIC_COMMANDS
             for arabic_cmd, handler in ARABIC_COMMANDS.items():
                 if arabic_cmd == target_cmd.split()[0]:
