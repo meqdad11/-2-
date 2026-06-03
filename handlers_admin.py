@@ -10,6 +10,7 @@ from helpers import (
     expires_at_from_duration,
     fmt_duration,
 )
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +52,11 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_user = get_reply_user(update)
     if reply_user:
         user_id = reply_user.id
+        username = f"@{reply_user.username}" if reply_user.username else f"المعرف {user_id}"
     elif context.args:
         try:
             user_id = int(context.args[0])
+            username = f"المعرف {user_id}"
         except ValueError:
             await update.message.reply_text("الاستخدام: رفع الحظر <معرف>")
             return
@@ -68,14 +71,23 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.warning("تعذّر رفع الحظر: %s", e)
     if removed:
-        await update.message.reply_text(f"✅ تم رفع الحظر عن المستخدم {user_id}.")
+        # إنشاء رابط دعوة صالح ليوم واحد (استخدام واحد)
         try:
-            await context.bot.send_message(
-                user_id,
-                "✅ تم رفع الحظر عنك.\n\nيمكنك الانضمام للمجموعة مجدداً عبر هذا الرابط:\nhttps://t.me/+Wzrqvy2x08w1NTFk"
+            link = await context.bot.create_chat_invite_link(
+                chat_id, 
+                member_limit=1, 
+                expire_date=datetime.now(timezone.utc) + timedelta(days=1)
             )
-        except Exception:
-            pass
+            invite_link = link.invite_link
+        except:
+            invite_link = "لا يمكن إنشاء رابط (تأكد من صلاحيات البوت)"
+        
+        await update.message.reply_text(
+            f"✅ تم رفع الحظر عن {username}.\n\n"
+            f"🔗 **رابط العودة للمجموعة** (صالح ليوم واحد فقط):\n"
+            f"{invite_link}\n\n"
+            f"📌 أرسل هذا الرابط إلى {username} ليعود إلى المجموعة."
+        )
         await db.log_event(chat_id, "unban", user_id=unbanner_id, target_id=user_id)
     else:
         await update.message.reply_text(f"المستخدم {user_id} غير موجود في قائمة الحظر.")
