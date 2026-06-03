@@ -215,72 +215,41 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-# ========== الهمسة المقفلة الجديدة ==========
+# ========== الهمسة السرية ==========
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إرسال همسة مقفلة (تظهر فقط للشخص المقصود)"""
+    """إنشاء همسة سرية لشخص معين"""
     msg = update.message
     
-    # التأكد أن الأمر في مجموعة
+    # التأكد من أن الأمر في مجموعة
     if update.effective_chat.type == "private":
         await msg.reply_text("❌ هذا الأمر للمجموعات فقط.")
         return
     
-    # التأكد من وجود منشن
-    if not msg.reply_to_message and not context.args:
-        await msg.reply_text("❗️ الاستخدام: اهمس @username الرسالة\nأو رد على رسالة الشخص ثم اكتب اهمس")
+    # التأكد من وجود رد على رسالة
+    if not msg.reply_to_message:
+        await msg.reply_text("❗️ قم بالرد على رسالة الشخص الذي تريد إرسال همسة سرية له.")
         return
     
-    # تحديد المستلم
-    recipient = None
-    if msg.reply_to_message:
-        recipient = msg.reply_to_message.from_user
-    elif context.args:
-        target_username = context.args[0].replace('@', '')
-        try:
-            recipient = await context.bot.get_chat(target_username)
-        except:
-            await msg.reply_text(f"❌ لم أستطع العثور على المستخدم {target_username}")
-            return
-    
-    if not recipient or recipient.is_bot:
+    target = msg.reply_to_message.from_user
+    if target.is_bot:
         await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
         return
     
-    # استخراج نص الهمسة
-    whisper_text = ""
-    if msg.reply_to_message and len(context.args) > 0:
-        whisper_text = " ".join(context.args)
-    elif context.args and len(context.args) > 1:
-        whisper_text = " ".join(context.args[1:])
+    # تخزين معلومات مؤقتة
+    context.user_data['whisper_target'] = target.id
+    context.user_data['whisper_target_name'] = target.first_name
+    context.user_data['whisper_group'] = update.effective_chat.id
     
-    # إذا ما كتب نص، نطلبه في الخاص
-    if not whisper_text:
-        context.user_data['whisper_recipient'] = recipient.id
-        context.user_data['whisper_group'] = update.effective_chat.id
-        await msg.reply_text("📝 أرسل نص الهمسة في الخاص خلال 60 ثانية.")
-        return
+    bot_username = (await context.bot.get_me()).username
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("✍️ كتابة الهمسة", url=f"https://t.me/{bot_username}")
+    ]])
     
-    # حفظ الهمسة في قاعدة البيانات
-    whisper_id = await db.save_whisper(
-        sender_id=update.effective_user.id,
-        recipient_id=recipient.id,
-        group_id=update.effective_chat.id,
-        message=whisper_text
+    await msg.reply_text(
+        f"🔒 **همسة سرية لـ {target.first_name}**\n\nاضغط الزر واكتب همستك في الخاص.",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
     )
-    
-    if whisper_id:
-        # إرسال رسالة مقفلة في المجموعة
-        await msg.reply_text(
-            f"🔒 **همسة مقفلة من {update.effective_user.first_name}**\n"
-            f"👤 إلى: {recipient.first_name}\n"
-            f"📌 اضغط على الزر لفتح الهمسة",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔓 فتح الهمسة", callback_data=f"open_whisper_{whisper_id}")
-            ]]),
-            parse_mode="Markdown"
-        )
-    else:
-        await msg.reply_text("❌ حدث خطأ في حفظ الهمسة، حاول مرة أخرى.")
 
 # ========== الأوامر الأخرى ==========
 async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
