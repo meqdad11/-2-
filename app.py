@@ -191,4 +191,29 @@ def register_jobs(app):
     jq = app.job_queue
     if jq:
         jq.run_repeating(job_expire_bans, interval=300, first=10)
-        jq
+        jq.run_daily(
+            job_daily_quote,
+            time=datetime.time(hour=9, minute=0, second=0, tzinfo=SAUDI_TZ)
+        )
+
+def main():
+    if not TELEGRAM_BOT_TOKEN:
+        raise RuntimeError("TELEGRAM_BOT_TOKEN غير محدد")
+
+    app = (
+        ApplicationBuilder()
+        .token(TELEGRAM_BOT_TOKEN)
+        .post_init(post_init)
+        .build()
+    )
+
+    register_handlers(app)
+    register_jobs(app)
+
+    app.run_polling(
+        allowed_updates=["message", "channel_post", "edited_channel_post", "chat_member", "callback_query"],
+        drop_pending_updates=True,
+    )
+
+if __name__ == "__main__":
+    main()
