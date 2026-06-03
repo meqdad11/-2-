@@ -73,7 +73,6 @@ from handlers_dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_sta
 
 # ========== نظام الأزمات الجديد ==========
 from handlers_crisis import (
-    register_crisis_handlers,
     check_crisis_words,
 )
 
@@ -219,9 +218,6 @@ def register_handlers(app):
 
     # فلترة المحتوى للمجموعات فقط
     app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
-    
-    # ⭐ تسجيل أوامر ومعالج نظام الأزمات ⭐
-    register_crisis_handlers(app)
 
 # ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
