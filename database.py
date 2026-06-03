@@ -348,14 +348,12 @@ async def add_crisis_word(chat_id: int, word: str) -> bool:
     if not supabase:
         return False
     try:
-        # التحقق من الوجود
         existing = await asyncio.get_event_loop().run_in_executor(
             None, lambda: supabase.table("crisis_words").select("word").eq("chat_id", chat_id).eq("word", word).execute()
         )
         if existing.data:
             return False
         
-        # الإضافة
         await asyncio.get_event_loop().run_in_executor(
             None, lambda: supabase.table("crisis_words").insert({
                 "chat_id": chat_id,
@@ -408,7 +406,6 @@ async def set_crisis_reply(chat_id: int, reply_text: str) -> bool:
     if not supabase:
         return False
     try:
-        # تحديث أو إدراج
         existing = await asyncio.get_event_loop().run_in_executor(
             None, lambda: supabase.table("crisis_settings").select("chat_id").eq("chat_id", chat_id).execute()
         )
@@ -507,6 +504,122 @@ async def log_crisis_alert(chat_id: int, word: str, user_id: int):
         )
     except Exception as e:
         print(f"Error logging crisis alert: {e}")
+
+
+# ==================== دوال الردود التلقائية (قاعدة البيانات) ====================
+
+async def add_custom_reply(chat_id: int, keyword: str, reply: str) -> bool:
+    """إضافة رد تلقائي - تعيد True إذا نجحت، False إذا موجود"""
+    if not supabase:
+        return False
+    try:
+        existing = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("custom_replies").select("keyword").eq("chat_id", chat_id).eq("keyword", keyword).execute()
+        )
+        if existing.data:
+            return False
+        
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("custom_replies").insert({
+                "chat_id": chat_id,
+                "keyword": keyword,
+                "reply": reply,
+                "created_at": now_iso()
+            }).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"Error adding custom reply: {e}")
+        return False
+
+
+async def remove_custom_reply(chat_id: int, keyword: str) -> bool:
+    """حذف رد تلقائي"""
+    if not supabase:
+        return False
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("custom_replies").delete().eq("chat_id", chat_id).eq("keyword", keyword).execute()
+        )
+        return len(result.data) > 0
+    except Exception as e:
+        print(f"Error removing custom reply: {e}")
+        return False
+
+
+async def get_custom_replies(chat_id: int) -> dict:
+    """جلب جميع الردود التلقائية للمجموعة {keyword: reply}"""
+    if not supabase:
+        return {}
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("custom_replies").select("keyword, reply").eq("chat_id", chat_id).execute()
+        )
+        return {row["keyword"]: row["reply"] for row in result.data}
+    except Exception as e:
+        print(f"Error getting custom replies: {e}")
+        return {}
+
+
+async def get_custom_reply(chat_id: int, keyword: str) -> str:
+    """جلب رد معين"""
+    replies = await get_custom_replies(chat_id)
+    return replies.get(keyword, "")
+
+
+# ==================== دوال الاختصارات (قاعدة البيانات) ====================
+
+async def add_custom_command(chat_id: int, shortcut: str, target_command: str) -> bool:
+    """إضافة اختصار - تعيد True إذا نجحت، False إذا موجود"""
+    if not supabase:
+        return False
+    try:
+        existing = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("custom_commands").select("shortcut").eq("chat_id", chat_id).eq("shortcut", shortcut).execute()
+        )
+        if existing.data:
+            return False
+        
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("custom_commands").insert({
+                "chat_id": chat_id,
+                "shortcut": shortcut,
+                "target_command": target_command,
+                "created_at": now_iso()
+            }).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"Error adding custom command: {e}")
+        return False
+
+
+async def remove_custom_command(chat_id: int, shortcut: str) -> bool:
+    """حذف اختصار"""
+    if not supabase:
+        return False
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("custom_commands").delete().eq("chat_id", chat_id).eq("shortcut", shortcut).execute()
+        )
+        return len(result.data) > 0
+    except Exception as e:
+        print(f"Error removing custom command: {e}")
+        return False
+
+
+async def get_custom_commands(chat_id: int) -> dict:
+    """جلب جميع الاختصارات للمجموعة {shortcut: target_command}"""
+    if not supabase:
+        return {}
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("custom_commands").select("shortcut, target_command").eq("chat_id", chat_id).execute()
+        )
+        return {row["shortcut"]: row["target_command"] for row in result.data}
+    except Exception as e:
+        print(f"Error getting custom commands: {e}")
+        return {}
 
 
 # ========== تهيئة قاعدة البيانات ==========
