@@ -24,23 +24,53 @@ async def job_daily_quote(context: ContextTypes.DEFAULT_TYPE):
 
 # ========== دالة التقرير البسيط ==========
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إرسال تقرير بسيط للمشرفين"""
+    """إرسال تقرير بسيط للمشرفين (سري - يتم حذف رسالة المستخدم)"""
     user = update.effective_user
     chat = update.effective_chat
     msg = update.message
     if not msg:
         return
+    
     report_text = msg.text.replace("/report", "").replace("تقرير", "").strip() if msg.text else ""
     if not report_text:
-        await msg.reply_text("اكتب سبب التقرير بعد الأمر.\nمثال: تقرير شخص يخالف القواعد")
+        # إرسال رسالة خطأ في الخاص (بدون ظهور في المجموعة)
+        try:
+            await context.bot.send_message(
+                user.id,
+                "❌ اكتب سبب التقرير بعد الأمر.\nمثال: تقرير شخص يخالف القواعد"
+            )
+        except:
+            pass
+        # حذف رسالة المستخدم الخاطئة
+        try:
+            await msg.delete()
+        except:
+            pass
         return
     
     # الرد على رسالة العضو
     if not msg.reply_to_message:
-        await msg.reply_text("❌ قم بالرد على رسالة العضو المخالف.")
+        try:
+            await context.bot.send_message(
+                user.id,
+                "❌ قم بالرد على رسالة العضو المخالف ثم اكتب التقرير."
+            )
+        except:
+            pass
+        try:
+            await msg.delete()
+        except:
+            pass
         return
     
     target = msg.reply_to_message.from_user
+    
+    # حذف رسالة المستخدم (للسرية)
+    try:
+        await msg.delete()
+    except Exception as e:
+        logger.error(f"فشل حذف رسالة التقرير: {e}")
+    
     reporter_name = user.full_name or user.first_name
     target_name = target.full_name or target.first_name
     
@@ -62,10 +92,26 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 pass
     
+    # إرسال تأكيد في الخاص فقط (بدون رسالة في المجموعة)
     if sent > 0:
-        await msg.reply_text(f"✅ تم إرسال تقريرك إلى المشرفين.")
+        try:
+            await context.bot.send_message(
+                user.id,
+                f"✅ تم إرسال تقريرك إلى {sent} من المشرفين (بشكل سري)."
+            )
+        except:
+            pass
     else:
-        await msg.reply_text("❌ لم يتم إرسال التقرير.")
+        try:
+            await context.bot.send_message(
+                user.id,
+                "❌ لم يتم إرسال التقرير لأي مشرف (تأكد من صلاحيات البوت)."
+            )
+        except:
+            pass
+    
+    # تسجيل في سجل الأحداث
+    await db.log_event(chat.id, "report", user_id=user.id, target_id=target.id, detail=report_text[:100])
 
 # ========== دالة انتهاء صلاحية الحظر ==========
 async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
@@ -83,23 +129,49 @@ async def job_expire_bans(context: ContextTypes.DEFAULT_TYPE):
 
 # ========== تقرير متقدم (عميق) ==========
 async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تقرير متقدم عن عضو مع عرض معلوماته التفصيلية"""
+    """تقرير متقدم عن عضو مع عرض معلوماته التفصيلية (سري - يتم حذف رسالة المستخدم)"""
     msg = update.message
     user = update.effective_user
     chat = update.effective_chat
     
     # التأكد من وجود رد على رسالة عضو
     if not msg.reply_to_message:
-        await msg.reply_text("❌ قم بالرد على رسالة العضو الذي تريد الإبلاغ عنه.")
+        try:
+            await context.bot.send_message(
+                user.id,
+                "❌ قم بالرد على رسالة العضو الذي تريد الإبلاغ عنه ثم اكتب: تقرير متقدم السبب"
+            )
+        except:
+            pass
+        try:
+            await msg.delete()
+        except:
+            pass
         return
     
     target = msg.reply_to_message.from_user
     if target.is_bot:
-        await msg.reply_text("❌ لا يمكن الإبلاغ عن بوت.")
+        try:
+            await context.bot.send_message(
+                user.id,
+                "❌ لا يمكن الإبلاغ عن بوت."
+            )
+        except:
+            pass
+        try:
+            await msg.delete()
+        except:
+            pass
         return
     
     # سبب التقرير
     reason = " ".join(context.args) if context.args else "لم يحدد سبب"
+    
+    # حذف رسالة المستخدم (للسرية)
+    try:
+        await msg.delete()
+    except Exception as e:
+        logger.error(f"فشل حذف رسالة التقرير المتقدم: {e}")
     
     # ========== جلب المعلومات ==========
     
@@ -187,14 +259,33 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 except Exception as e:
                     logger.error(f"فشل إرسال التقرير للمشرف {admin.user.id}: {e}")
         
+        # إرسال تأكيد في الخاص فقط (بدون رسالة في المجموعة)
         if sent_count > 0:
-            await msg.reply_text(f"✅ تم إرسال التقرير المتقدم إلى {sent_count} من المشرفين.")
+            try:
+                await context.bot.send_message(
+                    user.id,
+                    f"✅ تم إرسال التقرير المتقدم إلى {sent_count} من المشرفين (بشكل سري)."
+                )
+            except:
+                pass
         else:
-            await msg.reply_text("❌ لم يتم إرسال التقرير لأي مشرف (تأكد من صلاحيات البوت).")
+            try:
+                await context.bot.send_message(
+                    user.id,
+                    "❌ لم يتم إرسال التقرير لأي مشرف (تأكد من صلاحيات البوت)."
+                )
+            except:
+                pass
             
     except Exception as e:
         logger.error(f"خطأ في إرسال التقرير المتقدم: {e}")
-        await msg.reply_text("❌ حدث خطأ أثناء إرسال التقرير.")
+        try:
+            await context.bot.send_message(
+                user.id,
+                "❌ حدث خطأ أثناء إرسال التقرير."
+            )
+        except:
+            pass
     
     # تسجيل في سجل الأحداث
     await db.log_event(chat.id, "deep_report", user_id=user.id, target_id=target.id, detail=reason[:100])
