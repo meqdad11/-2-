@@ -311,7 +311,6 @@ async def get_anonymous_messages(user_id: int, mark_read: bool = True) -> list:
 
 # ========== دوال المستخدمين النشطين ==========
 async def update_user_activity(user_id: int, chat_id: int):
-    """تحديث آخر نشاط للمستخدم (شهرياً)"""
     current_month = datetime.now(timezone.utc).strftime("%Y-%m")
     if not supabase:
         return
@@ -327,7 +326,6 @@ async def update_user_activity(user_id: int, chat_id: int):
         print(f"خطأ في update_user_activity: {e}")
 
 async def count_active_users() -> int:
-    """عدد المستخدمين النشطين هذا الشهر"""
     current_month = datetime.now(timezone.utc).strftime("%Y-%m")
     if not supabase:
         return 0
@@ -344,7 +342,6 @@ async def count_active_users() -> int:
 # ==================== دوال نظام الأزمات ====================
 
 async def add_crisis_word(chat_id: int, word: str) -> bool:
-    """إضافة كلمة أزمة - تعيد True إذا نجحت، False إذا موجودة"""
     if not supabase:
         return False
     try:
@@ -367,7 +364,6 @@ async def add_crisis_word(chat_id: int, word: str) -> bool:
         return False
 
 async def remove_crisis_word(chat_id: int, word: str) -> bool:
-    """حذف كلمة أزمة"""
     if not supabase:
         return False
     try:
@@ -380,7 +376,6 @@ async def remove_crisis_word(chat_id: int, word: str) -> bool:
         return False
 
 async def get_crisis_words(chat_id: int) -> list:
-    """جلب جميع كلمات الأزمات للمجموعة"""
     if not supabase:
         return []
     try:
@@ -393,12 +388,10 @@ async def get_crisis_words(chat_id: int) -> list:
         return []
 
 async def get_crisis_words_count(chat_id: int) -> int:
-    """جلب عدد كلمات الأزمات"""
     words = await get_crisis_words(chat_id)
     return len(words)
 
 async def set_crisis_reply(chat_id: int, reply_text: str) -> bool:
-    """تعيين رسالة الرد التلقائي"""
     if not supabase:
         return False
     try:
@@ -424,7 +417,6 @@ async def set_crisis_reply(chat_id: int, reply_text: str) -> bool:
         return False
 
 async def get_crisis_reply(chat_id: int) -> str:
-    """جلب رسالة الرد التلقائي"""
     if not supabase:
         return ""
     try:
@@ -439,7 +431,6 @@ async def get_crisis_reply(chat_id: int) -> str:
         return ""
 
 async def set_crisis_enabled(chat_id: int, enabled: bool) -> bool:
-    """تفعيل/تعطيل النظام"""
     if not supabase:
         return False
     try:
@@ -465,7 +456,6 @@ async def set_crisis_enabled(chat_id: int, enabled: bool) -> bool:
         return False
 
 async def get_crisis_enabled(chat_id: int) -> bool:
-    """جلب حالة التفعيل"""
     if not supabase:
         return False
     try:
@@ -480,7 +470,6 @@ async def get_crisis_enabled(chat_id: int) -> bool:
         return False
 
 async def log_crisis_alert(chat_id: int, word: str, user_id: int):
-    """تسجيل تنبيه أزمة في سجل الأحداث"""
     if not supabase:
         return
     try:
@@ -500,7 +489,6 @@ async def log_crisis_alert(chat_id: int, word: str, user_id: int):
 # ==================== دوال الردود التلقائية (قاعدة البيانات) ====================
 
 async def add_custom_reply(chat_id: int, keyword: str, reply: str) -> bool:
-    """إضافة رد تلقائي - تعيد True إذا نجحت، False إذا موجود"""
     if not supabase:
         return False
     try:
@@ -524,7 +512,6 @@ async def add_custom_reply(chat_id: int, keyword: str, reply: str) -> bool:
         return False
 
 async def remove_custom_reply(chat_id: int, keyword: str) -> bool:
-    """حذف رد تلقائي"""
     if not supabase:
         return False
     try:
@@ -537,7 +524,6 @@ async def remove_custom_reply(chat_id: int, keyword: str) -> bool:
         return False
 
 async def get_custom_replies(chat_id: int) -> dict:
-    """جلب جميع الردود التلقائية للمجموعة {keyword: reply}"""
     if not supabase:
         return {}
     try:
@@ -552,7 +538,6 @@ async def get_custom_replies(chat_id: int) -> dict:
 # ==================== دوال الاختصارات (قاعدة البيانات) ====================
 
 async def add_custom_command(chat_id: int, shortcut: str, target_command: str) -> bool:
-    """إضافة اختصار - تعيد True إذا نجحت، False إذا موجود"""
     if not supabase:
         return False
     try:
@@ -576,7 +561,6 @@ async def add_custom_command(chat_id: int, shortcut: str, target_command: str) -
         return False
 
 async def remove_custom_command(chat_id: int, shortcut: str) -> bool:
-    """حذف اختصار"""
     if not supabase:
         return False
     try:
@@ -589,7 +573,6 @@ async def remove_custom_command(chat_id: int, shortcut: str) -> bool:
         return False
 
 async def get_custom_commands(chat_id: int) -> dict:
-    """جلب جميع الاختصارات للمجموعة {shortcut: target_command}"""
     if not supabase:
         return {}
     try:
@@ -601,61 +584,57 @@ async def get_custom_commands(chat_id: int) -> dict:
         print(f"Error getting custom commands: {e}")
         return {}
 
-# ==================== دوال الهمسات المقفلة ====================
+# ==================== دوال الهمسات (نظام الرابط) ====================
 
-async def save_whisper(sender_id: int, recipient_id: int, group_id: int, message: str) -> int:
-    """حفظ همسة جديدة في قاعدة البيانات"""
+async def save_whisper_link(whisper_id: str, sender_id: int, sender_name: str, target_id: int, target_name: str, chat_id: int, chat_title: str) -> bool:
+    """حفظ همسة جديدة مع رابط فريد"""
     if not supabase:
-        return 0
+        return False
     try:
         data = {
+            "id": whisper_id,
             "sender_id": sender_id,
-            "recipient_id": recipient_id,
-            "group_id": group_id,
-            "message": message,
-            "is_read": False,
+            "sender_name": sender_name,
+            "target_id": target_id,
+            "target_name": target_name,
+            "chat_id": chat_id,
+            "chat_title": chat_title,
+            "used": False,
             "created_at": now_iso()
         }
-        result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: supabase.table("whispers").insert(data).execute()
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("whisper_links").insert(data).execute()
         )
-        return result.data[0]["id"] if result.data else 0
+        return True
     except Exception as e:
-        print(f"Error saving whisper: {e}")
-        return 0
+        print(f"Error saving whisper link: {e}")
+        return False
 
-async def get_whisper(whisper_id: int, user_id: int) -> dict:
-    """جلب همسة مع التحقق أن المستخدم هو المستلم"""
+async def get_whisper_link(whisper_id: str) -> dict:
+    """جلب بيانات الهمسة من الرابط"""
     if not supabase:
         return None
     try:
         result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: supabase.table("whispers")
-            .select("*")
-            .eq("id", whisper_id)
-            .eq("recipient_id", user_id)
-            .execute()
+            None, lambda: supabase.table("whisper_links").select("*").eq("id", whisper_id).eq("used", False).execute()
         )
-        if result.data:
-            return result.data[0]
-        return None
+        return result.data[0] if result.data else None
     except Exception as e:
-        print(f"Error getting whisper: {e}")
+        print(f"Error getting whisper link: {e}")
         return None
 
-async def mark_whisper_read(whisper_id: int):
-    """تحديث حالة الهمسة إلى مقروءة"""
+async def delete_whisper_link(whisper_id: str) -> bool:
+    """حذف الهمسة بعد الاستخدام أو تعليمها كمستخدمة"""
     if not supabase:
-        return
+        return False
     try:
         await asyncio.get_event_loop().run_in_executor(
-            None, lambda: supabase.table("whispers")
-            .update({"is_read": True})
-            .eq("id", whisper_id)
-            .execute()
+            None, lambda: supabase.table("whisper_links").update({"used": True}).eq("id", whisper_id).execute()
         )
+        return True
     except Exception as e:
-        print(f"Error marking whisper read: {e}")
+        print(f"Error deleting whisper link: {e}")
+        return False
 
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
