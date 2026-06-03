@@ -20,7 +20,6 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
 
     if context.user_data.get('purge_mode') == chat_id:
         del context.user_data['purge_mode']
-        # حذف رسالة واحدة بالرد
         if msg.reply_to_message and text == "حذف":
             try:
                 await context.bot.delete_message(chat_id, msg.reply_to_message.message_id)
@@ -85,14 +84,13 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
         await msg.reply_text("✅ تم إرسال البث.")
         return
 
-    # ========== استقبال الهمسة في الخاص ==========
-    if context.user_data.get('waiting_whisper'):
+    # ========== استلام الهمسة من الخاص ==========
+    if context.user_data.get('waiting_whisper') and update.effective_chat.type == "private":
         target_id = context.user_data.pop('whisper_target')
         target_name = context.user_data.pop('whisper_target_name')
         group_id = context.user_data.pop('whisper_group')
-        del context.user_data['waiting_whisper']
+        context.user_data.pop('waiting_whisper')
         
-        # تخزين الهمسة مؤقتاً في الذاكرة
         whisper_id = msg.message_id
         context.bot_data[f'whisper_{whisper_id}'] = {
             'text': text,
@@ -101,17 +99,16 @@ async def handle_interactive_messages(update: Update, context: ContextTypes.DEFA
             'sender_name': update.effective_user.first_name
         }
         
-        # إرسال رسالة مقفلة في المجموعة
         try:
             await context.bot.send_message(
                 group_id,
-                f"🔒 **همسة سرية من {update.effective_user.first_name}**\n📌 خاصة بـ {target_name}",
+                f"🔒 **همسة من {update.effective_user.first_name}**\n📌 لـ {target_name}",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("👁️ عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
+                    InlineKeyboardButton("👁️ عرض", callback_data=f"show_whisper_{whisper_id}")
                 ]]),
                 parse_mode="Markdown"
             )
-            await msg.reply_text("✅ تم إرسال الهمسة إلى المجموعة.")
+            await msg.reply_text("✅ تم إرسال الهمسة.")
         except Exception as e:
             await msg.reply_text(f"❌ حدث خطأ: {e}")
         return
