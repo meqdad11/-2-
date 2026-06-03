@@ -541,3 +541,39 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("📢 **أرسل النص الذي تريد بثه للمجموعة:**", parse_mode="Markdown")
         context.user_data['waiting_broadcast'] = chat_id
         return
+
+    # ================= فتح الهمسة =================
+    if data.startswith("open_whisper_"):
+        whisper_id = int(data.split("_")[2])
+        user_id = update.effective_user.id
+        
+        # جلب الهمسة من قاعدة البيانات
+        whisper = await db.get_whisper(whisper_id, user_id)
+        
+        if not whisper:
+            await query.answer("❌ هذه الهمسة غير متاحة لك أو تم فتحها مسبقاً.", show_alert=True)
+            await msg.delete()
+            return
+        
+        # إرسال محتوى الهمسة للمستخدم في الخاص
+        try:
+            await context.bot.send_message(
+                user_id,
+                f"🔓 **همسة مقفلة**\n\n"
+                f"📝 {whisper['message']}\n\n"
+                f"🕒 {whisper['created_at'][:16]}",
+                parse_mode="Markdown"
+            )
+            await query.answer("✅ تم فتح الهمسة وأرسلت لك في الخاص.", show_alert=True)
+            
+            # تحديث حالة الهمسة إلى مقروءة
+            await db.mark_whisper_read(whisper_id)
+            
+            # حذف الرسالة المقفلة من المجموعة
+            await msg.delete()
+            
+        except Exception as e:
+            await query.answer("❌ لا يمكن إرسال الهمسة، تأكد من أن البوت غير محظور.", show_alert=True)
+            logger.error(f"خطأ في إرسال الهمسة: {e}")
+        
+        return
