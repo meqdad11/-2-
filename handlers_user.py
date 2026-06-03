@@ -230,11 +230,19 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         target_user = await context.bot.get_chat(target_username)
-        await context.bot.send_message(target_user.id, f"🔊 لديك همسة من {update.effective_user.mention_html()}:\n\n{whisper_text}", parse_mode="HTML")
-        await update.message.reply_text(f"✅ تم الإرسال إلى {target_user.mention_html()}!", parse_mode="HTML")
-    except:
-        await update.message.reply_text("❌ لم أستطع الإرسال.")
-
+        try:
+            await context.bot.send_message(target_user.id, f"🔊 لديك همسة من {update.effective_user.mention_html()}:\n\n{whisper_text}", parse_mode="HTML")
+            await update.message.reply_text(f"✅ تم الإرسال إلى {target_user.mention_html()}!", parse_mode="HTML")
+        except Exception as e:
+            error_message = str(e)
+            if "bot was blocked" in error_message:
+                await update.message.reply_text(f"❌ المستخدم {target_user.mention_html()} قام بحظر البوت.", parse_mode="HTML")
+            elif "chat not found" in error_message:
+                await update.message.reply_text(f"❌ لا يمكن إرسال الهمسة، ربما المستخدم {target_user.mention_html()} لم يبدأ البوت من قبل.", parse_mode="HTML")
+            else:
+                await update.message.reply_text(f"❌ فشل الإرسال: {error_message[:100]}")
+    except Exception as e:
+        await update.message.reply_text(f"❌ لم أستطع العثور على المستخدم @{target_username}")
 async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ للمشرفين فقط.")
