@@ -6,7 +6,7 @@ import logging
 import random
 import uuid
 import aiohttp
-from datetime import datetime
+from datetime import datetime, time as dtime
 from zoneinfo import ZoneInfo
 
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -15,6 +15,9 @@ from telegram.ext import ContextTypes
 import database as db
 from config import TIMEZONE
 from helpers import is_admin, get_reply_user
+
+# استيراد دوال التذكيرات من handlers_jobs
+from handlers_jobs import save_daily_reminder, delete_daily_reminder, job_reschedule_reminders
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +113,7 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== REMINDERS ====================
 
 async def _send_reminder(context: ContextTypes.DEFAULT_TYPE):
+    """إرسال التذكير (للتذكير العادي)"""
     await context.bot.send_message(
         chat_id=context.job.chat_id,
         text=f"🔔 تذكير:\n{context.job.data}",
@@ -117,6 +121,7 @@ async def _send_reminder(context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تذكير لمرة واحدة"""
     msg = update.message
     if not msg:
         return
@@ -156,23 +161,43 @@ async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ حدث خطأ.")
 
 async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تذكير يومي (يحفظ في ملف JSON ويعاد جدولته عند التشغيل)"""
     msg = update.message
     if not msg:
         return
+    
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
     if not context.args or len(context.args) < 2:
         await msg.reply_text(
             "📌 تذكير يومي:\n"
             "تذكير يومي 14:30 نص التذكير\n\n"
             "• الوقت بصيغة HH:MM (24 ساعة)\n"
-            "• مثال: تذكير يومي 09:00 اجتماع العمل",
+            "• مثال: تذكير يومي 09:00 اجتماع العمل\n\n"
+            "✏️ لإلغاء التذكير: تذكير يومي إلغاء",
             parse_mode="Markdown"
         )
         return
+    
+    # ===== إلغاء التذكير =====
+    if context.args[0] == "إلغاء":
+        # حذف من الملف
+        await delete_daily_reminder(user_id, chat_id)
+        # حذف من المجدول
+        for job in context.job_queue.jobs():
+            if job.name == f"daily_reminder_{chat_id}_{user_id}":
+                job.schedule_removal()
+        await msg.reply_text("✅ تم إلغاء التذكير اليومي.")
+        return
+    
     time_str = context.args[0]
     reminder_text = " ".join(context.args[1:])
+    
     if not reminder_text:
         await msg.reply_text("❌ اكتب نص التذكير.")
         return
+    
     try:
         hour, minute = map(int, time_str.split(":"))
         if not (0 <= hour <= 23 and 0 <= minute <= 59):
@@ -180,21 +205,33 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except:
         await msg.reply_text("❌ صيغة الوقت خاطئة. استخدم HH:MM (مثال: 14:30).")
         return
-    chat_id = msg.chat.id
+    
+    # حذف التذكير القديم إذا موجود
     for job in context.job_queue.jobs():
-        if job.name == f"daily_{chat_id}":
+        if job.name == f"daily_reminder_{chat_id}_{user_id}":
             job.schedule_removal()
+    
     try:
-        from datetime import time as dtime
+        # حفظ في الملف
+        await save_daily_reminder(user_id, chat_id, time_str, reminder_text)
+        
+        # إضافة للمجدول
         target_time = dtime(hour=hour, minute=minute, second=0, tzinfo=TIMEZONE)
         context.job_queue.run_daily(
             _send_reminder,
             time=target_time,
             chat_id=chat_id,
-            name=f"daily_{chat_id}",
+            name=f"daily_reminder_{chat_id}_{user_id}",
             data=reminder_text
         )
-        await msg.reply_text(f"✅ تم ضبط التذكير اليومي:\n⏰ الساعة {time_str}\n📝 {reminder_text}", parse_mode="Markdown")
+        
+        await msg.reply_text(
+            f"✅ تم ضبط التذكير اليومي:\n"
+            f"⏰ الساعة {time_str}\n"
+            f"📝 {reminder_text}\n\n"
+            f"💾 التذكير محفوظ ولن يضيع بعد إعادة التشغيل.",
+            parse_mode="Markdown"
+        )
     except Exception as e:
         logger.error(f"خطأ في التذكير اليومي: {e}")
         await msg.reply_text("❌ حدث خطأ.")
