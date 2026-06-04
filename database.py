@@ -701,6 +701,57 @@ async def clear_all_mutes(chat_id: int):
     except Exception as e:
         print(f"Error clearing mutes: {e}")
 
+# ==================== دوال التذكيرات ====================
+
+async def save_reminder(user_id: int, chat_id: int, reminder_time: str, reminder_text: str):
+    """حفظ تذكير يومي في قاعدة البيانات"""
+    if not supabase:
+        return False
+    try:
+        # حذف التذكير القديم إذا موجود
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("reminders").delete().eq("user_id", user_id).eq("chat_id", chat_id).execute()
+        )
+        # إضافة التذكير الجديد
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("reminders").insert({
+                "user_id": user_id,
+                "chat_id": chat_id,
+                "reminder_time": reminder_time,
+                "reminder_text": reminder_text
+            }).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في حفظ التذكير: {e}")
+        return False
+
+async def delete_reminder(user_id: int, chat_id: int):
+    """حذف تذكير يومي من قاعدة البيانات"""
+    if not supabase:
+        return False
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("reminders").delete().eq("user_id", user_id).eq("chat_id", chat_id).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في حذف التذكير: {e}")
+        return False
+
+async def load_all_reminders():
+    """تحميل جميع التذكيرات اليومية من قاعدة البيانات"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("reminders").select("*").execute()
+        )
+        return result.data if result.data else []
+    except Exception as e:
+        print(f"خطأ في تحميل التذكيرات: {e}")
+        return []
+
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
     if supabase:
