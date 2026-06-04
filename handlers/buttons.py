@@ -5,7 +5,7 @@ from telegram.constants import ChatMemberStatus
 from telegram.ext import ContextTypes
 from utils import database as db
 from utils.helpers import is_admin
-from quotes import DAILY_QUOTES
+from data.quotes import DAILY_QUOTES
 
 logger = logging.getLogger(__name__)
 temp_points = {}
