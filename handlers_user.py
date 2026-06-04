@@ -1,5 +1,5 @@
 """
-ملف المستخدم - نسخة كاملة مع نظام همسة يعمل بالرابط (بدون قاعدة بيانات)
+ملف المستخدم - مع تعدد التذكيرات اليومية
 """
 
 import logging
@@ -29,7 +29,6 @@ AUTO_REPLIES = {
 }
 
 # ==================== START ====================
-
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args and context.args[0].startswith("whisper_"):
         await handle_whisper_start(update, context)
@@ -51,7 +50,6 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 # ==================== ID ====================
-
 async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
@@ -97,7 +95,6 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(caption)
 
 # ==================== RULES ====================
-
 async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     rules = await db.get_setting(chat_id, "rules")
@@ -107,7 +104,6 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("لم يتم تعيين قواعد بعد.")
 
 # ==================== REMINDERS ====================
-
 async def _send_reminder(context: ContextTypes.DEFAULT_TYPE):
     await context.bot.send_message(
         chat_id=context.job.chat_id,
@@ -168,17 +164,10 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "تذكير يومي 14:30 نص التذكير\n\n"
             "• الوقت بصيغة HH:MM (24 ساعة)\n"
             "• مثال: تذكير يومي 09:00 اجتماع العمل\n\n"
-            "✏️ لإلغاء التذكير: تذكير يومي إلغاء",
+            "✏️ لإلغاء جميع التذكيرات: إلغاء تذكير يومي\n"
+            "📋 لعرض التذكيرات: تذكيراتي",
             parse_mode="Markdown"
         )
-        return
-
-    if context.args[0] == "إلغاء":
-        await db.delete_reminder(user_id, chat_id)
-        for job in context.job_queue.jobs():
-            if job.name == f"daily_reminder_{chat_id}_{user_id}":
-                job.schedule_removal()
-        await msg.reply_text("✅ تم إلغاء التذكير اليومي.")
         return
 
     time_str = context.args[0]
@@ -196,21 +185,22 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.reply_text("❌ صيغة الوقت خاطئة. استخدم HH:MM (مثال: 14:30).")
         return
 
-    for job in context.job_queue.jobs():
-        if job.name == f"daily_reminder_{chat_id}_{user_id}":
-            job.schedule_removal()
-
     try:
-        await db.save_reminder(user_id, chat_id, time_str, reminder_text)
+        # حفظ في قاعدة البيانات (لا يحذف القديم)
+        saved = await db.save_reminder(user_id, chat_id, time_str, reminder_text)
+        if not saved:
+            await msg.reply_text("❌ فشل حفظ التذكير في قاعدة البيانات.")
+            return
 
         target_time = dtime(hour=hour, minute=minute, second=0, tzinfo=TIMEZONE)
-        # ===== التعديل: data= بدل user_id= و text= =====
+        # استخدام id من السجل المحفوظ لإنشاء اسم فريد للوظيفة
         context.job_queue.run_daily(
             _send_daily_reminder,
             time=target_time,
             chat_id=chat_id,
-            data={"user_id": user_id, "text": reminder_text},
-            name=f"daily_reminder_{chat_id}_{user_id}"
+            user_id=user_id,
+            text=reminder_text,
+            name=f"daily_reminder_{saved['id']}"
         )
 
         await msg.reply_text(
@@ -223,6 +213,25 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         logger.error(f"خطأ في التذكير اليومي: {e}")
         await msg.reply_text("❌ حدث خطأ.")
+
+async def cmd_cancel_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إلغاء جميع التذكيرات اليومية للمستخدم في هذه المحادثة"""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # حذف من قاعدة البيانات
+    await db.delete_reminder(user_id, chat_id)
+
+    # حذف جميع وظائف التذكير اليومي الخاصة بهذا المستخدم/المحادثة
+    jobs_removed = 0
+    for job in context.job_queue.jobs():
+        if job.name.startswith("daily_reminder_") and hasattr(job, 'user_id') and hasattr(job, 'chat_id'):
+            if job.user_id == user_id and job.chat_id == chat_id:
+                job.schedule_removal()
+                jobs_removed += 1
+
+    await update.message.reply_text(f"✅ تم إلغاء جميع تذكيراتك اليومية ({jobs_removed} تذكير).")
+
 async def cmd_my_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض قائمة التذكيرات اليومية للمستخدم"""
     user_id = update.effective_user.id
@@ -236,12 +245,11 @@ async def cmd_my_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "📋 **تذكيراتك اليومية:**\n\n"
     for i, r in enumerate(reminders, 1):
         text += f"{i}. ⏰ {r['reminder_time']} - 📝 {r['reminder_text']}\n"
-    text += "\nللإلغاء: تذكير يومي إلغاء"
+    text += "\nللإلغاء: إلغاء تذكير يومي"
     
     await update.message.reply_text(text, parse_mode="Markdown")
 
 # ==================== AUTO REPLY ====================
-
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.text:
@@ -261,7 +269,6 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("هلا! كيف أقدر أساعدك؟ 😊")
 
 # ==================== MESSAGE TRACKING ====================
-
 async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.effective_user:
         return
@@ -279,7 +286,6 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
 # ==================== WHISPER ====================
-
 async def delete_whisper_job(context: ContextTypes.DEFAULT_TYPE, whisper_id: str):
     if hasattr(context.bot, 'whisper_storage'):
         if whisper_id in context.bot.whisper_storage:
@@ -427,7 +433,6 @@ async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data.pop("whisper_sender_name", None)
 
 # ==================== GET INVITE ====================
-
 async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ للمشرفين فقط.")
@@ -439,7 +444,6 @@ async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يمكن إنشاء رابط.")
 
 # ==================== SURAH & QURAN ====================
-
 async def cmd_surah(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("الاستخدام: سورة [رقم السورة]\nمثال: سورة 1")
@@ -483,7 +487,6 @@ async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("حدث خطأ، تأكد من الرقم.")
 
 # ==================== SPEAK & VOICE ====================
-
 async def cmd_speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("الاستخدام: انطقي [النص]")
@@ -498,7 +501,6 @@ async def cmd_voice_to_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("🎙️ خدمة تحويل الصوت لنص غير متاحة حالياً، سيتم تفعيلها لاحقاً.")
 
 # ==================== KICKME ====================
-
 async def cmd_kickme(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
@@ -510,7 +512,6 @@ async def cmd_kickme(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا أستطيع طردك.")
 
 # ==================== WELCOME ====================
-
 async def cmd_enable_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ للمشرفين فقط.")
@@ -526,7 +527,6 @@ async def cmd_disable_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text("✅ تم تعطيل الترحيب.")
 
 # ==================== BIO ====================
-
 async def cmd_bio(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     try:
@@ -537,12 +537,10 @@ async def cmd_bio(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("لا يمكن جلب البايو حالياً.")
 
 # ==================== OWNER ====================
-
 async def cmd_owner(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👨‍💻 المطور: Me8dad", parse_mode="Markdown")
 
 # ==================== ANONYMOUS ====================
-
 async def cmd_create_anon_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     link_id = await db.create_anonymous_link(user_id)
@@ -562,7 +560,6 @@ async def cmd_my_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="Markdown")
 
 # ==================== TRANSLATE ====================
-
 async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg.reply_to_message or not msg.reply_to_message.text:
@@ -587,7 +584,6 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ خدمة الترجمة غير متاحة حالياً، حاول لاحقاً.")
 
 # ==================== HANDLE PRIVATE MESSAGES ====================
-
 async def handle_private_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or update.effective_chat.type != "private":
@@ -614,7 +610,6 @@ async def handle_private_messages(update: Update, context: ContextTypes.DEFAULT_
         return
 
 # ==================== REGISTER ====================
-
 def register_user_handlers(app):
     from telegram.ext import MessageHandler, filters
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_private_messages))
