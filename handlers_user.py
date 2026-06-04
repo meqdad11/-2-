@@ -31,12 +31,10 @@ AUTO_REPLIES = {
 # ==================== START ====================
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ===== معالج رابط الهمسة =====
     if context.args and context.args[0].startswith("whisper_"):
         await handle_whisper_start(update, context)
         return
 
-    # ===== معالج رابط صارحني =====
     if context.args and context.args[0].startswith("anon_"):
         link_id = context.args[0].replace("anon_", "")
         target_user_id = await db.get_user_by_link(link_id)
@@ -111,7 +109,6 @@ async def cmd_rules(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== REMINDERS ====================
 
 async def _send_reminder(context: ContextTypes.DEFAULT_TYPE):
-    """إرسال التذكير (للتذكير العادي)"""
     await context.bot.send_message(
         chat_id=context.job.chat_id,
         text=f"🔔 تذكير:\n{context.job.data}",
@@ -119,7 +116,6 @@ async def _send_reminder(context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تذكير لمرة واحدة"""
     msg = update.message
     if not msg:
         return
@@ -159,14 +155,13 @@ async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ حدث خطأ.")
 
 async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تذكير يومي (يحفظ في Supabase ويعاد جدولته عند التشغيل)"""
     msg = update.message
     if not msg:
         return
-    
+
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
-    
+
     if not context.args or len(context.args) < 2:
         await msg.reply_text(
             "📌 تذكير يومي:\n"
@@ -177,8 +172,7 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
             parse_mode="Markdown"
         )
         return
-    
-    # ===== إلغاء التذكير =====
+
     if context.args[0] == "إلغاء":
         await db.delete_reminder(user_id, chat_id)
         for job in context.job_queue.jobs():
@@ -186,14 +180,14 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 job.schedule_removal()
         await msg.reply_text("✅ تم إلغاء التذكير اليومي.")
         return
-    
+
     time_str = context.args[0]
     reminder_text = " ".join(context.args[1:])
-    
+
     if not reminder_text:
         await msg.reply_text("❌ اكتب نص التذكير.")
         return
-    
+
     try:
         hour, minute = map(int, time_str.split(":"))
         if not (0 <= hour <= 23 and 0 <= minute <= 59):
@@ -201,27 +195,24 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except:
         await msg.reply_text("❌ صيغة الوقت خاطئة. استخدم HH:MM (مثال: 14:30).")
         return
-    
-    # حذف التذكير القديم من المجدول
+
     for job in context.job_queue.jobs():
         if job.name == f"daily_reminder_{chat_id}_{user_id}":
             job.schedule_removal()
-    
+
     try:
-        # حفظ في Supabase
         await db.save_reminder(user_id, chat_id, time_str, reminder_text)
-        
-        # إضافة للمجدول
+
         target_time = dtime(hour=hour, minute=minute, second=0, tzinfo=TIMEZONE)
+        # ===== التعديل: data= بدل user_id= و text= =====
         context.job_queue.run_daily(
             _send_daily_reminder,
             time=target_time,
             chat_id=chat_id,
-            user_id=user_id,
-            text=reminder_text,
+            data={"user_id": user_id, "text": reminder_text},
             name=f"daily_reminder_{chat_id}_{user_id}"
         )
-        
+
         await msg.reply_text(
             f"✅ تم ضبط التذكير اليومي:\n"
             f"⏰ الساعة {time_str}\n"
@@ -271,17 +262,15 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-# ==================== WHISPER (بدون قاعدة بيانات) ====================
+# ==================== WHISPER ====================
 
 async def delete_whisper_job(context: ContextTypes.DEFAULT_TYPE, whisper_id: str):
-    """حذف الهمسة من الذاكرة بعد انتهاء الوقت"""
     if hasattr(context.bot, 'whisper_storage'):
         if whisper_id in context.bot.whisper_storage:
             del context.bot.whisper_storage[whisper_id]
             print(f"🗑️ تم حذف الهمسة {whisper_id} (انتهت صلاحيتها)")
 
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إنشاء همسة لشخص معين - طريقة الرابط (علنية)"""
     msg = update.message
 
     from telegram import Chat as TGChat
@@ -303,10 +292,8 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ لا يمكنك إرسال همسة لنفسك.")
         return
 
-    # إنشاء معرف فريد للهمسة
     whisper_id = str(uuid.uuid4())[:12]
 
-    # حفظ بيانات الهمسة في الذاكرة المؤقتة
     whisper_data = {
         "sender_id": msg.from_user.id,
         "sender_name": msg.from_user.first_name,
@@ -316,13 +303,11 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "chat_title": update.effective_chat.title or "المجموعة",
         "created_at": datetime.now().isoformat()
     }
-    
-    # تخزين في user_data الخاص بالبوت (مؤقت)
+
     if not hasattr(context.bot, 'whisper_storage'):
         context.bot.whisper_storage = {}
     context.bot.whisper_storage[whisper_id] = whisper_data
 
-    # جدولة حذف الهمسة بعد 5 دقائق
     if context.job_queue:
         context.job_queue.run_once(
             lambda ctx: delete_whisper_job(ctx, whisper_id),
@@ -330,7 +315,6 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
             name=f"del_whisper_{whisper_id}"
         )
 
-    # إنشاء الرابط
     bot_username = (await context.bot.get_me()).username
     link = f"https://t.me/{bot_username}?start=whisper_{whisper_id}"
 
@@ -343,17 +327,13 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-
 async def handle_whisper_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالج رابط الهمسة - يطلب من المستخدم كتابة الهمسة"""
     msg = update.message
 
     if not context.args or not context.args[0].startswith("whisper_"):
         return
 
     whisper_id = context.args[0].replace("whisper_", "")
-
-    # التحقق من صحة الهمسة من الذاكرة
     whisper_storage = getattr(context.bot, 'whisper_storage', {})
     whisper_data = whisper_storage.get(whisper_id)
 
@@ -361,7 +341,6 @@ async def handle_whisper_start(update: Update, context: ContextTypes.DEFAULT_TYP
         await msg.reply_text("❌ انتهت صلاحية الهمسة أو الرابط غير صالح (الهمسة صالحة لمدة 5 دقائق).")
         return
 
-    # التحقق من أن المستخدم هو المرسل الأصلي
     if whisper_data["sender_id"] != msg.from_user.id:
         await msg.reply_text(
             f"❌ هذا الرابط مخصص لـ {whisper_data['sender_name']}.\n"
@@ -369,7 +348,6 @@ async def handle_whisper_start(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return
 
-    # تخزين معرف الهمسة في الجلسة
     context.user_data["active_whisper_id"] = whisper_id
     context.user_data["whisper_target_id"] = whisper_data["target_id"]
     context.user_data["whisper_target_name"] = whisper_data["target_name"]
@@ -382,15 +360,12 @@ async def handle_whisper_start(update: Update, context: ContextTypes.DEFAULT_TYP
         parse_mode="Markdown"
     )
 
-
 async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالج الهمسة المرسلة في الخاص"""
     msg = update.message
 
     if not msg or update.effective_chat.type != "private":
         return
 
-    # التحقق من وجود همسة نشطة
     whisper_id = context.user_data.get("active_whisper_id")
     if not whisper_id:
         return
@@ -404,7 +379,6 @@ async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_T
         context.user_data.pop("active_whisper_id", None)
         return
 
-    # إرسال الهمسة إلى الهدف
     try:
         await context.bot.send_message(
             chat_id=target_id,
@@ -423,7 +397,6 @@ async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode="Markdown"
         )
 
-        # حذف الهمسة من الذاكرة بعد الاستخدام
         whisper_storage = getattr(context.bot, 'whisper_storage', {})
         if whisper_id in whisper_storage:
             del whisper_storage[whisper_id]
@@ -432,7 +405,6 @@ async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_T
         logger.error(f"خطأ في إرسال الهمسة: {e}")
         await msg.reply_text("❌ فشل إرسال الهمسة. تأكد من أن البوت ليس محظوراً من قبل المستخدم.")
 
-    # تنظيف البيانات
     context.user_data.pop("active_whisper_id", None)
     context.user_data.pop("whisper_target_id", None)
     context.user_data.pop("whisper_target_name", None)
@@ -601,17 +573,14 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== HANDLE PRIVATE MESSAGES ====================
 
 async def handle_private_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالج الرسائل في الخاص (صارحني + همسة)"""
     msg = update.message
     if not msg or update.effective_chat.type != "private":
         return
 
-    # ===== أولاً: معالج الهمسة =====
     if context.user_data.get("active_whisper_id"):
         await handle_whisper_message(update, context)
         return
 
-    # ===== ثانياً: معالج صارحني =====
     anon_target = context.user_data.get("anon_target")
     if anon_target:
         await db.save_anonymous_message("", msg.text, update.effective_user.id)
