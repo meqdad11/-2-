@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-import database as db
+from utils import database as db
 import uvicorn
 import threading
 import logging
