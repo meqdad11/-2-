@@ -202,7 +202,7 @@ async def post_init(app):
                     chat_id=r["chat_id"],
                     user_id=r["user_id"],
                     text=r["reminder_text"],
-                    name=f"daily_reminder_{r['chat_id']}_{r['user_id']}"
+                    name=f"daily_reminder_{r['id']}"   # <-- التعديل الوحيد هنا
                 )
                 count += 1
             except Exception as e:
