@@ -1,4 +1,4 @@
-from handlers_user import (
+from handlers.user import (
     cmd_reminder, cmd_daily_reminder, cmd_my_reminders, cmd_cancel_daily_reminder,
     cmd_whisper, cmd_get_invite, cmd_surah, cmd_quran_page,
     cmd_speak, cmd_voice_to_text, cmd_kickme,
@@ -6,33 +6,33 @@ from handlers_user import (
     cmd_create_anon_link, cmd_my_messages, cmd_active_users,
     cmd_start, cmd_id, cmd_rules, cmd_translate,
 )
-from handlers_admin import (
+from handlers.admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
     cmd_banlist, cmd_baninfo, cmd_checkban, cmd_eventlog,
     cmd_setrules, cmd_mute, cmd_unmute, cmd_lock, cmd_unlock,
     cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
     cmd_demote_all, cmd_purge_bans, cmd_purge_muted,
     cmd_tag_all, cmd_my_rank, cmd_his_rank,
-    cmd_pin, cmd_unpin, cmd_warn_user, cmd_userfile,   # <-- أضيف هنا
+    cmd_pin, cmd_unpin, cmd_warn_user, cmd_userfile,
 )
-from handlers_moderation import (
+from handlers.moderation import (
     cmd_add_word, cmd_remove_word, cmd_list_words,
     cmd_add_reply, cmd_remove_reply, cmd_list_replies,
     cmd_add_command, cmd_remove_command, cmd_list_commands,
 )
-from handlers_resources import (
+from handlers.resources import (
     cmd_add_resource, cmd_list_resources, cmd_delete_resource,
 )
-from handlers_ai import (
+from handlers.ai import (
     cmd_shafaq, cmd_gemini, cmd_limit, cmd_choose_model,
 )
-from handlers_dev import (
+from handlers.dev import (
     cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats, cmd_backup,
 )
-from handlers_jobs import cmd_report, cmd_deep_report
+from handlers.jobs import cmd_report, cmd_deep_report
 from music import cmd_download, cmd_sc_search, cmd_yt_search
-from handlers_menu import cmd_menu
-from handlers_locks import (
+from handlers.menu import cmd_menu
+from handlers.locks import (
     cmd_lock_links, cmd_unlock_links,
     cmd_lock_tags, cmd_unlock_tags,
     cmd_lock_media, cmd_unlock_media,
@@ -63,7 +63,7 @@ from handlers_locks import (
     cmd_lock_whisper, cmd_unlock_whisper,
     cmd_lock_all, cmd_unlock_all,
 )
-from handlers_crisis import (
+from handlers.crisis import (
     cmd_add_crisis_words, cmd_remove_crisis_word, cmd_list_crisis_words,
     cmd_set_crisis_reply, cmd_enable_crisis, cmd_disable_crisis, cmd_crisis_status,
 )
@@ -122,7 +122,7 @@ ARABIC_COMMANDS = {
     "مسح المحظورين": cmd_purge_bans, "مسح المكتومين": cmd_purge_muted,
     "تاك للكل": cmd_tag_all, "رتبتي": cmd_my_rank, "رتبته": cmd_his_rank,
 
-    "ملف": cmd_userfile,   # <-- أمر ملف الجديد
+    "ملف": cmd_userfile,
 
     "اهمس": cmd_whisper, "افتاري": cmd_get_invite,
     "سورة": cmd_surah, "قران": cmd_quran_page,
@@ -147,7 +147,6 @@ ARABIC_COMMANDS = {
     "الغاء تثبيت": cmd_unpin,
     "تنبيه": cmd_warn_user,
 
-    # ========== أوامر نظام الأزمات الجديدة ==========
     "اضف كلمة ازمة": cmd_add_crisis_words,
     "اضف كلمات ازمة": cmd_add_crisis_words,
     "حذف كلمة ازمة": cmd_remove_crisis_word,
