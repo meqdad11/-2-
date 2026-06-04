@@ -55,13 +55,19 @@ def _get_common_opts():
         "retries": 5,
         "extractor_args": {
             "youtube": {
-                "player_client": ["android", "ios", "web"],
+                "player_client": ["tv_embedded", "web_embedded", "web"],
                 "skip": ["hls", "dash"],
             }
         },
         "user_agent": "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
     }
-    if os.path.exists("cookies.txt"):
+    cookies_data = os.environ.get("COOKIES_DATA")
+    if cookies_data:
+        cookies_path = "/tmp/cookies.txt"
+        with open(cookies_path, "w") as f:
+            f.write(cookies_data)
+        opts["cookiefile"] = cookies_path
+    elif os.path.exists("cookies.txt"):
         opts["cookiefile"] = "cookies.txt"
     return opts
 
@@ -104,34 +110,27 @@ def _download_media(url: str, audio_only: bool) -> dict:
     except Exception as e:
         raise Exception(f"فشل التحميل: {e}")
 
-# ==================== تحميل تيك توك بدون وصف ====================
-
 async def _download_tiktok_no_watermark(url: str) -> dict:
     """تحميل فيديو تيك توك بدون وصف (caption)"""
     tmp_dir = tempfile.mkdtemp()
-    
     ydl_opts = {
         "quiet": True,
         "no_warnings": True,
         "outtmpl": os.path.join(tmp_dir, "%(title)s.%(ext)s"),
         "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
     }
-    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             if "entries" in info:
                 info = info["entries"][0]
-        
         title = info.get("title", "TikTok Video")
         duration = info.get("duration", 0)
         uploader = info.get("uploader", "TikTok User")
-        
         for fname in os.listdir(tmp_dir):
             fpath = os.path.join(tmp_dir, fname)
             if os.path.getsize(fpath) > 0:
                 return {"path": fpath, "title": title, "duration": duration, "uploader": uploader}
-        
         raise Exception("لم يتم العثور على الملف")
     except Exception as e:
         raise Exception(f"فشل تحميل تيك توك: {str(e)[:100]}")
@@ -141,10 +140,8 @@ async def send_media(message, path: str, info: dict, audio_only: bool):
     if size > MAX_FILE_MB * 1024 * 1024:
         os.remove(path)
         raise Exception(f"الملف أكبر من {MAX_FILE_MB}MB")
-    
     channel_button = [[InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")]]
     reply_markup = InlineKeyboardMarkup(channel_button)
-    
     with open(path, "rb") as f:
         if audio_only:
             await message.reply_audio(
@@ -170,7 +167,6 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not url:
         return
     url_type = get_url_type(url)
-    
     if url_type == "audio":
         status = await msg.reply_text("⏳ جارٍ التحميل...")
         try:
@@ -182,7 +178,6 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error("خطأ تحميل صوت: %s", e)
             await status.edit_text("❌ تعذّر التحميل.")
-            
     elif url_type == "tiktok":
         status = await msg.reply_text("📱 جاري تحميل فيديو تيك توك...")
         try:
@@ -206,8 +201,6 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         action, url = query.data.split("|", 1)
         audio_only = action == "dl_audio"
-        
-        # التحقق إذا كان رابط تيك توك
         if "tiktok.com" in url:
             status = await query.message.reply_text("📱 جاري تحميل فيديو تيك توك...")
             try:
@@ -219,7 +212,6 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.error("خطأ تحميل تيك توك: %s", e)
                 await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
             return
-        
         status = await query.message.reply_text("⏳ جارٍ التحميل...")
         try:
             loop = asyncio.get_event_loop()
@@ -246,7 +238,6 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لم يُعثر على رابط مدعوم.")
         return
     url_type = get_url_type(url)
-    
     if url_type == "audio":
         await update.message.reply_text(
             "❌ ساوند كلاود غير متاح حالياً.\n\n"
@@ -279,15 +270,20 @@ def _search_youtube(query: str) -> List[Dict]:
             'playlistend': 5,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'ios', 'web'],
+                    'player_client': ['tv_embedded', 'web_embedded', 'web'],
                     'skip': ['hls', 'dash'],
                 }
             },
             'user_agent': "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
         }
-        if os.path.exists("cookies.txt"):
+        cookies_data = os.environ.get("COOKIES_DATA")
+        if cookies_data:
+            cookies_path = "/tmp/cookies.txt"
+            with open(cookies_path, "w") as f:
+                f.write(cookies_data)
+            ydl_opts['cookiefile'] = cookies_path
+        elif os.path.exists("cookies.txt"):
             ydl_opts['cookiefile'] = 'cookies.txt'
-        
         search_url = f"ytsearch5:{query}"
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(search_url, download=False)
