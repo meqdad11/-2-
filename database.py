@@ -591,10 +591,9 @@ async def get_custom_commands(chat_id: int) -> dict:
         print(f"Error getting custom commands: {e}")
         return {}
 
-# ==================== دوال الهمسات (نظام الرابط) ====================
+# ==================== دوال الهمسات ====================
 
 async def save_whisper_link(whisper_id: str, sender_id: int, sender_name: str, target_id: int, target_name: str, chat_id: int, chat_title: str) -> bool:
-    """حفظ همسة جديدة مع رابط فريد"""
     if not supabase:
         return False
     try:
@@ -618,7 +617,6 @@ async def save_whisper_link(whisper_id: str, sender_id: int, sender_name: str, t
         return False
 
 async def get_whisper_link(whisper_id: str) -> dict:
-    """جلب بيانات الهمسة من الرابط"""
     if not supabase:
         return None
     try:
@@ -631,7 +629,6 @@ async def get_whisper_link(whisper_id: str) -> dict:
         return None
 
 async def delete_whisper_link(whisper_id: str) -> bool:
-    """حذف الهمسة بعد الاستخدام أو تعليمها كمستخدمة"""
     if not supabase:
         return False
     try:
@@ -643,9 +640,9 @@ async def delete_whisper_link(whisper_id: str) -> bool:
         print(f"Error deleting whisper link: {e}")
         return False
 
-# ==================== دوال سجل المستخدمين (ملف العضو) ====================
+# ==================== دوال سجل المستخدمين ====================
 
-async def log_user_action(user_id: int, chat_id: int, action_type: str, action_by: int = 0, reason: str = None, duration: str = None):
+async def log_user_action(user_id: int, chat_id: int, action_type: str, action_by: int = 0, by_name: str = "", reason: str = None, duration: str = None):
     """تسجيل أي إجراء ضد عضو (تحذير، حظر، كتم، تقرير)"""
     if not supabase:
         return
@@ -655,6 +652,7 @@ async def log_user_action(user_id: int, chat_id: int, action_type: str, action_b
             "chat_id": chat_id,
             "action_type": action_type,
             "action_by": action_by,
+            "by_name": by_name,
             "reason": reason,
             "duration": duration,
             "created_at": now_iso()
@@ -666,7 +664,6 @@ async def log_user_action(user_id: int, chat_id: int, action_type: str, action_b
         print(f"Error logging user action: {e}")
 
 async def get_user_actions(user_id: int, chat_id: int, limit: int = 50) -> list:
-    """جلب جميع الإجراءات المسجلة ضد عضو"""
     if not supabase:
         return []
     try:
@@ -685,7 +682,6 @@ async def get_user_actions(user_id: int, chat_id: int, limit: int = 50) -> list:
         return []
 
 async def clear_all_bans(chat_id: int):
-    """مسح جميع الحظر في مجموعة (للمطور)"""
     if not supabase:
         return
     try:
@@ -696,7 +692,6 @@ async def clear_all_bans(chat_id: int):
         print(f"Error clearing bans: {e}")
 
 async def clear_all_mutes(chat_id: int):
-    """مسح جميع المكتومين في مجموعة (للمطور)"""
     if not supabase:
         return
     try:
