@@ -493,10 +493,10 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ تم إرسال التقرير للمشرفين.")
 
 
-# ==================== ملف العضو (سجل كامل) ====================
+# ==================== ملف العضو (سري - يرسل في الخاص) ====================
 
 async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض ملف كامل عن العضو (تحذيرات، حظر، كتم، تقارير)"""
+    """عرض ملف كامل عن العضو (يرسل في الخاص للمشرف فقط)"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -508,12 +508,25 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user_id = reply_user.id
     chat_id = update.effective_chat.id
+    admin_id = update.effective_user.id
     
     # جلب جميع الإجراءات من قاعدة البيانات
     actions = await db.get_user_actions(user_id, chat_id)
     
-    if not actions:
-        await update.message.reply_text(f"📋 **ملف {reply_user.first_name}**\n\nلا توجد إجراءات مسجلة ضد هذا العضو.", parse_mode="Markdown")
+    # جلب الإحصائيات
+    msg_count = await db.get_message_count(user_id, chat_id)
+    first_seen = await db.get_user_first_seen(user_id, chat_id)
+    last_seen = await db.get_user_last_seen(user_id, chat_id)
+    current_warns = await db.get_warnings(user_id, chat_id)
+    current_ban = await db.get_ban(user_id, chat_id)
+    
+    if not actions and msg_count == 0:
+        await context.bot.send_message(
+            chat_id=admin_id,
+            text=f"📋 **ملف {reply_user.first_name}**\n\nلا توجد إجراءات مسجلة ضد هذا العضو.",
+            parse_mode="Markdown"
+        )
+        await update.message.reply_text("✅ تم إرسال الملف في الخاص.")
         return
     
     # تصنيف الإجراءات
@@ -521,7 +534,6 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bans = []
     mutes = []
     reports = []
-    others = []
     
     for action in actions:
         action_type = action.get("action_type", "")
@@ -533,20 +545,23 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             mutes.append(action)
         elif action_type == "report":
             reports.append(action)
-        else:
-            others.append(action)
     
     # بناء الرسالة
     text = f"📋 **ملف العضو: {reply_user.first_name}**\n"
     text += f"🆔 المعرف: `{user_id}`\n"
     if reply_user.username:
         text += f"📱 اليوزر: @{reply_user.username}\n"
+    text += f"💬 عدد الرسائل: {msg_count}\n"
+    if first_seen:
+        text += f"🕐 أول ظهور: {first_seen[:16]}\n"
+    if last_seen:
+        text += f"🕐 آخر ظهور: {last_seen[:16]}\n"
     text += f"━━━━━━━━━━━━━━━━━━\n\n"
     
     # التحذيرات
     if warns:
         text += f"⚠️ **التحذيرات ({len(warns)}):**\n"
-        for w in warns[-5:]:  # آخر 5 تحذيرات
+        for w in warns[-5:]:
             time = w.get("created_at", "")[:16]
             reason = w.get("reason", "بدون سبب")
             by = w.get("action_by", 0)
@@ -594,9 +609,6 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "\n"
     
     # الحالة النهائية
-    current_ban = await db.get_ban(user_id, chat_id)
-    current_warns = await db.get_warnings(user_id, chat_id)
-    
     text += f"━━━━━━━━━━━━━━━━━━\n"
     text += f"📊 **الملخص:**\n"
     text += f"   • التحذيرات الحالية: {current_warns}/3\n"
@@ -605,7 +617,17 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         text += f"   • الحالي: غير محظور ✅\n"
     
-    await update.message.reply_text(text, parse_mode="Markdown")
+    # إرسال في الخاص للمشرف
+    try:
+        await context.bot.send_message(
+            chat_id=admin_id,
+            text=text,
+            parse_mode="Markdown"
+        )
+        await update.message.reply_text("✅ تم إرسال ملف العضو في الخاص.")
+    except Exception as e:
+        logger.error(f"خطأ في إرسال الملف: {e}")
+        await update.message.reply_text("❌ لا يمكن إرسال الملف في الخاص (يرجى بدء محادثة مع البوت).")
 
 
 # ==================== تثبيت الرسائل ====================
