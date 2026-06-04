@@ -33,7 +33,7 @@ from handlers_moderation import (
 )
 from handlers_jobs import (
     cmd_report, job_expire_bans, 
-    job_daily_quote,
+    job_daily_quote, job_reschedule_reminders,
 )
 from handlers_ai import (
     cmd_shafaq, cmd_choose_model, callback_choose_model,
@@ -187,6 +187,8 @@ async def handle_channel_post(update: Update, context):
 # ========== تهيئة التطبيق ==========
 async def post_init(app):
     await db.init_db()
+    # إعادة جدولة التذكيرات اليومية المحفوظة
+    await job_reschedule_reminders(app)
 
 # ========== تسجيل الهاندلرز ==========
 def register_handlers(app):
