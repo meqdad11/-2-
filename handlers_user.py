@@ -186,14 +186,12 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     try:
-        # حفظ في قاعدة البيانات (لا يحذف القديم)
         saved = await db.save_reminder(user_id, chat_id, time_str, reminder_text)
         if not saved:
             await msg.reply_text("❌ فشل حفظ التذكير في قاعدة البيانات.")
             return
 
         target_time = dtime(hour=hour, minute=minute, second=0, tzinfo=TIMEZONE)
-        # استخدام data بدلاً من user_id و text مباشرة
         context.job_queue.run_daily(
             _send_daily_reminder,
             time=target_time,
@@ -248,6 +246,12 @@ async def cmd_my_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(text, parse_mode="Markdown")
 
+# ==================== مستخدمين نشطين ====================
+async def cmd_active_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عرض عدد المستخدمين النشطين هذا الشهر"""
+    count = await db.count_active_users()
+    await update.message.reply_text(f"👥 المستخدمين النشطين هذا الشهر: {count}")
+
 # ==================== AUTO REPLY ====================
 async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
@@ -286,10 +290,10 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== WHISPER ====================
 async def delete_whisper_job(context: ContextTypes.DEFAULT_TYPE, whisper_id: str):
-    if hasattr(context.bot, 'whisper_storage'):
-        if whisper_id in context.bot.whisper_storage:
-            del context.bot.whisper_storage[whisper_id]
-            print(f"🗑️ تم حذف الهمسة {whisper_id} (انتهت صلاحيتها)")
+    storage = context.bot_data.get('whisper_storage', {})
+    if whisper_id in storage:
+        del storage[whisper_id]
+        print(f"🗑️ تم حذف الهمسة {whisper_id} (انتهت صلاحيتها)")
 
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
@@ -325,9 +329,9 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "created_at": datetime.now().isoformat()
     }
 
-    if not hasattr(context.bot, 'whisper_storage'):
-        context.bot.whisper_storage = {}
-    context.bot.whisper_storage[whisper_id] = whisper_data
+    if 'whisper_storage' not in context.bot_data:
+        context.bot_data['whisper_storage'] = {}
+    context.bot_data['whisper_storage'][whisper_id] = whisper_data
 
     if context.job_queue:
         context.job_queue.run_once(
@@ -355,7 +359,7 @@ async def handle_whisper_start(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     whisper_id = context.args[0].replace("whisper_", "")
-    whisper_storage = getattr(context.bot, 'whisper_storage', {})
+    whisper_storage = context.bot_data.get('whisper_storage', {})
     whisper_data = whisper_storage.get(whisper_id)
 
     if not whisper_data:
@@ -418,9 +422,9 @@ async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_T
             parse_mode="Markdown"
         )
 
-        whisper_storage = getattr(context.bot, 'whisper_storage', {})
-        if whisper_id in whisper_storage:
-            del whisper_storage[whisper_id]
+        storage = context.bot_data.get('whisper_storage', {})
+        if whisper_id in storage:
+            del storage[whisper_id]
 
     except Exception as e:
         logger.error(f"خطأ في إرسال الهمسة: {e}")
