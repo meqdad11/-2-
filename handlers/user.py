@@ -573,13 +573,25 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_lang = "ar"
 
     try:
-        from googletrans import Translator
-        translator = Translator()
-        result = await translator.translate(original_text, dest=target_lang)
-        translated = result.text
+        import aiohttp
+        url = "https://translate.googleapis.com/translate_a/single"
+        params = {
+            "client": "gtx",
+            "sl": "auto",
+            "tl": target_lang,
+            "dt": "t",
+            "q": original_text
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params) as resp:
+                if resp.status != 200:
+                    raise Exception("API error")
+                data = await resp.json()
+                translated = data[0][0][0]
+                
         await msg.reply_text(
             f"🌐 **الترجمة إلى العربية:**\n\n{translated}\n\n"
-            f"_الرسالة الأصلية:_ {original_text[:100]}...",
+            f"_النص الأصلي:_ {original_text[:100]}...",
             parse_mode="Markdown"
         )
     except Exception as e:
