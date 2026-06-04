@@ -3,10 +3,12 @@ import logging
 import os
 import re
 import tempfile
+import json
 from typing import List, Dict
 
 import yt_dlp
 import requests
+import aiohttp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
@@ -16,9 +18,9 @@ SEARCH_CACHE = {}
 MAX_FILE_MB = 45
 
 SOUNDCLOUD_DOMAINS = ("soundcloud.com",)
-VIDEO_ONLY_DOMAINS = ("vt.tiktok.com", "instagram.com")
+TIKTOK_DOMAINS = ("tiktok.com", "vt.tiktok.com", "vm.tiktok.com")
 YOUTUBE_DOMAINS = ("youtube.com", "youtu.be")
-ALL_DOMAINS = SOUNDCLOUD_DOMAINS + VIDEO_ONLY_DOMAINS + YOUTUBE_DOMAINS
+ALL_DOMAINS = SOUNDCLOUD_DOMAINS + TIKTOK_DOMAINS + YOUTUBE_DOMAINS
 
 URL_PATTERN = re.compile(
     r'https?://(?:(?:www\.|vm\.|vt\.)?tiktok\.com|(?:www\.)?youtube\.com|youtu\.be|(?:www\.)?instagram\.com|(?:www\.|on\.)?soundcloud\.com)'
@@ -33,8 +35,8 @@ def extract_url(text: str):
 def get_url_type(url: str) -> str:
     if any(d in url for d in SOUNDCLOUD_DOMAINS):
         return "audio"
-    if any(d in url for d in VIDEO_ONLY_DOMAINS):
-        return "video"
+    if any(d in url for d in TIKTOK_DOMAINS):
+        return "tiktok"
     return "ask"
 
 def fmt_dur(seconds) -> str:
@@ -45,7 +47,6 @@ def fmt_dur(seconds) -> str:
         return ""
 
 def _get_common_opts():
-    """خيارات مشتركة لتجنب حظر يوتيوب"""
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -103,6 +104,38 @@ def _download_media(url: str, audio_only: bool) -> dict:
     except Exception as e:
         raise Exception(f"فشل التحميل: {e}")
 
+# ==================== تحميل تيك توك بدون وصف ====================
+
+async def _download_tiktok_no_watermark(url: str) -> dict:
+    """تحميل فيديو تيك توك بدون وصف (caption)"""
+    tmp_dir = tempfile.mkdtemp()
+    
+    ydl_opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "outtmpl": os.path.join(tmp_dir, "%(title)s.%(ext)s"),
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+    }
+    
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=True)
+            if "entries" in info:
+                info = info["entries"][0]
+        
+        title = info.get("title", "TikTok Video")
+        duration = info.get("duration", 0)
+        uploader = info.get("uploader", "TikTok User")
+        
+        for fname in os.listdir(tmp_dir):
+            fpath = os.path.join(tmp_dir, fname)
+            if os.path.getsize(fpath) > 0:
+                return {"path": fpath, "title": title, "duration": duration, "uploader": uploader}
+        
+        raise Exception("لم يتم العثور على الملف")
+    except Exception as e:
+        raise Exception(f"فشل تحميل تيك توك: {str(e)[:100]}")
+
 async def send_media(message, path: str, info: dict, audio_only: bool):
     size = os.path.getsize(path)
     if size > MAX_FILE_MB * 1024 * 1024:
@@ -137,6 +170,7 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not url:
         return
     url_type = get_url_type(url)
+    
     if url_type == "audio":
         status = await msg.reply_text("⏳ جارٍ التحميل...")
         try:
@@ -148,17 +182,17 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error("خطأ تحميل صوت: %s", e)
             await status.edit_text("❌ تعذّر التحميل.")
-    elif url_type == "video":
-        status = await msg.reply_text("⏳ جارٍ التحميل...")
+            
+    elif url_type == "tiktok":
+        status = await msg.reply_text("📱 جاري تحميل فيديو تيك توك...")
         try:
-            loop = asyncio.get_event_loop()
-            info = await loop.run_in_executor(None, _download_media, url, False)
+            info = await _download_tiktok_no_watermark(url)
             await status.edit_text("📤 جارٍ الإرسال...")
             await send_media(msg, info["path"], info, False)
             await status.delete()
         except Exception as e:
-            logger.error("خطأ تحميل فيديو: %s", e)
-            await status.edit_text("❌ تعذّر التحميل.")
+            logger.error("خطأ تحميل تيك توك: %s", e)
+            await status.edit_text(f"❌ تعذّر تحميل تيك توك: {str(e)[:50]}")
     else:
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
@@ -172,6 +206,20 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         action, url = query.data.split("|", 1)
         audio_only = action == "dl_audio"
+        
+        # التحقق إذا كان رابط تيك توك
+        if "tiktok.com" in url:
+            status = await query.message.reply_text("📱 جاري تحميل فيديو تيك توك...")
+            try:
+                info = await _download_tiktok_no_watermark(url)
+                await status.edit_text("📤 جارٍ الإرسال...")
+                await send_media(query.message, info["path"], info, False)
+                await status.delete()
+            except Exception as e:
+                logger.error("خطأ تحميل تيك توك: %s", e)
+                await status.edit_text(f"❌ تعذّر التحميل: {str(e)[:50]}")
+            return
+        
         status = await query.message.reply_text("⏳ جارٍ التحميل...")
         try:
             loop = asyncio.get_event_loop()
@@ -190,7 +238,7 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
             "أرسل رابط مباشرة للتحميل\n"
-            "الروابط المدعومة: يوتيوب، تيك توك، انستقرام"
+            "الروابط المدعومة: يوتيوب، تيك توك"
         )
         return
     url = extract_url(" ".join(context.args))
@@ -198,17 +246,17 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لم يُعثر على رابط مدعوم.")
         return
     url_type = get_url_type(url)
+    
     if url_type == "audio":
         await update.message.reply_text(
             "❌ ساوند كلاود غير متاح حالياً.\n\n"
             "💡 الحل: ابحث عن الأغنية على اليوتيوب\n"
             "اكتب: يوتيوب <اسم الأغنية>"
         )
-    elif url_type == "video":
-        status = await update.message.reply_text("⏳ جارٍ التحميل...")
+    elif url_type == "tiktok":
+        status = await update.message.reply_text("📱 جاري تحميل فيديو تيك توك...")
         try:
-            loop = asyncio.get_event_loop()
-            info = await loop.run_in_executor(None, _download_media, url, False)
+            info = await _download_tiktok_no_watermark(url)
             await status.edit_text("📤 جارٍ الإرسال...")
             await send_media(update.message, info["path"], info, False)
             await status.delete()
