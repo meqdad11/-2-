@@ -587,7 +587,10 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 if resp.status != 200:
                     raise Exception(f"HTTP {resp.status}")
                 data = await resp.json()
-                translated = data[0][0][0]
+                
+                # تجميع كل أجزاء الترجمة (وليس فقط الجزء الأول)
+                translated_parts = [part[0] for part in data[0] if part[0]]
+                translated = ''.join(translated_parts)
                 
         await msg.reply_text(
             f"🌐 **الترجمة إلى العربية:**\n\n{translated}\n\n"
