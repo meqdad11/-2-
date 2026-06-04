@@ -318,21 +318,24 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
-    # ================= القوائم الرئيسية =================
+    # ================= القائمة الرئيسية (ثنائية) =================
     if data == "menu_main":
         keyboard = [
-            [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin")],
-            [InlineKeyboardButton("👥 للجميع", callback_data="menu_user")],
-            [InlineKeyboardButton("🎵 الميديا", callback_data="menu_media")],
-            [InlineKeyboardButton("📚 الموارد", callback_data="menu_resources")],
-            [InlineKeyboardButton("📊 إحصائيات", callback_data="exec_stats")],
-            [InlineKeyboardButton("💬 اقتباس اليوم", callback_data="exec_quote")],
+            [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin"),
+             InlineKeyboardButton("👥 للجميع", callback_data="menu_user")],
+            [InlineKeyboardButton("🎵 الميديا", callback_data="menu_media"),
+             InlineKeyboardButton("📚 الموارد", callback_data="menu_resources")],
+            [InlineKeyboardButton("📊 إحصائيات", callback_data="exec_stats"),
+             InlineKeyboardButton("💬 اقتباس اليوم", callback_data="exec_quote")],
+            [InlineKeyboardButton("📋 تذكيراتي", callback_data="exec_my_reminders"),
+             InlineKeyboardButton("❌ إلغاء تذكير يومي", callback_data="exec_cancel_daily_reminder")],
+            [InlineKeyboardButton("📁 ملف", callback_data="exec_userfile"),
+             InlineKeyboardButton("📜 سجل", callback_data="exec_eventlog")],
             [InlineKeyboardButton("📋 الأوامر", callback_data="menu_commands")],
-            [InlineKeyboardButton("🚨 نظام الأزمات", callback_data="menu_crisis_commands")],
-            [InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
-            [InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google")],
-            [InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")],
-            [InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
+            [InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games"),
+             InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google")],
+            [InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad"),
+             InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text("🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:", reply_markup=InlineKeyboardMarkup(keyboard))
