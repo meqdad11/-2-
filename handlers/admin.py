@@ -484,27 +484,33 @@ async def cmd_warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== ملف العضو (أمر ملف) ====================
 async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض ملف شامل للعضو (للمشرفين فقط لعرض الآخرين)"""
+    """عرض ملف شامل للعضو (سري - يرسل إلى الخاص)"""
     msg = update.message
     chat = update.effective_chat
     user = update.effective_user
 
-    # تحديد الهدف: إذا كان هناك رد على شخص فالمشرف يرى ملفه، وإلا ملف نفسه
+    # تحديد الهدف
     target = user
     if msg.reply_to_message:
         if await is_admin(update, context):
             target = msg.reply_to_message.from_user
         else:
-            await msg.reply_text("⛔ فقط المشرفون يمكنهم عرض ملف عضو آخر.")
+            # إذا لم يكن مشرفاً، نبلغه بشكل سري أيضاً (رسالة تحذف)
+            try:
+                temp = await msg.reply_text("⛔ فقط المشرفون يمكنهم عرض ملف عضو آخر.")
+                await asyncio.sleep(3)
+                await temp.delete()
+            except:
+                pass
+            await msg.delete()
             return
 
-    # جمع المعلومات من قاعدة البيانات
+    # جمع المعلومات
     warnings = await db.get_warnings(target.id, chat.id)
     ban_info = await db.get_ban(target.id, chat.id)
     msg_count = await db.get_message_count(target.id, chat.id)
     first_seen = await db.get_user_first_seen(target.id, chat.id)
-    
-    # الحالة الحالية
+
     is_banned = "✅ محظور" if ban_info else "❌ غير محظور"
     is_muted = "❓ غير معروف"
     try:
@@ -516,7 +522,6 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-    # بناء الرسالة
     username = f"@{target.username}" if target.username else "لا يوجد"
     text = (
         f"📁 **ملف العضو**\n\n"
@@ -529,4 +534,29 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🚫 الحظر: {is_banned}\n"
         f"🔇 الكتم: {is_muted}\n"
     )
-    await msg.reply_text(text, parse_mode="Markdown")
+
+    # حذف رسالة الأمر من المجموعة
+    try:
+        await msg.delete()
+    except:
+        pass
+
+    # إرسال الملف إلى الخاص
+    try:
+        await context.bot.send_message(
+            chat_id=user.id,
+            text=text,
+            parse_mode="Markdown"
+        )
+    except Exception:
+        # إذا فشل الإرسال، نرسل إشعاراً مؤقتاً
+        try:
+            temp = await context.bot.send_message(
+                chat_id=chat.id,
+                text="❌ لم أستطع إرسال الملف إلى الخاص. تأكد من فتح محادثة خاصة مع البوت.",
+                parse_mode="Markdown"
+            )
+            await asyncio.sleep(5)
+            await temp.delete()
+        except:
+            pass
