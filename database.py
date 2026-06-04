@@ -170,6 +170,13 @@ async def get_user_first_seen(user_id: int, chat_id: int) -> Optional[str]:
     )
     return result.data[0]["first_seen"] if result.data else None
 
+async def get_user_last_seen(user_id: int, chat_id: int) -> Optional[str]:
+    if not supabase: return None
+    result = await asyncio.get_event_loop().run_in_executor(
+        None, lambda: supabase.table("user_stats").select("last_seen").eq("user_id", user_id).eq("chat_id", chat_id).execute()
+    )
+    return result.data[0]["last_seen"] if result.data else None
+
 async def get_all_active_chats() -> list:
     if not supabase: return []
     result = await asyncio.get_event_loop().run_in_executor(
