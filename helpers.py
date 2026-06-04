@@ -50,6 +50,8 @@ async def notify_admins(bot, chat_id: int, text: str):
                 pass
     except Exception:
         pass
+
+
 def parse_duration(duration_str: str) -> Optional[timedelta]:
     if not duration_str:
         return None
@@ -65,6 +67,40 @@ def parse_duration(duration_str: str) -> Optional[timedelta]:
     except ValueError:
         pass
     return None
+
+
+def parse_time(time_str: str) -> int:
+    """تحويل 1d, 2h, 30m إلى ثواني (للاستخدام مع الحظر والكتم المؤقت)"""
+    if not time_str:
+        return 0
+    
+    time_str = time_str.lower()
+    if time_str.endswith('d'):
+        return int(time_str[:-1]) * 24 * 60 * 60
+    elif time_str.endswith('h'):
+        return int(time_str[:-1]) * 60 * 60
+    elif time_str.endswith('m'):
+        return int(time_str[:-1]) * 60
+    else:
+        try:
+            return int(time_str) * 60
+        except:
+            return 0
+
+
+async def can_restrict(update: Update, context: ContextTypes.DEFAULT_TYPE, target_id: int) -> bool:
+    """التحقق إذا كان البوت يستطيع تقييد عضو (حظر/كتم)"""
+    try:
+        bot_member = await update.message.chat.get_member(context.bot.id)
+        if not bot_member.can_restrict_members:
+            return False
+        
+        target_member = await update.message.chat.get_member(target_id)
+        if target_member.status in ['administrator', 'creator']:
+            return False
+        return True
+    except Exception:
+        return False
 
 
 def expires_at_from_duration(duration: Optional[timedelta]) -> Optional[datetime]:
