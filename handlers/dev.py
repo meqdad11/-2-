@@ -82,17 +82,67 @@ async def cmd_broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"فشل الإرسال للمجموعة {chat_id}: {e}")
     
     await update.message.reply_text(f"✅ تم الإرسال إلى {success} من {len(chats)} مجموعة.")
-# ========== إحصائيات البوت ==========
+
+# ========== إحصائيات البوت (التفصيلية الجديدة) ==========
 async def cmd_bot_stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إحصائيات شاملة لكل مجموعة (للمطور فقط)"""
     if not await is_owner(update):
         await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
         return
-    chats = len(await db.get_all_active_chats())
-    await update.message.reply_text(
-        f"📊 **إحصائيات البوت:**\n"
-        f"• المجموعات النشطة: {chats}\n"
-    )
 
+    # إشعار بالانتظار
+    status_msg = await update.message.reply_text("⏳ جاري تجميع الإحصائيات...")
+
+    # جلب كل المجموعات النشطة
+    chats = await db.get_all_active_chats()
+    total_chats = len(chats)
+
+    if total_chats == 0:
+        await status_msg.edit_text("📭 لا توجد مجموعات نشطة.")
+        return
+
+    # بناء التقرير
+    report_lines = []
+    report_lines.append(f"📊 **إحصائيات البوت الشاملة**\n")
+    report_lines.append(f"📌 عدد المجموعات النشطة: {total_chats}\n")
+
+    for chat_id in chats:
+        # اسم المجموعة
+        chat_name = await db.get_chat_name(chat_id)
+        # جلب جميع الأعضاء مع عدد رسائلهم (مرتبين من الأعلى)
+        members = await db.get_top_members(chat_id, limit=10000)  # حد كبير لجلب الكل
+
+        if not members:
+            continue
+
+        total_members = len(members)
+        report_lines.append(f"\n🟢 **{chat_name}** (`{chat_id}`)")
+        report_lines.append(f"👥 عدد الأعضاء المسجلين: {total_members}")
+
+        # عرض الأعضاء وعدد رسائلهم
+        for i, member in enumerate(members, 1):
+            user_id = member['user_id']
+            full_name = member.get('full_name', 'بدون اسم')
+            msg_count = member.get('message_count', 0)
+            report_lines.append(f"   {i}. {full_name} — {msg_count} رسالة")
+
+    full_report = "\n".join(report_lines)
+
+    # تقسيم النص إذا تجاوز الحد المسموح
+    max_len = 4000
+    if len(full_report) > max_len:
+        chunks = [full_report[i:i+max_len] for i in range(0, len(full_report), max_len)]
+    else:
+        chunks = [full_report]
+
+    # إرسال التقرير
+    await status_msg.edit_text("📤 جاري إرسال التقرير...")
+    for chunk in chunks:
+        await update.message.reply_text(chunk, parse_mode="Markdown")
+
+    await status_msg.delete()
+
+# ========== عدد المستخدمين النشطين ==========
 async def cmd_active_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عدد المستخدمين النشطين هذا الشهر"""
     if not await is_owner(update):
