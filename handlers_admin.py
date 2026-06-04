@@ -324,6 +324,7 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رفع الكتم عن عضو"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -333,6 +334,7 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❗️ رد على العضو.")
         return
     
+    # صلاحيات افتراضية للجميع
     permissions = ChatPermissions(
         can_send_messages=True,
         can_send_media_messages=True,
@@ -341,6 +343,7 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     try:
+        # محاولة رفع الكتم
         await update.message.chat.restrict_member(reply_user.id, permissions)
         
         await db.log_user_action(
@@ -355,7 +358,7 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ تم رفع الكتم عن {reply_user.first_name}.")
     except Exception as e:
         logger.error(f"خطأ في رفع الكتم: {e}")
-        await update.message.reply_text("❌ فشل رفع الكتم.")
+        await update.message.reply_text("❌ فشل رفع الكتم. تأكد من صلاحيات البوت.")
 
 
 # ==================== قفل المجموعة ====================
@@ -665,11 +668,27 @@ async def cmd_warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يمكن إرسال تنبيه لهذا العضو (قد يكون حظر البوت).")
 
 
-# ==================== إدارة المشرفين ====================
+# ==================== إدارة المشرفين (للمطور ومالك المجموعة) ====================
+
+async def is_creator(update: Update) -> bool:
+    """التحقق من أن المستخدم هو مالك المجموعة"""
+    try:
+        admins = await update.message.chat.get_administrators()
+        for admin in admins:
+            if admin.status == "creator" and admin.user.id == update.effective_user.id:
+                return True
+        return False
+    except:
+        return False
+
 
 async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in [5462027396]:
-        await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
+    """رفع عضو إلى مشرف (للمطور أو مالك المجموعة)"""
+    user_id = update.effective_user.id
+    is_creator_user = await is_creator(update)
+    
+    if user_id != 5462027396 and not is_creator_user:
+        await update.message.reply_text("⛔ هذا الأمر للمطور أو مالك المجموعة فقط.")
         return
     
     reply_user = get_reply_user(update)
@@ -694,8 +713,12 @@ async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in [5462027396]:
-        await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
+    """تنزيل مشرف (للمطور أو مالك المجموعة)"""
+    user_id = update.effective_user.id
+    is_creator_user = await is_creator(update)
+    
+    if user_id != 5462027396 and not is_creator_user:
+        await update.message.reply_text("⛔ هذا الأمر للمطور أو مالك المجموعة فقط.")
         return
     
     reply_user = get_reply_user(update)
@@ -726,6 +749,8 @@ async def cmd_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for admin in admins:
             user = admin.user
             role = "المطور" if user.id == 5462027396 else "مشرف"
+            if admin.status == "creator":
+                role = "👑 المالك"
             text += f"• {user.first_name} (@{user.username}) - {role}\n"
         await update.message.reply_text(text, parse_mode="Markdown")
     except Exception as e:
@@ -757,7 +782,7 @@ async def confirm_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE)
         count = 0
         for admin in admins:
             user = admin.user
-            if user.id != 5462027396 and not user.is_bot:
+            if user.id != 5462027396 and not user.is_bot and admin.status != "creator":
                 try:
                     await update.message.chat.promote_member(
                         user.id,
