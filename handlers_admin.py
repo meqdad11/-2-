@@ -335,20 +335,18 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     try:
-        # إنشاء صلاحيات افتراضية (الكل مسموح)
-        permissions = ChatPermissions(
-            can_send_messages=True,
-            can_send_media_messages=True,
-            can_send_polls=True,
-            can_send_other_messages=True,
-            can_add_web_page_previews=True,
-            can_change_info=False,
-            can_invite_users=True,
-            can_pin_messages=False,
-            can_manage_topics=False
+        # استخدام method مباشرة من bot
+        await context.bot.restrict_chat_member(
+            chat_id=update.effective_chat.id,
+            user_id=reply_user.id,
+            permissions=ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True
+            )
         )
-        
-        await update.message.chat.restrict_member(reply_user.id, permissions)
         
         await db.log_user_action(
             user_id=reply_user.id,
@@ -362,7 +360,7 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ تم رفع الكتم عن {reply_user.first_name}.")
     except Exception as e:
         logger.error(f"خطأ في رفع الكتم: {e}")
-        await update.message.reply_text("❌ فشل رفع الكتم. تأكد من صلاحيات البوت.")
+        await update.message.reply_text(f"❌ فشل رفع الكتم: {str(e)[:100]}")
 
 
 # ==================== قفل المجموعة ====================
@@ -682,10 +680,9 @@ async def cmd_warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يمكن إرسال تنبيه لهذا العضو (قد يكون حظر البوت).")
 
 
-# ==================== إدارة المشرفين (للمطور ومالك المجموعة) ====================
+# ==================== إدارة المشرفين ====================
 
 async def is_creator(update: Update) -> bool:
-    """التحقق من أن المستخدم هو مالك المجموعة"""
     try:
         admins = await update.message.chat.get_administrators()
         for admin in admins:
@@ -697,7 +694,6 @@ async def is_creator(update: Update) -> bool:
 
 
 async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """رفع عضو إلى مشرف (للمطور أو مالك المجموعة)"""
     user_id = update.effective_user.id
     is_creator_user = await is_creator(update)
     
@@ -727,7 +723,6 @@ async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تنزيل مشرف (للمطور أو مالك المجموعة)"""
     user_id = update.effective_user.id
     is_creator_user = await is_creator(update)
     
