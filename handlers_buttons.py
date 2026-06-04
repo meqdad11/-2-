@@ -6,7 +6,6 @@ from telegram.ext import ContextTypes
 import database as db
 from helpers import is_admin
 from quotes import DAILY_QUOTES
-from handlers_user import cmd_my_reminders, cmd_cancel_daily_reminder  # ← أضيف هنا
 
 logger = logging.getLogger(__name__)
 temp_points = {}
@@ -440,7 +439,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⏰ تذكير", callback_data="exec_remind")],
             [InlineKeyboardButton("🔄 تذكير يومي", callback_data="exec_daily_remind")],
             [InlineKeyboardButton("📋 تذكيراتي", callback_data="exec_my_reminders"),
-             InlineKeyboardButton("❌ إلغاء تذكير يومي", callback_data="exec_cancel_daily_reminder")],  # ← أضيف هنا
+             InlineKeyboardButton("❌ إلغاء تذكير يومي", callback_data="exec_cancel_daily_reminder")],
             [InlineKeyboardButton("👤 المالك", callback_data="exec_owner")],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
@@ -614,17 +613,33 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.delete()
         return
 
-    # ========== تنفيذ أوامر التذكير الجديدة ==========
-    if data == "exec_my_reminders":          # ← أضيف هنا
-        fake_update = FakeUpdate(msg)
-        await cmd_my_reminders(fake_update, context)
-        await msg.delete()
+    # ========== تنفيذ أوامر التذكير الجديدة (مباشرة) ==========
+    if data == "exec_my_reminders":
+        reminders = await db.get_user_reminders(user.id)
+        if not reminders:
+            text = "📭 ليس لديك أي تذكيرات يومية."
+        else:
+            lines = [f"⏰ {r['reminder_time']} - 📝 {r['reminder_text']}" for r in reminders]
+            text = "📋 **تذكيراتك اليومية:**\n\n" + "\n".join(lines)
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_user")],
+                    [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
+        await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
-    if data == "exec_cancel_daily_reminder": # ← أضيف هنا
-        fake_update = FakeUpdate(msg)
-        await cmd_cancel_daily_reminder(fake_update, context)
-        await msg.delete()
+    if data == "exec_cancel_daily_reminder":
+        user_id = user.id
+        await db.delete_reminder(user_id, chat_id)
+        jobs_removed = 0
+        for job in context.job_queue.jobs():
+            if job.name and job.name.startswith("daily_reminder_") and hasattr(job, 'data'):
+                j_data = job.data
+                if isinstance(j_data, dict) and j_data.get("user_id") == user_id and job.chat_id == chat_id:
+                    job.schedule_removal()
+                    jobs_removed += 1
+        text = f"✅ تم إلغاء جميع تذكيراتك اليومية ({jobs_removed} تذكير)."
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_user")],
+                    [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
+        await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     # ========== الميديا والموارد (للجميع) ==========
