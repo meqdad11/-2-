@@ -15,9 +15,7 @@ from telegram.ext import ContextTypes
 import database as db
 from config import TIMEZONE
 from helpers import is_admin, get_reply_user
-
-# استيراد دوال التذكيرات من handlers_jobs
-from handlers_jobs import save_daily_reminder, delete_daily_reminder, job_reschedule_reminders
+from handlers_jobs import _send_daily_reminder
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +159,7 @@ async def cmd_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ حدث خطأ.")
 
 async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تذكير يومي (يحفظ في ملف JSON ويعاد جدولته عند التشغيل)"""
+    """تذكير يومي (يحفظ في Supabase ويعاد جدولته عند التشغيل)"""
     msg = update.message
     if not msg:
         return
@@ -182,9 +180,7 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     # ===== إلغاء التذكير =====
     if context.args[0] == "إلغاء":
-        # حذف من الملف
-        await delete_daily_reminder(user_id, chat_id)
-        # حذف من المجدول
+        await db.delete_reminder(user_id, chat_id)
         for job in context.job_queue.jobs():
             if job.name == f"daily_reminder_{chat_id}_{user_id}":
                 job.schedule_removal()
@@ -206,23 +202,24 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.reply_text("❌ صيغة الوقت خاطئة. استخدم HH:MM (مثال: 14:30).")
         return
     
-    # حذف التذكير القديم إذا موجود
+    # حذف التذكير القديم من المجدول
     for job in context.job_queue.jobs():
         if job.name == f"daily_reminder_{chat_id}_{user_id}":
             job.schedule_removal()
     
     try:
-        # حفظ في الملف
-        await save_daily_reminder(user_id, chat_id, time_str, reminder_text)
+        # حفظ في Supabase
+        await db.save_reminder(user_id, chat_id, time_str, reminder_text)
         
         # إضافة للمجدول
         target_time = dtime(hour=hour, minute=minute, second=0, tzinfo=TIMEZONE)
         context.job_queue.run_daily(
-            _send_reminder,
+            _send_daily_reminder,
             time=target_time,
             chat_id=chat_id,
-            name=f"daily_reminder_{chat_id}_{user_id}",
-            data=reminder_text
+            user_id=user_id,
+            text=reminder_text,
+            name=f"daily_reminder_{chat_id}_{user_id}"
         )
         
         await msg.reply_text(
