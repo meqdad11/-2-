@@ -751,7 +751,18 @@ async def load_all_reminders():
     except Exception as e:
         print(f"خطأ في تحميل التذكيرات: {e}")
         return []
-
+async def get_user_reminders(user_id: int):
+    """جلب تذكيرات مستخدم معين"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("reminders").select("*").eq("user_id", user_id).execute()
+        )
+        return result.data if result.data else []
+    except Exception as e:
+        print(f"خطأ في جلب التذكيرات: {e}")
+        return []
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
     if supabase:
