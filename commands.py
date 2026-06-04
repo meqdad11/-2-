@@ -75,7 +75,7 @@ ARABIC_COMMANDS = {
     "كتم": cmd_mute, "رفع الكتم": cmd_unmute,
     "أغلق المجموعة": cmd_lock, "افتح المجموعة": cmd_unlock,
     "سجل": cmd_eventlog, "تقرير": cmd_report,
-    "متقدم تقرير ": cmd_deep_report,
+    "متقدم تقرير": cmd_deep_report,
     "أضف كلمة": cmd_add_word, "احذف كلمة": cmd_remove_word, "الكلمات المحظورة": cmd_list_words,
     "أضف مورد": cmd_add_resource, "الموارد": cmd_list_resources, "احذف مورد": cmd_delete_resource,
     "ايدي": cmd_id, "القواعد": cmd_rules, "شفق": cmd_shafaq,
