@@ -11,6 +11,13 @@ from helpers import is_admin, get_reply_user, parse_time, can_restrict
 
 logger = logging.getLogger(__name__)
 
+# استيراد قائمة المطورين من handlers_dev
+from handlers_dev import DEVELOPERS
+
+async def is_dev(user_id: int) -> bool:
+    """التحقق مما إذا كان المستخدم مطوراً"""
+    return user_id in DEVELOPERS
+
 # ==================== حظر ====================
 
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -696,7 +703,7 @@ async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     is_creator_user = await is_creator(update)
     
-    if user_id != 5462027396 and not is_creator_user:
+    if not await is_dev(user_id) and not is_creator_user:
         await update.message.reply_text("⛔ هذا الأمر للمطور أو مالك المجموعة فقط.")
         return
     
@@ -725,7 +732,7 @@ async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     is_creator_user = await is_creator(update)
     
-    if user_id != 5462027396 and not is_creator_user:
+    if not await is_dev(user_id) and not is_creator_user:
         await update.message.reply_text("⛔ هذا الأمر للمطور أو مالك المجموعة فقط.")
         return
     
@@ -756,7 +763,7 @@ async def cmd_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = "👮 **قائمة المشرفين:**\n\n"
         for admin in admins:
             user = admin.user
-            role = "المطور" if user.id == 5462027396 else "مشرف"
+            role = "المطور" if await is_dev(user.id) else "مشرف"
             if admin.status == "creator":
                 role = "👑 المالك"
             text += f"• {user.first_name} (@{user.username}) - {role}\n"
@@ -767,7 +774,7 @@ async def cmd_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in [5462027396]:
+    if not await is_dev(update.effective_user.id):
         await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
         return
     
@@ -790,7 +797,7 @@ async def confirm_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE)
         count = 0
         for admin in admins:
             user = admin.user
-            if user.id != 5462027396 and not user.is_bot and admin.status != "creator":
+            if not await is_dev(user.id) and not user.is_bot and admin.status != "creator":
                 try:
                     await update.message.chat.promote_member(
                         user.id,
@@ -812,8 +819,8 @@ async def confirm_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def cmd_purge_bans(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in [5462027396]:
-        await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
+    if not await is_dev(update.effective_user.id) and not await is_admin(update, context):
+        await update.message.reply_text("⛔ هذا الأمر للمطور والمشرفين فقط.")
         return
     
     try:
@@ -825,8 +832,8 @@ async def cmd_purge_bans(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_purge_muted(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in [5462027396]:
-        await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
+    if not await is_dev(update.effective_user.id) and not await is_admin(update, context):
+        await update.message.reply_text("⛔ هذا الأمر للمطور والمشرفين فقط.")
         return
     
     try:
@@ -869,7 +876,7 @@ async def cmd_tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_my_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     
-    if user.id == 5462027396:
+    if await is_dev(user.id):
         rank = "👑 المطور الأساسي"
     elif await is_admin(update, context):
         rank = "👮 مشرف"
@@ -889,7 +896,7 @@ async def cmd_his_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❗️ رد على العضو.")
         return
     
-    if reply_user.id == 5462027396:
+    if await is_dev(reply_user.id):
         rank = "👑 المطور الأساسي"
     elif reply_user.id == update.effective_user.id:
         rank = "أنت"
