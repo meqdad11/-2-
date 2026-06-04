@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 # ==================== حظر ====================
 
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """حظر عضو - استخدم: /ban @user سبب"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -28,22 +27,18 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يمكنك حظر نفسك.")
         return
     
-    # التحقق من الصلاحيات
     if not await can_restrict(update, context, reply_user.id):
         await update.message.reply_text("❌ لا يمكنني حظر هذا العضو (صلاحياتي أقل أو هو مشرف).")
         return
     
-    # تحليل الوقت والسبب
     args = context.args
     duration = None
     reason = "بدون سبب"
     
     if args:
-        # محاولة استخراج الوقت (مثل 1d, 2h, 30m)
         for i, arg in enumerate(args):
             if parse_time(arg):
                 duration = parse_time(arg)
-                # باقي الكلام هو السبب
                 if len(args) > i + 1:
                     reason = " ".join(args[i+1:])
                 break
@@ -56,12 +51,12 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.chat.ban_member(reply_user.id, until_date=expires_at)
             await db.add_ban(reply_user.id, update.effective_chat.id, reason, update.effective_user.id, expires_at)
             
-            # تسجيل في سجل العضو
             await db.log_user_action(
                 user_id=reply_user.id,
                 chat_id=update.effective_chat.id,
                 action_type="ban",
                 action_by=update.effective_user.id,
+                by_name=update.effective_user.first_name,
                 reason=reason,
                 duration=expires_at.isoformat()
             )
@@ -79,6 +74,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=update.effective_chat.id,
                 action_type="ban",
                 action_by=update.effective_user.id,
+                by_name=update.effective_user.first_name,
                 reason=reason
             )
             
@@ -92,7 +88,6 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """رفع الحظر عن عضو"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -111,6 +106,7 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id,
             action_type="unban",
             action_by=update.effective_user.id,
+            by_name=update.effective_user.first_name,
             reason="رفع الحظر"
         )
         
@@ -121,7 +117,6 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_banlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض قائمة المحظورين"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -145,7 +140,6 @@ async def cmd_banlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_baninfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معلومات حظر عضو"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -177,14 +171,12 @@ async def cmd_baninfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_checkban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """التحقق من حظر عضو (اختصار baninfo)"""
     await cmd_baninfo(update, context)
 
 
 # ==================== تحذيرات ====================
 
 async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تحذير عضو - 3 تحذيرات = حظر"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -203,6 +195,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=update.effective_chat.id,
         action_type="warn",
         action_by=update.effective_user.id,
+        by_name=update.effective_user.first_name,
         reason=reason
     )
     
@@ -226,7 +219,6 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مسح تحذيرات عضو"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -243,6 +235,7 @@ async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id=update.effective_chat.id,
         action_type="clear_warns",
         action_by=update.effective_user.id,
+        by_name=update.effective_user.first_name,
         reason="مسح التحذيرات"
     )
     
@@ -250,7 +243,6 @@ async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_warnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض عدد تحذيرات عضو"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -267,7 +259,6 @@ async def cmd_warnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== كتم ====================
 
 async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """كتم عضو"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -302,6 +293,7 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=update.effective_chat.id,
                 action_type="mute",
                 action_by=update.effective_user.id,
+                by_name=update.effective_user.first_name,
                 reason=reason,
                 duration=until_date.isoformat()
             )
@@ -318,6 +310,7 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=update.effective_chat.id,
                 action_type="mute",
                 action_by=update.effective_user.id,
+                by_name=update.effective_user.first_name,
                 reason=reason
             )
             
@@ -331,7 +324,6 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """رفع الكتم عن عضو"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -356,6 +348,7 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
             chat_id=update.effective_chat.id,
             action_type="unmute",
             action_by=update.effective_user.id,
+            by_name=update.effective_user.first_name,
             reason="رفع الكتم"
         )
         
@@ -368,7 +361,6 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== قفل المجموعة ====================
 
 async def cmd_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """قفل المجموعة (منع الجميع من الكتابة)"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -390,7 +382,6 @@ async def cmd_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """فتح المجموعة"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -414,7 +405,6 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== سجل الأحداث ====================
 
 async def cmd_eventlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض آخر الأحداث"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -440,7 +430,6 @@ async def cmd_eventlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== القواعد ====================
 
 async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تعيين قواعد المجموعة"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -457,7 +446,6 @@ async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== تقرير عن عضو ====================
 
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إرسال تقرير عن عضو للمشرفين"""
     reply_user = get_reply_user(update)
     if not reply_user:
         await update.message.reply_text("❗️ رد على العضو الذي تريد الإبلاغ عنه.")
@@ -465,16 +453,15 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     reason = " ".join(context.args) if context.args else "بدون سبب محدد"
     
-    # تسجيل التقرير في قاعدة البيانات
     await db.log_user_action(
         user_id=reply_user.id,
         chat_id=update.effective_chat.id,
         action_type="report",
         action_by=update.effective_user.id,
+        by_name=update.effective_user.first_name,
         reason=reason
     )
     
-    # إرسال إشعار للمشرفين
     admins = await update.message.chat.get_administrators()
     for admin in admins:
         try:
@@ -496,7 +483,6 @@ async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== ملف العضو (سري - يرسل في الخاص) ====================
 
 async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض ملف كامل عن العضو (يرسل في الخاص للمشرف فقط)"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -510,10 +496,7 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     admin_id = update.effective_user.id
     
-    # جلب جميع الإجراءات من قاعدة البيانات
     actions = await db.get_user_actions(user_id, chat_id)
-    
-    # جلب الإحصائيات
     msg_count = await db.get_message_count(user_id, chat_id)
     first_seen = await db.get_user_first_seen(user_id, chat_id)
     last_seen = await db.get_user_last_seen(user_id, chat_id)
@@ -529,7 +512,6 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ تم إرسال الملف في الخاص.")
         return
     
-    # تصنيف الإجراءات
     warns = []
     bans = []
     mutes = []
@@ -546,7 +528,6 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif action_type == "report":
             reports.append(action)
     
-    # بناء الرسالة
     text = f"📋 **ملف العضو: {reply_user.first_name}**\n"
     text += f"🆔 المعرف: `{user_id}`\n"
     if reply_user.username:
@@ -558,57 +539,52 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"🕐 آخر ظهور: {last_seen[:16]}\n"
     text += f"━━━━━━━━━━━━━━━━━━\n\n"
     
-    # التحذيرات
     if warns:
         text += f"⚠️ **التحذيرات ({len(warns)}):**\n"
         for w in warns[-5:]:
             time = w.get("created_at", "")[:16]
             reason = w.get("reason", "بدون سبب")
-            by = w.get("action_by", 0)
-            text += f"   • {time}: {reason} (بواسطة {by})\n"
+            by_name = w.get("by_name", "") or str(w.get("action_by", 0))
+            text += f"   • {time}: {reason} (بواسطة {by_name})\n"
         text += "\n"
     else:
         text += f"⚠️ **التحذيرات:** 0\n\n"
     
-    # الحظر
     if bans:
         text += f"🚫 **الحظر ({len(bans)}):**\n"
         for b in bans[-3:]:
             time = b.get("created_at", "")[:16]
             reason = b.get("reason", "بدون سبب")
-            by = b.get("action_by", 0)
+            by_name = b.get("by_name", "") or str(b.get("action_by", 0))
             duration = b.get("duration", "")
             if duration:
-                text += f"   • {time}: {reason} (بواسطة {by}, حتى {duration[:16]})\n"
+                text += f"   • {time}: {reason} (بواسطة {by_name}, حتى {duration[:16]})\n"
             else:
-                text += f"   • {time}: {reason} (بواسطة {by}, دائم)\n"
+                text += f"   • {time}: {reason} (بواسطة {by_name}, دائم)\n"
         text += "\n"
     
-    # الكتم
     if mutes:
         text += f"🔇 **الكتم ({len(mutes)}):**\n"
         for m in mutes[-3:]:
             time = m.get("created_at", "")[:16]
             reason = m.get("reason", "بدون سبب")
-            by = m.get("action_by", 0)
+            by_name = m.get("by_name", "") or str(m.get("action_by", 0))
             duration = m.get("duration", "")
             if duration:
-                text += f"   • {time}: {reason} (بواسطة {by}, حتى {duration[:16]})\n"
+                text += f"   • {time}: {reason} (بواسطة {by_name}, حتى {duration[:16]})\n"
             else:
-                text += f"   • {time}: {reason} (بواسطة {by}, دائم)\n"
+                text += f"   • {time}: {reason} (بواسطة {by_name}, دائم)\n"
         text += "\n"
     
-    # التقارير ضده
     if reports:
         text += f"📝 **التقارير ضده ({len(reports)}):**\n"
         for r in reports[-5:]:
             time = r.get("created_at", "")[:16]
             reason = r.get("reason", "بدون سبب")
-            by = r.get("action_by", 0)
-            text += f"   • {time}: {reason} (بواسطة {by})\n"
+            by_name = r.get("by_name", "") or str(r.get("action_by", 0))
+            text += f"   • {time}: {reason} (بواسطة {by_name})\n"
         text += "\n"
     
-    # الحالة النهائية
     text += f"━━━━━━━━━━━━━━━━━━\n"
     text += f"📊 **الملخص:**\n"
     text += f"   • التحذيرات الحالية: {current_warns}/3\n"
@@ -617,7 +593,6 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         text += f"   • الحالي: غير محظور ✅\n"
     
-    # إرسال في الخاص للمشرف
     try:
         await context.bot.send_message(
             chat_id=admin_id,
@@ -633,7 +608,6 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== تثبيت الرسائل ====================
 
 async def cmd_pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تثبيت رسالة (للمشرفين فقط)"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -651,7 +625,6 @@ async def cmd_pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إلغاء تثبيت الرسالة (للمشرفين فقط)"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -667,7 +640,6 @@ async def cmd_unpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== تنبيه عضو ====================
 
 async def cmd_warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إرسال تنبيه لعضو عبر الخاص (للمشرفين)"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
@@ -696,8 +668,7 @@ async def cmd_warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== إدارة المشرفين ====================
 
 async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """رفع عضو إلى مشرف (يتطلب أن يكون البوت مشرفاً)"""
-    if update.effective_user.id not in [5462027396]:  # ID المطور
+    if update.effective_user.id not in [5462027396]:
         await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
         return
     
@@ -723,7 +694,6 @@ async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تنزيل مشرف"""
     if update.effective_user.id not in [5462027396]:
         await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
         return
@@ -750,7 +720,6 @@ async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض قائمة المشرفين"""
     try:
         admins = await update.message.chat.get_administrators()
         text = "👮 **قائمة المشرفين:**\n\n"
@@ -765,7 +734,6 @@ async def cmd_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تنزيل جميع المشرفين (للمطور فقط)"""
     if update.effective_user.id not in [5462027396]:
         await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
         return
@@ -779,7 +747,6 @@ async def cmd_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def confirm_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تأكيد تنزيل جميع المشرفين"""
     if context.user_data.get('awaiting_demote_all') != update.effective_chat.id:
         return
     
@@ -812,7 +779,6 @@ async def confirm_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def cmd_purge_bans(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مسح جميع الحظر (للمطور)"""
     if update.effective_user.id not in [5462027396]:
         await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
         return
@@ -826,7 +792,6 @@ async def cmd_purge_bans(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_purge_muted(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مسح جميع المكتومين (للمطور)"""
     if update.effective_user.id not in [5462027396]:
         await update.message.reply_text("⛔ هذا الأمر للمطور فقط.")
         return
@@ -840,14 +805,12 @@ async def cmd_purge_muted(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """منشن جميع الأعضاء (للمشرفين)"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
     
     reason = " ".join(context.args) if context.args else "تنبيه"
     
-    # جلب آخر 50 عضو نشط
     members = await db.get_top_members(update.effective_chat.id, 50)
     if not members:
         await update.message.reply_text("❌ لا يوجد أعضاء نشطين.")
@@ -863,7 +826,6 @@ async def cmd_tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يمكن منشن الأعضاء.")
         return
     
-    # تقسيم إلى مجموعات
     chunk_size = 20
     for i in range(0, len(mentions), chunk_size):
         chunk = mentions[i:i+chunk_size]
@@ -872,7 +834,6 @@ async def cmd_tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_my_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض رتبتي"""
     user = update.effective_user
     
     if user.id == 5462027396:
@@ -886,7 +847,6 @@ async def cmd_my_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_his_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض رتبة عضو آخر"""
     if not await is_admin(update, context):
         await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
         return
