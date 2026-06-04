@@ -41,6 +41,8 @@ env/
 .env
 .env.local
 .env.*.local
+sample.env
+.env.example
 
 # Database
 *.db
@@ -66,7 +68,7 @@ compressed_*
 *.pyc
 *.pyo
 *.pyd
-__init__.cpython-*.pyc
+*.cpython-*
 
 # ZIP files
 *.zip
