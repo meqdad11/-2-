@@ -636,6 +636,69 @@ async def delete_whisper_link(whisper_id: str) -> bool:
         print(f"Error deleting whisper link: {e}")
         return False
 
+# ==================== دوال سجل المستخدمين (ملف العضو) ====================
+
+async def log_user_action(user_id: int, chat_id: int, action_type: str, action_by: int = 0, reason: str = None, duration: str = None):
+    """تسجيل أي إجراء ضد عضو (تحذير، حظر، كتم، تقرير)"""
+    if not supabase:
+        return
+    try:
+        data = {
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "action_type": action_type,
+            "action_by": action_by,
+            "reason": reason,
+            "duration": duration,
+            "created_at": now_iso()
+        }
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("user_actions").insert(data).execute()
+        )
+    except Exception as e:
+        print(f"Error logging user action: {e}")
+
+async def get_user_actions(user_id: int, chat_id: int, limit: int = 50) -> list:
+    """جلب جميع الإجراءات المسجلة ضد عضو"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("user_actions")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("chat_id", chat_id)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return result.data
+    except Exception as e:
+        print(f"Error getting user actions: {e}")
+        return []
+
+async def clear_all_bans(chat_id: int):
+    """مسح جميع الحظر في مجموعة (للمطور)"""
+    if not supabase:
+        return
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("bans").delete().eq("chat_id", chat_id).execute()
+        )
+    except Exception as e:
+        print(f"Error clearing bans: {e}")
+
+async def clear_all_mutes(chat_id: int):
+    """مسح جميع المكتومين في مجموعة (للمطور)"""
+    if not supabase:
+        return
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("user_actions").delete().eq("chat_id", chat_id).eq("action_type", "mute").execute()
+        )
+    except Exception as e:
+        print(f"Error clearing mutes: {e}")
+
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
     if supabase:
