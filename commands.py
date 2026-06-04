@@ -13,7 +13,7 @@ from handlers_admin import (
     cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
     cmd_demote_all, cmd_purge_bans, cmd_purge_muted,
     cmd_tag_all, cmd_my_rank, cmd_his_rank,
-    cmd_pin, cmd_unpin, cmd_warn_user,
+    cmd_pin, cmd_unpin, cmd_warn_user, cmd_userfile,   # <-- أضيف هنا
 )
 from handlers_moderation import (
     cmd_add_word, cmd_remove_word, cmd_list_words,
@@ -121,6 +121,8 @@ ARABIC_COMMANDS = {
     "المشرفين": cmd_list_admins, "تنزيل الكل": cmd_demote_all,
     "مسح المحظورين": cmd_purge_bans, "مسح المكتومين": cmd_purge_muted,
     "تاك للكل": cmd_tag_all, "رتبتي": cmd_my_rank, "رتبته": cmd_his_rank,
+
+    "ملف": cmd_userfile,   # <-- أمر ملف الجديد
 
     "اهمس": cmd_whisper, "افتاري": cmd_get_invite,
     "سورة": cmd_surah, "قران": cmd_quran_page,
