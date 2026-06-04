@@ -127,7 +127,7 @@ ARABIC_COMMANDS = {
     "انطقي": cmd_speak, "وش يقول": cmd_voice_to_text,
     "اطردني": cmd_kickme,
     "تفعيل الترحيب": cmd_enable_welcome, "تعطيل الترحيب": cmd_disable_welcome,
-    "بايـو": cmd_bio, "المالك": cmd_owner,
+    "بايو": cmd_bio, "المالك": cmd_owner,
     "ترجم": cmd_translate,
     "اضف رد": cmd_add_reply, "حذف رد": cmd_remove_reply, "الردود المضافه": cmd_list_replies,
     "اضف امر": cmd_add_command, "حذف امر": cmd_remove_command, "الاوامر المضافه": cmd_list_commands,
