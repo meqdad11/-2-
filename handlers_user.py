@@ -223,6 +223,22 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except Exception as e:
         logger.error(f"خطأ في التذكير اليومي: {e}")
         await msg.reply_text("❌ حدث خطأ.")
+async def cmd_my_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عرض قائمة التذكيرات اليومية للمستخدم"""
+    user_id = update.effective_user.id
+    
+    reminders = await db.get_user_reminders(user_id)
+    
+    if not reminders:
+        await update.message.reply_text("📭 ليس لديك أي تذكيرات يومية.")
+        return
+    
+    text = "📋 **تذكيراتك اليومية:**\n\n"
+    for i, r in enumerate(reminders, 1):
+        text += f"{i}. ⏰ {r['reminder_time']} - 📝 {r['reminder_text']}\n"
+    text += "\nللإلغاء: تذكير يومي إلغاء"
+    
+    await update.message.reply_text(text, parse_mode="Markdown")
 
 # ==================== AUTO REPLY ====================
 
