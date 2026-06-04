@@ -608,6 +608,69 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="Markdown")
 
 
+# ==================== تثبيت الرسائل ====================
+
+async def cmd_pin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تثبيت رسالة (للمشرفين فقط)"""
+    if not await is_admin(update, context):
+        await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+        return
+    
+    if not update.message.reply_to_message:
+        await update.message.reply_text("❗️ رد على الرسالة التي تريد تثبيتها.")
+        return
+    
+    try:
+        await update.message.reply_to_message.pin()
+        await update.message.reply_text("📌 تم تثبيت الرسالة.")
+    except Exception as e:
+        logger.error(f"خطأ في التثبيت: {e}")
+        await update.message.reply_text("❌ فشل تثبيت الرسالة.")
+
+
+async def cmd_unpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إلغاء تثبيت الرسالة (للمشرفين فقط)"""
+    if not await is_admin(update, context):
+        await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+        return
+    
+    try:
+        await update.message.chat.unpin_message()
+        await update.message.reply_text("📌 تم إلغاء تثبيت الرسالة.")
+    except Exception as e:
+        logger.error(f"خطأ في إلغاء التثبيت: {e}")
+        await update.message.reply_text("❌ فشل إلغاء التثبيت.")
+
+
+# ==================== تنبيه عضو ====================
+
+async def cmd_warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """إرسال تنبيه لعضو عبر الخاص (للمشرفين)"""
+    if not await is_admin(update, context):
+        await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+        return
+    
+    reply_user = get_reply_user(update)
+    if not reply_user:
+        await update.message.reply_text("❗️ رد على العضو.")
+        return
+    
+    reason = " ".join(context.args) if context.args else "بدون سبب محدد"
+    
+    try:
+        await context.bot.send_message(
+            chat_id=reply_user.id,
+            text=f"⚠️ **تنبيه من مشرف**\n\n"
+                 f"📍 المجموعة: {update.effective_chat.title}\n"
+                 f"📝 السبب: {reason}\n\n"
+                 f"يرجى الالتزام بقواعد المجموعة."
+        )
+        await update.message.reply_text(f"✅ تم إرسال التنبيه إلى {reply_user.first_name}.")
+    except Exception as e:
+        logger.error(f"خطأ في إرسال التنبيه: {e}")
+        await update.message.reply_text("❌ لا يمكن إرسال تنبيه لهذا العضو (قد يكون حظر البوت).")
+
+
 # ==================== إدارة المشرفين ====================
 
 async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
