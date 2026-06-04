@@ -6,6 +6,7 @@ from telegram.ext import ContextTypes
 import database as db
 from helpers import is_admin
 from quotes import DAILY_QUOTES
+from handlers_user import cmd_my_reminders, cmd_cancel_daily_reminder  # ← أضيف هنا
 
 logger = logging.getLogger(__name__)
 temp_points = {}
@@ -438,6 +439,8 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🌐 ترجمة", callback_data="exec_translate_msg")],
             [InlineKeyboardButton("⏰ تذكير", callback_data="exec_remind")],
             [InlineKeyboardButton("🔄 تذكير يومي", callback_data="exec_daily_remind")],
+            [InlineKeyboardButton("📋 تذكيراتي", callback_data="exec_my_reminders"),
+             InlineKeyboardButton("❌ إلغاء تذكير يومي", callback_data="exec_cancel_daily_reminder")],  # ← أضيف هنا
             [InlineKeyboardButton("👤 المالك", callback_data="exec_owner")],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
@@ -608,6 +611,19 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         fake_update = FakeUpdate(msg)
         context.args = []
         await cmd_deep_report(fake_update, context)
+        await msg.delete()
+        return
+
+    # ========== تنفيذ أوامر التذكير الجديدة ==========
+    if data == "exec_my_reminders":          # ← أضيف هنا
+        fake_update = FakeUpdate(msg)
+        await cmd_my_reminders(fake_update, context)
+        await msg.delete()
+        return
+
+    if data == "exec_cancel_daily_reminder": # ← أضيف هنا
+        fake_update = FakeUpdate(msg)
+        await cmd_cancel_daily_reminder(fake_update, context)
         await msg.delete()
         return
 
