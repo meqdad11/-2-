@@ -35,7 +35,6 @@ from handlers_menu import cmd_menu
 ARABIC_COMMANDS = {
     # أوامر المستخدمين
     "تذكر": cmd_reminder,
-    "تذكير": cmd_reminder,
     "تذكير يومي": cmd_daily_reminder,
     "تذكيراتي": cmd_my_reminders,
     "إلغاء تذكير يومي": cmd_cancel_daily_reminder,
