@@ -2,6 +2,8 @@ import logging
 import random
 import datetime
 import pytz
+import json
+import os
 from datetime import datetime as dt
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -10,6 +12,30 @@ from quotes import DAILY_QUOTES
 from config import TIMEZONE
 
 logger = logging.getLogger(__name__)
+
+# ========== دوال مساعدة للتذكيرات ==========
+
+def _load_reminders():
+    """تحميل التذكيرات من متغير البيئة"""
+    try:
+        data = os.environ.get("REMINDERS_DATA", "{}")
+        return json.loads(data)
+    except:
+        return {}
+
+def _save_reminders(reminders):
+    """حفظ التذكيرات في متغير البيئة (للملف فقط، Railway يحتاج تحديث يدوي)"""
+    # في Railway، متغيرات البيئة تتحدث عبر API أو dashboard
+    # نخزنها في ملف مؤقت كنسخة احتياطية
+    try:
+        with open("reminders_backup.json", "w") as f:
+            json.dump(reminders, f, ensure_ascii=False)
+    except:
+        pass
+
+def _get_reminders_key(user_id, chat_id):
+    """توليد مفتاح فريد للتذكير"""
+    return f"{chat_id}_{user_id}"
 
 # ========== دالة الاقتباس اليومي ==========
 async def job_daily_quote(context: ContextTypes.DEFAULT_TYPE):
@@ -21,6 +47,107 @@ async def job_daily_quote(context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id, f"💬 **اقتباس اليوم:**\n\n{quote}", parse_mode="Markdown")
         except Exception as e:
             logger.error(f"فشل إرسال الاقتباس للمجموعة {chat_id}: {e}")
+
+# ========== دالة إعادة جدولة التذكيرات عند التشغيل ==========
+async def job_reschedule_reminders(context: ContextTypes.DEFAULT_TYPE):
+    """إعادة جدولة جميع التذكيرات اليومية عند تشغيل البوت"""
+    reminders = _load_reminders()
+    
+    if not reminders:
+        return
+    
+    # إزالة التذكيرات القديمة من المجدول
+    jobs = context.job_queue.jobs()
+    for job in jobs:
+        if job.name.startswith("daily_reminder_"):
+            job.schedule_removal()
+    
+    count = 0
+    for key, data in reminders.items():
+        try:
+            user_id = data.get("user_id")
+            chat_id = data.get("chat_id")
+            reminder_time = data.get("reminder_time")
+            reminder_text = data.get("reminder_text", "")
+            
+            if not reminder_time:
+                continue
+            
+            # تحويل الوقت إلى ساعة ودقيقة
+            try:
+                hour, minute = reminder_time.split(":")
+                hour = int(hour)
+                minute = int(minute)
+            except:
+                continue
+            
+            # إضافة المهمة للمجدول
+            context.job_queue.run_daily(
+                _send_reminder,
+                time=datetime.time(hour=hour, minute=minute, tzinfo=pytz.UTC),
+                chat_id=chat_id,
+                user_id=user_id,
+                text=reminder_text,
+                name=f"daily_reminder_{key}"
+            )
+            count += 1
+        except Exception as e:
+            logger.error(f"فشل إعادة جدولة تذكير {key}: {e}")
+    
+    if count > 0:
+        logger.info(f"✅ تم إعادة جدولة {count} تذكير يومي")
+
+async def _send_reminder(context: ContextTypes.DEFAULT_TYPE):
+    """إرسال التذكير اليومي"""
+    job = context.job
+    chat_id = job.chat_id
+    user_id = job.user_id
+    text = job.text
+    
+    try:
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=f"⏰ **تذكير يومي**\n\n📝 {text}",
+            parse_mode="Markdown"
+        )
+    except:
+        # إذا ما قدر يرسل في الخاص، يحاول في المجموعة
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"⏰ **تذكير يومي**\n\n👤 [مستخدم](tg://user?id={user_id})\n📝 {text}",
+                parse_mode="Markdown"
+            )
+        except:
+            pass
+
+# ========== حفظ التذكير اليومي ==========
+async def save_daily_reminder(user_id: int, chat_id: int, reminder_time: str, reminder_text: str):
+    """حفظ تذكير يومي جديد"""
+    reminders = _load_reminders()
+    key = _get_reminders_key(user_id, chat_id)
+    
+    reminders[key] = {
+        "user_id": user_id,
+        "chat_id": chat_id,
+        "reminder_time": reminder_time,
+        "reminder_text": reminder_text
+    }
+    
+    _save_reminders(reminders)
+    return True
+
+# ========== حذف التذكير اليومي ==========
+async def delete_daily_reminder(user_id: int, chat_id: int):
+    """حذف تذكير يومي"""
+    reminders = _load_reminders()
+    key = _get_reminders_key(user_id, chat_id)
+    
+    if key in reminders:
+        del reminders[key]
+        _save_reminders(reminders)
+        return True
+    return False
 
 # ========== دالة التقرير البسيط ==========
 async def cmd_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
