@@ -4,7 +4,7 @@ from handlers_user import (
     cmd_speak, cmd_voice_to_text, cmd_kickme,
     cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
     cmd_create_anon_link, cmd_my_messages,
-    cmd_start, cmd_id, cmd_rules,
+    cmd_start, cmd_id, cmd_rules, cmd_translate,
 )
 from handlers_admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
@@ -61,7 +61,7 @@ ARABIC_COMMANDS = {
     "صارحني": cmd_create_anon_link,
     "رسائلي": cmd_my_messages,
     "ترجمة": cmd_translate,
-    
+
     # أوامر المشرفين
     "حظر": cmd_ban,
     "فك الحظر": cmd_unban,
@@ -100,24 +100,24 @@ ARABIC_COMMANDS = {
     "اضافة مورد": cmd_add_resource,
     "قائمة الموارد": cmd_list_resources,
     "حذف مورد": cmd_delete_resource,
-    
+
     # الذكاء الاصطناعي
     "شفق": cmd_shafaq,
     "جوجل": cmd_gemini,
     "استعمال": cmd_limit,
     "نموذج": cmd_choose_model,
-    
+
     # أوامر المطور
     "رفع مطور": cmd_add_dev,
     "تنزيل مطور": cmd_remove_dev,
     "اذاعة": cmd_broadcast,
     "احصائيات البوت": cmd_bot_stats,
-    
+
     # وسائط
     "تحميل": cmd_download,
     "بحث ساوند": cmd_sc_search,
     "بحث يوتيوب": cmd_yt_search,
-    
+
     # قائمة
     "القائمة": cmd_menu,
 }
