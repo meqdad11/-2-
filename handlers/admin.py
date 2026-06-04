@@ -481,3 +481,52 @@ async def cmd_unpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """أمر تنبيه - تحذير مع سبب"""
     await cmd_warn(update, context)
+
+# ==================== ملف العضو (أمر ملف) ====================
+async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عرض ملف شامل للعضو (للمشرفين فقط لعرض الآخرين)"""
+    msg = update.message
+    chat = update.effective_chat
+    user = update.effective_user
+
+    # تحديد الهدف: إذا كان هناك رد على شخص فالمشرف يرى ملفه، وإلا ملف نفسه
+    target = user
+    if msg.reply_to_message:
+        if await is_admin(update, context):
+            target = msg.reply_to_message.from_user
+        else:
+            await msg.reply_text("⛔ فقط المشرفون يمكنهم عرض ملف عضو آخر.")
+            return
+
+    # جمع المعلومات من قاعدة البيانات
+    warnings = await db.get_warnings(target.id, chat.id)
+    ban_info = await db.get_ban(target.id, chat.id)
+    msg_count = await db.get_message_count(target.id, chat.id)
+    first_seen = await db.get_user_first_seen(target.id, chat.id)
+    
+    # الحالة الحالية
+    is_banned = "✅ محظور" if ban_info else "❌ غير محظور"
+    is_muted = "❓ غير معروف"
+    try:
+        member = await context.bot.get_chat_member(chat.id, target.id)
+        if member.status == 'restricted' and not member.can_send_messages:
+            is_muted = "✅ مكتوم"
+        else:
+            is_muted = "❌ غير مكتوم"
+    except:
+        pass
+
+    # بناء الرسالة
+    username = f"@{target.username}" if target.username else "لا يوجد"
+    text = (
+        f"📁 **ملف العضو**\n\n"
+        f"👤 الاسم: {target.full_name or target.first_name}\n"
+        f"🆔 المعرف: `{target.id}`\n"
+        f"📎 اليوزر: {username}\n"
+        f"📅 أول ظهور: {first_seen or 'غير معروف'}\n"
+        f"💬 عدد الرسائل: {msg_count}\n"
+        f"⚠️ التحذيرات: {warnings}/3\n"
+        f"🚫 الحظر: {is_banned}\n"
+        f"🔇 الكتم: {is_muted}\n"
+    )
+    await msg.reply_text(text, parse_mode="Markdown")
