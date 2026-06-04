@@ -6,7 +6,7 @@ from datetime import datetime as dt
 from telegram import Update
 from telegram.ext import ContextTypes
 from utils import database as db
-from quotes import DAILY_QUOTES
+from data.quotes import DAILY_QUOTES
 from config import TIMEZONE
 
 logger = logging.getLogger(__name__)
