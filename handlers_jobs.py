@@ -1,3 +1,4 @@
+
 import logging
 import random
 import datetime
@@ -71,12 +72,19 @@ async def job_reschedule_reminders(context: ContextTypes.DEFAULT_TYPE):
     if count > 0:
         logger.info(f"✅ تم إعادة جدولة {count} تذكير يومي")
 
+# ========== دالة إرسال التذكير اليومي (معدلة) ==========
 async def _send_daily_reminder(context: ContextTypes.DEFAULT_TYPE):
     """إرسال التذكير اليومي"""
     job = context.job
     chat_id = job.chat_id
-    user_id = job.user_id
-    text = job.text
+    
+    # دعم الطريقتين: مباشر (من job_reschedule) أو عبر data (من cmd_daily_reminder)
+    if hasattr(job, 'data') and job.data:
+        user_id = job.data.get("user_id")
+        text = job.data.get("text")
+    else:
+        user_id = job.user_id
+        text = job.text
     
     try:
         await context.bot.send_message(
