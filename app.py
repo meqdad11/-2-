@@ -25,7 +25,7 @@ from handlers_admin import (
 )
 from handlers_user import (
     cmd_start, cmd_id, cmd_rules,
-    auto_reply, track_message,
+    auto_reply, track_message, cmd_my_reminders,
 )
 from handlers_moderation import (
     cmd_add_word, cmd_remove_word, cmd_list_words,
@@ -239,6 +239,7 @@ def register_handlers(app):
     app.add_handler(CommandHandler("ytsearch",   cmd_yt_search))
     app.add_handler(CommandHandler("download",   cmd_download))
     app.add_handler(CommandHandler("model",      cmd_choose_model))
+    app.add_handler(CommandHandler("myreminders", cmd_my_reminders))
 
     # أزرار inline
     app.add_handler(CallbackQueryHandler(callback_download,     pattern=r"^dl_(audio|video)\|"))
