@@ -200,9 +200,8 @@ async def post_init(app):
                     _send_daily_reminder,
                     time=datetime.time(hour=h, minute=m, tzinfo=SAUDI_TZ),
                     chat_id=r["chat_id"],
-                    user_id=r["user_id"],
-                    text=r["reminder_text"],
-                    name=f"daily_reminder_{r['id']}"   # <-- التعديل الوحيد هنا
+                    data={"user_id": r["user_id"], "text": r["reminder_text"]},
+                    name=f"daily_reminder_{r['id']}"
                 )
                 count += 1
             except Exception as e:
