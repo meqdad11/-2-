@@ -10,7 +10,6 @@ from supabase import create_client, Client
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://xlaruzxqtbsqjqdbwbyb.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "sb_publishable_gbt0EnA6iBYIm1b4TuKHXg_vQYhmPXm")
 
-# ========== إنشاء عميل Supabase ==========
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
     print("✅ تم الاتصال بـ Supabase بنجاح")
@@ -18,7 +17,6 @@ except Exception as e:
     print(f"❌ فشل الاتصال بـ Supabase: {e}")
     supabase = None
 
-# ========== دوال مساعدة ==========
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -267,7 +265,6 @@ async def is_locked(chat_id: int, lock_type: str) -> bool:
     return result.data[0]["is_locked"] if result.data else False
 
 # ========== دوال نظام "صارحني" ==========
-
 async def create_anonymous_link(user_id: int) -> str:
     if not supabase: return ""
     await asyncio.get_event_loop().run_in_executor(
@@ -347,7 +344,6 @@ async def count_active_users() -> int:
         return 0
 
 # ==================== دوال نظام الأزمات ====================
-
 async def add_crisis_word(chat_id: int, word: str) -> bool:
     if not supabase:
         return False
@@ -494,7 +490,6 @@ async def log_crisis_alert(chat_id: int, word: str, user_id: int):
         print(f"Error logging crisis alert: {e}")
 
 # ==================== دوال الردود التلقائية ====================
-
 async def add_custom_reply(chat_id: int, keyword: str, reply: str) -> bool:
     if not supabase:
         return False
@@ -543,7 +538,6 @@ async def get_custom_replies(chat_id: int) -> dict:
         return {}
 
 # ==================== دوال الاختصارات ====================
-
 async def add_custom_command(chat_id: int, shortcut: str, target_command: str) -> bool:
     if not supabase:
         return False
@@ -592,7 +586,6 @@ async def get_custom_commands(chat_id: int) -> dict:
         return {}
 
 # ==================== دوال الهمسات ====================
-
 async def save_whisper_link(whisper_id: str, sender_id: int, sender_name: str, target_id: int, target_name: str, chat_id: int, chat_title: str) -> bool:
     if not supabase:
         return False
@@ -641,7 +634,6 @@ async def delete_whisper_link(whisper_id: str) -> bool:
         return False
 
 # ==================== دوال سجل المستخدمين ====================
-
 async def log_user_action(user_id: int, chat_id: int, action_type: str, action_by: int = 0, by_name: str = "", reason: str = None, duration: str = None):
     """تسجيل أي إجراء ضد عضو (تحذير، حظر، كتم، تقرير)"""
     if not supabase:
@@ -702,18 +694,12 @@ async def clear_all_mutes(chat_id: int):
         print(f"Error clearing mutes: {e}")
 
 # ==================== دوال التذكيرات ====================
-
-async def save_reminder(user_id: int, chat_id: int, reminder_time: str, reminder_text: str):
-    """حفظ تذكير يومي في قاعدة البيانات"""
+async def save_reminder(user_id: int, chat_id: int, reminder_time: str, reminder_text: str) -> Optional[Dict]:
+    """حفظ تذكير يومي جديد وإرجاع السجل المُنشأ (لا يحذف السابق)"""
     if not supabase:
-        return False
+        return None
     try:
-        # حذف التذكير القديم إذا موجود
-        await asyncio.get_event_loop().run_in_executor(
-            None, lambda: supabase.table("reminders").delete().eq("user_id", user_id).eq("chat_id", chat_id).execute()
-        )
-        # إضافة التذكير الجديد
-        await asyncio.get_event_loop().run_in_executor(
+        result = await asyncio.get_event_loop().run_in_executor(
             None, lambda: supabase.table("reminders").insert({
                 "user_id": user_id,
                 "chat_id": chat_id,
@@ -721,13 +707,13 @@ async def save_reminder(user_id: int, chat_id: int, reminder_time: str, reminder
                 "reminder_text": reminder_text
             }).execute()
         )
-        return True
+        return result.data[0] if result.data else None
     except Exception as e:
         print(f"خطأ في حفظ التذكير: {e}")
-        return False
+        return None
 
 async def delete_reminder(user_id: int, chat_id: int):
-    """حذف تذكير يومي من قاعدة البيانات"""
+    """حذف جميع تذكيرات المستخدم في محادثة معينة"""
     if not supabase:
         return False
     try:
@@ -740,7 +726,7 @@ async def delete_reminder(user_id: int, chat_id: int):
         return False
 
 async def load_all_reminders():
-    """تحميل جميع التذكيرات اليومية من قاعدة البيانات"""
+    """تحميل جميع التذكيرات اليومية من قاعدة البيانات (مع id)"""
     if not supabase:
         return []
     try:
@@ -751,6 +737,7 @@ async def load_all_reminders():
     except Exception as e:
         print(f"خطأ في تحميل التذكيرات: {e}")
         return []
+
 async def get_user_reminders(user_id: int):
     """جلب تذكيرات مستخدم معين"""
     if not supabase:
@@ -763,6 +750,7 @@ async def get_user_reminders(user_id: int):
     except Exception as e:
         print(f"خطأ في جلب التذكيرات: {e}")
         return []
+
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
     if supabase:
