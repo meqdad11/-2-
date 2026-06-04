@@ -193,13 +193,12 @@ async def cmd_daily_reminder(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return
 
         target_time = dtime(hour=hour, minute=minute, second=0, tzinfo=TIMEZONE)
-        # استخدام id من السجل المحفوظ لإنشاء اسم فريد للوظيفة
+        # استخدام data بدلاً من user_id و text مباشرة
         context.job_queue.run_daily(
             _send_daily_reminder,
             time=target_time,
             chat_id=chat_id,
-            user_id=user_id,
-            text=reminder_text,
+            data={"user_id": user_id, "text": reminder_text},
             name=f"daily_reminder_{saved['id']}"
         )
 
@@ -219,14 +218,14 @@ async def cmd_cancel_daily_reminder(update: Update, context: ContextTypes.DEFAUL
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
 
-    # حذف من قاعدة البيانات
     await db.delete_reminder(user_id, chat_id)
 
-    # حذف جميع وظائف التذكير اليومي الخاصة بهذا المستخدم/المحادثة
     jobs_removed = 0
     for job in context.job_queue.jobs():
-        if job.name.startswith("daily_reminder_") and hasattr(job, 'user_id') and hasattr(job, 'chat_id'):
-            if job.user_id == user_id and job.chat_id == chat_id:
+        if job.name.startswith("daily_reminder_") and job.data:
+            j_user_id = job.data.get("user_id")
+            j_chat_id = job.chat_id
+            if j_user_id == user_id and j_chat_id == chat_id:
                 job.schedule_removal()
                 jobs_removed += 1
 
