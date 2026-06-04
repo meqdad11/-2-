@@ -585,7 +585,7 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as resp:
                 if resp.status != 200:
-                    raise Exception("API error")
+                    raise Exception(f"HTTP {resp.status}")
                 data = await resp.json()
                 translated = data[0][0][0]
                 
@@ -596,8 +596,7 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         logger.error(f"خطأ في الترجمة: {e}")
-        await msg.reply_text("❌ خدمة الترجمة غير متاحة حالياً، حاول لاحقاً.")
-
+        await msg.reply_text(f"❌ خطأ في الترجمة ({str(e)[:150]}).")
 # ==================== HANDLE PRIVATE MESSAGES ====================
 async def handle_private_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
