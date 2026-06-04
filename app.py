@@ -34,6 +34,7 @@ from handlers_moderation import (
 from handlers_jobs import (
     cmd_report, job_expire_bans, 
     job_daily_quote, job_reschedule_reminders,
+    _send_daily_reminder,
 )
 from handlers_ai import (
     cmd_shafaq, cmd_choose_model, callback_choose_model,
@@ -187,8 +188,27 @@ async def handle_channel_post(update: Update, context):
 # ========== تهيئة التطبيق ==========
 async def post_init(app):
     await db.init_db()
-    # إعادة جدولة التذكيرات اليومية المحفوظة
-    await job_reschedule_reminders(app)
+    
+    # إعادة تشغيل التذكيرات اليومية المحفوظة
+    reminders = await db.load_all_reminders()
+    if reminders:
+        count = 0
+        for r in reminders:
+            try:
+                h, m = map(int, r["reminder_time"].split(":"))
+                app.job_queue.run_daily(
+                    _send_daily_reminder,
+                    time=datetime.time(hour=h, minute=m, tzinfo=SAUDI_TZ),
+                    chat_id=r["chat_id"],
+                    user_id=r["user_id"],
+                    text=r["reminder_text"],
+                    name=f"daily_reminder_{r['chat_id']}_{r['user_id']}"
+                )
+                count += 1
+            except Exception as e:
+                logger.error(f"فشل إعادة جدولة تذكير: {e}")
+        if count:
+            logger.info(f"✅ تم إعادة جدولة {count} تذكير يومي")
 
 # ========== تسجيل الهاندلرز ==========
 def register_handlers(app):
