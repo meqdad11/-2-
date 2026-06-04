@@ -334,16 +334,20 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❗️ رد على العضو.")
         return
     
-    # صلاحيات افتراضية للجميع
-    permissions = ChatPermissions(
-        can_send_messages=True,
-        can_send_media_messages=True,
-        can_send_other_messages=True,
-        can_add_web_page_previews=True
-    )
-    
     try:
-        # محاولة رفع الكتم
+        # إنشاء صلاحيات افتراضية (الكل مسموح)
+        permissions = ChatPermissions(
+            can_send_messages=True,
+            can_send_media_messages=True,
+            can_send_polls=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True,
+            can_change_info=False,
+            can_invite_users=True,
+            can_pin_messages=False,
+            can_manage_topics=False
+        )
+        
         await update.message.chat.restrict_member(reply_user.id, permissions)
         
         await db.log_user_action(
@@ -371,8 +375,13 @@ async def cmd_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     permissions = ChatPermissions(
         can_send_messages=False,
         can_send_media_messages=False,
+        can_send_polls=False,
         can_send_other_messages=False,
-        can_add_web_page_previews=False
+        can_add_web_page_previews=False,
+        can_change_info=False,
+        can_invite_users=False,
+        can_pin_messages=False,
+        can_manage_topics=False
     )
     
     try:
@@ -392,8 +401,13 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
     permissions = ChatPermissions(
         can_send_messages=True,
         can_send_media_messages=True,
+        can_send_polls=True,
         can_send_other_messages=True,
-        can_add_web_page_previews=True
+        can_add_web_page_previews=True,
+        can_change_info=False,
+        can_invite_users=True,
+        can_pin_messages=False,
+        can_manage_topics=False
     )
     
     try:
