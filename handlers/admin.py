@@ -111,6 +111,19 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
+    # ✅ إرسال رابط المجموعة للعضو تلقائيًا عبر اليوزربوت
+    try:
+        from telegram import Bot
+        import os as _os
+        bot = Bot(token=_os.environ.get("TELEGRAM_BOT_TOKEN"))
+        # 729970974 هو معرف حسابك الشخصي الذي يعمل عليه اليوزربوت
+        cmd = f"/send_invite {target_id}"
+        await bot.send_message(chat_id=729970974, text=cmd)
+        auto_sent = True
+    except Exception as e:
+        logger.error(f"فشل إرسال أمر الدعوة التلقائي: {e}")
+        auto_sent = False
+
     # ✅ إرسال رسالة إلى الشخص الذي فك الحظر
     msg_parts = [
         f"✅ **تم رفع الحظر عن:** {target_name}",
@@ -121,6 +134,11 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         msg_parts.append("\n📩 أرسل هذا الرابط للعضو ليتمكن من العودة.")
     else:
         msg_parts.append("\n⚠️ تعذر إنشاء رابط. يمكنك نسخ رابط المجموعة يدوياً وإرساله له.")
+
+    if auto_sent:
+        msg_parts.append("\n📩 تم إرسال رابط المجموعة للعضو تلقائياً عبر المساعد.")
+    else:
+        msg_parts.append("\n⚠️ تعذر إرسال رابط المجموعة للعضو تلقائياً.")
 
     await update.message.reply_text("\n".join(msg_parts), parse_mode="Markdown")
 
@@ -186,7 +204,6 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
 
-    # ✅ استخدام can_restrict بدلاً من is_admin
     if not await can_restrict(update, context, target_id):
         await update.message.reply_text("❌ لا يمكن تحذير مشرف أو مالك المجموعة.")
         return
@@ -283,7 +300,6 @@ async def cmd_eventlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-    # التعديل: تحويل النقطة والمسافة إلى سطر جديد
     text = " ".join(context.args).replace(". ", ".\n") if context.args else ""
     if not text:
         await update.message.reply_text("❌ استخدم: تعيين القواعد <القوانين>")
@@ -357,7 +373,6 @@ async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     
-    # التحقق من صلاحيات المستخدم (مالك أو مطور)
     try:
         member = await chat.get_member(user.id)
         is_creator = (member.status == 'creator')
@@ -369,13 +384,11 @@ async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ لا يمكن التحقق من صلاحياتك: {e}")
         return
 
-    # الحصول على الهدف
     target_id, target_name = get_target_id(update, context)
     if not target_id:
         await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
 
-    # التحقق من أن الهدف موجود بالفعل
     try:
         target_member = await chat.get_member(target_id)
         if target_member.status == 'creator':
@@ -388,7 +401,6 @@ async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ لا يمكن العثور على العضو: {e}")
         return
 
-    # محاولة التنزيل (بإلغاء جميع صلاحيات المشرف)
     try:
         await context.bot.promote_chat_member(
             chat.id,
@@ -490,16 +502,11 @@ async def cmd_tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== رتبتي / رتبته ====================
 async def get_full_rank(user_id: int, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> str:
-    """جلب الرتبة الكاملة (تشمل المطور)"""
-    # 1. التحقق من المطور
     if await db.is_developer(user_id):
         return "👨‍💻 مطور"
-    
-    # 2. التحقق من حالة العضو في تيليجرام
     try:
         member = await context.bot.get_chat_member(chat_id, user_id)
         status = member.status
-        
         if status == 'creator':
             return "👑 المالك"
         elif status == 'administrator':
@@ -514,7 +521,6 @@ async def get_full_rank(user_id: int, chat_id: int, context: ContextTypes.DEFAUL
             return "👤 عضو"
     except:
         pass
-    
     return "❓ غير معروف"
 
 async def cmd_my_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -569,7 +575,6 @@ async def cmd_warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== ملف العضو (أمر ملف) ====================
 async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض ملف شامل للعضو (سري - يرسل إلى الخاص)"""
     msg = update.message
     chat = update.effective_chat
     user = update.effective_user
