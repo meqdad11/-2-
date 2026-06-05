@@ -321,20 +321,22 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ================= القائمة الرئيسية (فهرس فقط) =================
-    if data == "menu_main":
-        keyboard = [
-            [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin"),
-             InlineKeyboardButton("👥 للجميع", callback_data="menu_user")],
-            [InlineKeyboardButton("🎵 الميديا", callback_data="menu_media"),
-             InlineKeyboardButton("📚 الموارد", callback_data="menu_resources")],
-            [InlineKeyboardButton("📋 الأوامر المتقدمة", callback_data="menu_commands"),
-             InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
-            [InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google"),
-             InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
-            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
-        ]
-        await msg.edit_text("🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:", reply_markup=InlineKeyboardMarkup(keyboard))
-        return
+    # ================= القائمة الرئيسية (فهرس فقط) =================
+if data == "menu_main":
+    keyboard = [
+        [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin"),
+         InlineKeyboardButton("👥 للجميع", callback_data="menu_user")],
+        [InlineKeyboardButton("🎵 الميديا", callback_data="menu_media"),
+         InlineKeyboardButton("📚 الموارد", callback_data="menu_resources")],
+        [InlineKeyboardButton("📋 الأوامر المتقدمة", callback_data="menu_commands"),
+         InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
+        [InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google"),
+         InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
+        [InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")],
+        [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
+    ]
+    await msg.edit_text("🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:", reply_markup=InlineKeyboardMarkup(keyboard))
+    return
 
     # ========== قائمة المشرفين (بدون مساعدين) ==========
     if data == "menu_admin":
