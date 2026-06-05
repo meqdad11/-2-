@@ -9,6 +9,9 @@ import yt_dlp
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 
+# =============================================================================
+# إعدادات عامة
+# =============================================================================
 logger = logging.getLogger(__name__)
 
 MAX_FILE_MB = 45
@@ -21,29 +24,41 @@ URL_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-USERBOT_CHAT_ID = 729970974
-pending_requests = {}
-request_counter = 0
+USERBOT_CHAT_ID = 729970974          # معرف حسابك الشخصي (اليوزربوت)
+pending_requests = {}                # تخزين الطلبات المعلقة
+request_counter = 0                  # عداد للطلبات
+SEARCH_CACHE = {}                    # ذاكرة مؤقتة لنتائج البحث
 
+
+# =============================================================================
+# دوال مساعدة
+# =============================================================================
 def extract_url(text: str):
+    """استخراج الرابط من النص"""
     match = URL_PATTERN.search(text)
     return match.group(0) if match else None
 
+
 def get_url_type(url: str) -> str:
+    """تحديد نوع الرابط (صوت، تيك توك، غير ذلك)"""
     if any(d in url for d in SOUNDCLOUD_DOMAINS):
         return "audio"
     if any(d in url for d in TIKTOK_DOMAINS):
         return "tiktok"
     return "ask"
 
+
 def fmt_dur(seconds) -> str:
+    """تنسيق المدة إلى دقائق:ثواني"""
     try:
         s = int(seconds)
         return f"{s//60}:{s%60:02d}"
     except:
         return ""
 
+
 def _get_common_opts():
+    """إعدادات yt-dlp الأساسية"""
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -68,7 +83,68 @@ def _get_common_opts():
         opts["cookiefile"] = "cookies.txt"
     return opts
 
+
+# =============================================================================
+# دوال البحث (يوتيوب - ساوند كلاود)
+# =============================================================================
+def _search_youtube(query: str) -> List[Dict]:
+    """بحث في يوتيوب وإرجاع قائمة بالنتائج"""
+    try:
+        ydl_opts = {
+            'quiet': True, 'no_warnings': True,
+            'extract_flat': 'in_playlist', 'playlistend': 5,
+            'extractor_args': {'youtube': {'player_client': ['ios', 'android', 'tv_embedded'], 'skip': ['hls', 'dash']}},
+            'user_agent': "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"ytsearch5:{query}", download=False)
+            results = []
+            if 'entries' in info:
+                for entry in info['entries'][:5]:
+                    if entry and entry.get('id'):
+                        results.append({
+                            'title': entry.get('title', 'بدون عنوان'),
+                            'url': f"https://www.youtube.com/watch?v={entry.get('id')}",
+                            'duration': fmt_dur(entry.get('duration', 0)),
+                        })
+            return results
+    except Exception as e:
+        logger.error(f"خطأ البحث في يوتيوب: {e}")
+        return []
+
+
+def _search_soundcloud(query: str) -> List[Dict]:
+    """بحث في ساوند كلاود وإرجاع قائمة بالنتائج"""
+    try:
+        ydl_opts = {
+            'quiet': True, 'no_warnings': True,
+            'extract_flat': 'in_playlist', 'playlistend': 5,
+            'user_agent': "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"scsearch5:{query}", download=False)
+            results = []
+            if 'entries' in info:
+                for entry in info['entries'][:5]:
+                    if entry:
+                        url = entry.get('webpage_url') or entry.get('url') or ''
+                        if url:
+                            results.append({
+                                'title': entry.get('title', 'بدون عنوان'),
+                                'url': url,
+                                'duration': fmt_dur(entry.get('duration', 0)),
+                            })
+            return results
+    except Exception as e:
+        logger.error(f"خطأ البحث في ساوند كلاود: {e}")
+        return []
+
+
+# =============================================================================
+# دوال التواصل مع اليوزربوت
+# =============================================================================
 async def _send_to_userbot(url: str, audio_only: bool, chat_id: int, message_id: int):
+    """إرسال أمر التحميل إلى حسابك الشخصي (اليوزربوت)"""
     global request_counter
     request_counter += 1
     req_id = f"{chat_id}_{message_id}_{request_counter}"
@@ -90,7 +166,12 @@ async def _send_to_userbot(url: str, audio_only: bool, chat_id: int, message_id:
         pending_requests.pop(req_id, None)
         return None
 
+
+# =============================================================================
+# استقبال الملفات من اليوزربوت وإرسالها للمستخدم
+# =============================================================================
 async def handle_userbot_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """استقبال الملفات من حسابك الشخصي وإعادة إرسالها للمستخدم"""
     msg = update.message
     if not msg or not msg.from_user:
         return
@@ -104,15 +185,33 @@ async def handle_userbot_response(update: Update, context: ContextTypes.DEFAULT_
     req_id, (chat_id, message_id) = next(iter(pending_requests.items()))
     del pending_requests[req_id]
     
+    # ✅ زر قناة التحديثات
+    channel_button = InlineKeyboardMarkup([[
+        InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")
+    ]])
+    
     try:
         if msg.video:
-            await context.bot.send_video(chat_id=chat_id, video=msg.video.file_id,
-                                         caption=msg.caption or "تم التحميل بواسطة شفق")
+            await context.bot.send_video(
+                chat_id=chat_id,
+                video=msg.video.file_id,
+                caption=msg.caption or "تم التحميل بواسطة شفق",
+                reply_markup=channel_button
+            )
         elif msg.audio:
-            await context.bot.send_audio(chat_id=chat_id, audio=msg.audio.file_id,
-                                         title=msg.audio.title, performer=msg.audio.performer)
+            await context.bot.send_audio(
+                chat_id=chat_id,
+                audio=msg.audio.file_id,
+                title=msg.audio.title,
+                performer=msg.audio.performer,
+                reply_markup=channel_button
+            )
         elif msg.document:
-            await context.bot.send_document(chat_id=chat_id, document=msg.document.file_id)
+            await context.bot.send_document(
+                chat_id=chat_id,
+                document=msg.document.file_id,
+                reply_markup=channel_button
+            )
     except Exception as e:
         logger.error(f"فشل إعادة إرسال الملف للمستخدم: {e}")
     finally:
@@ -121,7 +220,12 @@ async def handle_userbot_response(update: Update, context: ContextTypes.DEFAULT_
         except:
             pass
 
+
+# =============================================================================
+# معالجة الرابط المباشر (من المستخدم)
+# =============================================================================
 async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عند إرسال رابط مباشر - تحديد النوع وتوجيهه لليوزربوت"""
     msg = update.message or update.channel_post
     if not msg or not msg.text:
         return
@@ -143,13 +247,19 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             await msg.reply_text("❌ تعذر الاتصال بمساعد التحميل.")
     else:
+        # روابط يوتيوب وإنستغرام وغيرها ← أزرار اختيار فيديو/صوت
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو",    callback_data=f"dl_video|{url}"),
         ]])
         await msg.reply_text("اختر نوع التحميل:", reply_markup=keyboard)
 
+
+# =============================================================================
+# أزرار اختيار فيديو/صوت (لجميع الروابط)
+# =============================================================================
 async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالج الأزرار dl_audio و dl_video"""
     query = update.callback_query
     await query.answer()
     try:
@@ -167,7 +277,12 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في callback_download: {e}")
         await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
 
+
+# =============================================================================
+# أمر /download (للتوافق)
+# =============================================================================
 async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تحميل من رابط يرسل مع الأمر"""
     if not context.args:
         await update.message.reply_text("أرسل رابط مباشرة للتحميل")
         return
@@ -186,8 +301,12 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]])
         await update.message.reply_text("اختر نوع التحميل:", reply_markup=keyboard)
 
-# ---------- البحث في يوتيوب ----------
+
+# =============================================================================
+# البحث في يوتيوب
+# =============================================================================
 async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """أمر البحث في يوتيوب"""
     if not context.args:
         await update.message.reply_text("الاستخدام: يوتيوب <اسم الفيديو>")
         return
@@ -208,7 +327,9 @@ async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في cmd_yt_search: {e}")
         await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:40]}")
 
+
 async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار نتيجة من بحث يوتيوب"""
     query = update.callback_query
     await query.answer()
     try:
@@ -228,8 +349,12 @@ async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في callback_yt_pick: {e}")
         await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
 
-# ---------- البحث في ساوند كلاود ----------
+
+# =============================================================================
+# البحث في ساوند كلاود
+# =============================================================================
 async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """أمر البحث في ساوند كلاود"""
     if not context.args:
         await update.message.reply_text("الاستخدام: بحث <اسم الأغنية>\nمثال: بحث فيروز")
         return
@@ -252,7 +377,9 @@ async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في cmd_sc_search: {e}")
         await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:40]}")
 
+
 async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """اختيار نتيجة من بحث ساوند كلاود"""
     query = update.callback_query
     await query.answer()
     try:
@@ -278,56 +405,10 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في callback_sc_pick: {e}")
         await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
 
-SEARCH_CACHE = {}
 
-def _search_youtube(query: str) -> List[Dict]:
-    try:
-        ydl_opts = {
-            'quiet': True, 'no_warnings': True,
-            'extract_flat': 'in_playlist', 'playlistend': 5,
-            'extractor_args': {'youtube': {'player_client': ['ios', 'android', 'tv_embedded'], 'skip': ['hls', 'dash']}},
-            'user_agent': "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"ytsearch5:{query}", download=False)
-            results = []
-            if 'entries' in info:
-                for entry in info['entries'][:5]:
-                    if entry and entry.get('id'):
-                        results.append({
-                            'title': entry.get('title', 'بدون عنوان'),
-                            'url': f"https://www.youtube.com/watch?v={entry.get('id')}",
-                            'duration': fmt_dur(entry.get('duration', 0)),
-                        })
-            return results
-    except Exception as e:
-        logger.error(f"خطأ البحث في يوتيوب: {e}")
-        return []
-
-def _search_soundcloud(query: str) -> List[Dict]:
-    try:
-        ydl_opts = {
-            'quiet': True, 'no_warnings': True,
-            'extract_flat': 'in_playlist', 'playlistend': 5,
-            'user_agent': "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(f"scsearch5:{query}", download=False)
-            results = []
-            if 'entries' in info:
-                for entry in info['entries'][:5]:
-                    if entry:
-                        url = entry.get('webpage_url') or entry.get('url') or ''
-                        if url:
-                            results.append({
-                                'title': entry.get('title', 'بدون عنوان'),
-                                'url': url,
-                                'duration': fmt_dur(entry.get('duration', 0)),
-                            })
-            return results
-    except Exception as e:
-        logger.error(f"خطأ البحث في ساوند كلاود: {e}")
-        return []
-
+# =============================================================================
+# أزرار قديمة (للتوافق)
+# =============================================================================
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """زر ساوند كلاود القديم - غير مستخدم حالياً"""
     await update.callback_query.answer("غير متاح")
