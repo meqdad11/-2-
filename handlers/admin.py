@@ -490,7 +490,7 @@ async def cmd_tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== رتبتي / رتبته ====================
 async def get_full_rank(user_id: int, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> str:
-    """جلب الرتبة الكاملة (تشمل المطور والمساعد)"""
+    """جلب الرتبة الكاملة (تشمل المطور)"""
     # 1. التحقق من المطور
     if await db.is_developer(user_id):
         return "👨‍💻 مطور"
@@ -505,25 +505,15 @@ async def get_full_rank(user_id: int, chat_id: int, context: ContextTypes.DEFAUL
         elif status == 'administrator':
             return "👮 مشرف"
         elif status == 'restricted':
-            # التحقق من المساعد
-            if await db.is_assistant(chat_id, user_id):
-                return "⭐ مشرف مساعد (مكتوم)"
             return "🔇 مكتوم"
         elif status == 'left':
             return "🚪 غادر"
         elif status == 'kicked':
             return "🚫 محظور"
         elif status == 'member':
-            # التحقق من المساعد
-            if await db.is_assistant(chat_id, user_id):
-                return "⭐ مشرف مساعد"
             return "👤 عضو"
     except:
         pass
-    
-    # 3. التحقق من المساعد حتى لو لم نستطع جلب حالة تيليجرام
-    if await db.is_assistant(chat_id, user_id):
-        return "⭐ مشرف مساعد"
     
     return "❓ غير معروف"
 
@@ -635,68 +625,3 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await temp.delete()
         except:
             pass
-
-# ==================== المشرفين المساعدين (معدّل) ====================
-async def cmd_promote_assistant(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """رفع عضو كمشرف مساعد"""
-    if not await require_admin(update, context):
-        return
-    
-    target_id, target_name = get_target_id(update, context)
-    if not target_id:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
-        return
-    
-    chat_id = update.effective_chat.id
-    success = await db.add_assistant(chat_id, target_id)
-    
-    if success:
-        await update.message.reply_text(f"✅ تم رفع {target_name} كمشرف مساعد.")
-    else:
-        await update.message.reply_text("⚠️ هذا العضو مشرف مساعد بالفعل.")
-
-async def cmd_demote_assistant(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تنزيل مشرف مساعد (حتى لو مش موجود بالقائمة، يتأكد ويزيله)"""
-    if not await require_admin(update, context):
-        return
-    
-    target_id, target_name = get_target_id(update, context)
-    if not target_id:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
-        return
-    
-    chat_id = update.effective_chat.id
-    
-    # نحاول الحذف باستخدام force_remove_assistant (يتجاهل إذا مش موجود)
-    await db.force_remove_assistant(chat_id, target_id)
-    await update.message.reply_text(f"⬇️ تم تنزيل {target_name} من المشرفين المساعدين.")
-
-async def cmd_clear_assistants(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """مسح جميع المشرفين المساعدين في المجموعة"""
-    if not await require_admin(update, context):
-        return
-    
-    chat_id = update.effective_chat.id
-    success = await db.clear_assistants(chat_id)
-    if success:
-        await update.message.reply_text("🧹 تم مسح جميع المشرفين المساعدين.")
-    else:
-        await update.message.reply_text("❌ فشل المسح.")
-
-async def cmd_list_assistants(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض قائمة المشرفين المساعدين"""
-    if not await require_admin(update, context):
-        return
-    
-    chat_id = update.effective_chat.id
-    assistants = await db.get_assistants(chat_id)
-    
-    if not assistants:
-        await update.message.reply_text("📭 لا يوجد مشرفون مساعدون.")
-        return
-    
-    lines = []
-    for a in assistants:
-        lines.append(f"• `{a['user_id']}`")
-    
-    await update.message.reply_text("👥 **المشرفون المساعدون:**\n" + "\n".join(lines), parse_mode="Markdown")
