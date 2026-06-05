@@ -309,16 +309,30 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ لا يمكنك إرسال همسة لنفسك.")
         return
 
-    # تخزين بيانات الهمسة مؤقتاً
+    # حذف رسالة الأمر فوراً
+    try:
+        await msg.delete()
+    except:
+        pass
+
+    # تخزين معرف المستهدف في user_data
     context.user_data['whisper_target_id'] = target.id
     context.user_data['whisper_target_name'] = target.first_name
+    context.user_data['whisper_sender_name'] = sender.first_name
     context.user_data['whisper_chat_id'] = update.effective_chat.id
 
-    # طلب الهمسة باستخدام ForceReply
-    await msg.reply_text(
-        f"✍️ {sender.first_name}، أرسل همستك الآن.\n"
-        "ستكون سرية ولن يراها أحد غيره.",
-        reply_markup=ForceReply(selective=True)
+    # زر يفتح نافذة Inline Query في نفس القروب
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton(
+            "✍️ اكتب همستك",
+            switch_inline_query_current_chat=""
+        )
+    ]])
+    await msg.reply_to_message.reply_text(
+        f"💌 **همسة خاصة** من {sender.first_name} إلى {target.first_name}\n\n"
+        "اضغط الزر أعلاه 👆 واكتب همستك.",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
     )
 
 async def handle_whisper_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
