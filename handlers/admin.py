@@ -56,6 +56,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رفع الحظر عن عضو (فقط إذا كان محظوراً فعلاً)"""
     if not await require_admin(update, context):
         return
     reply_user = get_reply_user(update)
@@ -73,12 +74,26 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     try:
+        # التحقق من حالة العضو الحالية في المجموعة
+        member = await context.bot.get_chat_member(update.effective_chat.id, target_id)
+        
+        # إذا كان العضو موجوداً وعضواً طبيعياً (غير محظور)، لا داعي لرفع الحظر
+        if member.status == 'member' or member.status == 'administrator' or member.status == 'creator':
+            await update.message.reply_text("⚠️ هذا العضو ليس محظوراً، بل هو موجود في المجموعة.")
+            return
+        
+        # إذا كان العضو محظوراً (kicked) أو مقيداً، نرفع الحظر
         await context.bot.unban_chat_member(update.effective_chat.id, target_id)
         await db.remove_ban(target_id, update.effective_chat.id, update.effective_user.id)
-        await update.message.reply_text(f"✅ تم رفع الحظر عن {target_id}")
+        
+        if reply_user:
+            await update.message.reply_text(f"✅ تم رفع الحظر عن {fmt_user(reply_user)}.")
+        else:
+            await update.message.reply_text(f"✅ تم رفع الحظر عن {target_id}")
+            
     except Exception as e:
         logger.error(f"فشل رفع الحظر: {e}")
-        await update.message.reply_text("❌ لا يمكن رفع الحظر.")
+        await update.message.reply_text("❌ لا يمكن رفع الحظر عن هذا المستخدم.")
 
 
 # ==================== الكتم ====================
