@@ -321,6 +321,8 @@ async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
+    
+    # التحقق من صلاحيات المستخدم (مالك أو مطور)
     try:
         member = await chat.get_member(user.id)
         is_creator = (member.status == 'creator')
@@ -328,20 +330,49 @@ async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not (is_creator or is_dev):
             await update.message.reply_text("⛔ هذا الأمر حصري لمالك المجموعة أو المطور فقط.")
             return
-    except:
-        await update.message.reply_text("❌ لا يمكن التحقق من صلاحياتك.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ لا يمكن التحقق من صلاحياتك: {e}")
         return
 
+    # الحصول على الهدف
     target_id, target_name = get_target_id(update, context)
     if not target_id:
         await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
+
+    # التحقق من أن الهدف موجود بالفعل
+    try:
+        target_member = await chat.get_member(target_id)
+        if target_member.status == 'creator':
+            await update.message.reply_text("❌ لا يمكن تنزيل مالك المجموعة.")
+            return
+        if target_member.status != 'administrator':
+            await update.message.reply_text(f"⚠️ {target_name} ليس مشرفاً.")
+            return
+    except Exception as e:
+        await update.message.reply_text(f"❌ لا يمكن العثور على العضو: {e}")
+        return
+
+    # محاولة التنزيل
     try:
         await chat.demote_member(target_id)
         await update.message.reply_text(f"⬇️ تم تنزيل {target_name} من المشرفين.")
     except Exception as e:
         logger.error(f"فشل التنزيل: {e}")
-        await update.message.reply_text("❌ تعذر التنزيل. تأكد من أن البوت مشرف ويملك صلاحية إضافة مشرفين.")
+        error_msg = str(e).lower()
+        if "not enough rights" in error_msg or "rights" in error_msg:
+            await update.message.reply_text(
+                "❌ **البوت لا يملك صلاحية كافية!**\n\n"
+                "تأكد من أن البوت مشرف ولديه الصلاحيات التالية:\n"
+                "1. **إضافة مشرفين جدد** (Add New Admins).\n"
+                "2. رتبة البوت أعلى من العضو المطلوب تنزيله.\n\n"
+                "اذهب إلى: إعدادات المجموعة → المشرفين → بوت شفق → الصلاحيات.",
+                parse_mode="Markdown"
+            )
+        elif "user not found" in error_msg or "member not found" in error_msg:
+            await update.message.reply_text("❌ هذا العضو غير موجود في المجموعة.")
+        else:
+            await update.message.reply_text(f"❌ تعذر التنزيل: {e}")
 
 
 async def cmd_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
