@@ -289,89 +289,36 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== WHISPER (النظام الجديد) ====================
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
+
     if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
         await msg.reply_text("❌ هذا الأمر للمجموعات فقط.")
         return
+
     if not msg.reply_to_message:
         await msg.reply_text("❗️ رد على رسالة الشخص ثم اكتب: همسة")
         return
+
     target = msg.reply_to_message.from_user
     sender = msg.from_user
+
     if target.is_bot:
         await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
         return
+
     if target.id == sender.id:
         await msg.reply_text("❌ لا يمكنك إرسال همسة لنفسك.")
         return
 
+    # تخزين بيانات الهمسة مؤقتاً
     context.user_data['whisper_target_id'] = target.id
     context.user_data['whisper_target_name'] = target.first_name
-    context.user_data['whisper_sender_name'] = sender.first_name
     context.user_data['whisper_chat_id'] = update.effective_chat.id
 
-    try:
-        await msg.delete()
-    except:
-        pass
-
-    keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("✍️ اكتب همستك", switch_inline_query_current_chat="")
-    ]])
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=f"💌 **همسة خاصة** من {sender.first_name} إلى {target.first_name}",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
-
-async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or not msg.text:
-        return
-
-    # التحقق من أن المستخدم لديه جلسة همسة نشطة
-    target_id = context.user_data.get('whisper_target_id')
-    if not target_id:
-        return  # ليست همسة، تابع المعالجة العادية
-
-    # جلب بيانات الجلسة
-    target_name = context.user_data.pop('whisper_target_name', 'مجهول')
-    chat_id = context.user_data.pop('whisper_chat_id', None)
-    sender = msg.from_user
-    sender_name = context.user_data.pop('whisper_sender_name', sender.first_name)
-    whisper_text = msg.text
-
-    # تنظيف الجلسة
-    context.user_data.pop('whisper_target_id', None)
-
-    # حذف رسالة الهمسة من المجموعة (سري)
-    try:
-        await msg.delete()
-    except:
-        pass
-
-    # إنشاء معرف فريد للهمسة
-    whisper_id = str(uuid.uuid4())[:12]
-
-    # تخزين الهمسة في bot_data
-    context.bot_data[f'whisper_{whisper_id}'] = {
-        'sender_id': sender.id,
-        'sender_name': sender_name,
-        'target_id': target_id,
-        'target_name': target_name,
-        'text': whisper_text,
-        'created_at': datetime.now().isoformat()
-    }
-
-    # إرسال زر الهمسة إلى المجموعة
-    keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("👁️ عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
-    ]])
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=f"💌 **همسة خاصة** من {sender_name} إلى {target_name}",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
+    # طلب الهمسة باستخدام ForceReply
+    await msg.reply_text(
+        f"✍️ {sender.first_name}، أرسل همستك الآن.\n"
+        "ستكون سرية ولن يراها أحد غيره.",
+        reply_markup=ForceReply(selective=True)
     )
 
 async def handle_whisper_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -517,6 +464,34 @@ async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_T
     context.user_data.pop("whisper_target_id", None)
     context.user_data.pop("whisper_target_name", None)
     context.user_data.pop("whisper_sender_name", None)
+
+# ==================== AVATAR ====================
+async def cmd_avatar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    user = update.effective_user
+    target = user
+    reply_user = msg.reply_to_message.from_user if msg.reply_to_message else None
+
+    if reply_user and reply_user.id != user.id:
+        if await is_admin(update, context):
+            target = reply_user
+        else:
+            await msg.reply_text("⛔ فقط المشرفون يمكنهم عرض صور أعضاء آخرين.")
+            return
+
+    try:
+        photos = await context.bot.get_user_profile_photos(target.id, limit=1)
+        if photos.total_count > 0:
+            photo = photos.photos[0][-1]
+            await msg.reply_photo(
+                photo=photo.file_id,
+                caption=f"🖼️ صورة {target.first_name}"
+            )
+        else:
+            await msg.reply_text(f"❌ {target.first_name} ليس لديه صورة شخصية.")
+    except Exception as e:
+        logger.error(f"خطأ في جلب الصورة: {e}")
+        await msg.reply_text("❌ حدث خطأ في جلب الصورة.")
 
 # ==================== GET INVITE ====================
 async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
