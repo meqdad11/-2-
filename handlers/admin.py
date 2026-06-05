@@ -111,15 +111,19 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
-    # ✅ إرسال رابط المجموعة للعضو تلقائيًا عبر اليوزربوت
+    # ✅ إرسال رابط المجموعة للعضو تلقائياً عبر اليوزربوت
     try:
         from telegram import Bot
         import os as _os
         bot = Bot(token=_os.environ.get("TELEGRAM_BOT_TOKEN"))
-        # 729970974 هو معرف حسابك الشخصي الذي يعمل عليه اليوزربوت
-        cmd = f"/send_invite {target_id}"
-        await bot.send_message(chat_id=729970974, text=cmd)
-        auto_sent = True
+        # نستخدم الرابط المنشأ حديثاً، أو إذا تعذّر نستخدم رابطاً عاماً احتياطياً
+        link_to_send = invite_link if invite_link else f"https://t.me/{chat.username}" if chat.username else ""
+        if link_to_send:
+            cmd = f"/send_invite {target_id} {link_to_send}"
+            await bot.send_message(chat_id=729970974, text=cmd)  # 729970974 = حسابك
+            auto_sent = True
+        else:
+            auto_sent = False
     except Exception as e:
         logger.error(f"فشل إرسال أمر الدعوة التلقائي: {e}")
         auto_sent = False
@@ -131,7 +135,6 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     if invite_link:
         msg_parts.append(f"🔗 **رابط المجموعة:** {invite_link}")
-        msg_parts.append("\n📩 أرسل هذا الرابط للعضو ليتمكن من العودة.")
     else:
         msg_parts.append("\n⚠️ تعذر إنشاء رابط. يمكنك نسخ رابط المجموعة يدوياً وإرساله له.")
 
