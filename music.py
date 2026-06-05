@@ -22,8 +22,8 @@ URL_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-# معرف اليوزربوت (حسابك الشخصي) – نستخدم يوزر البوت لأن اليوزربوت يستمع لرسائله
-USERBOT_USERNAME = "@mygroup_guardm_bot"  # نفس البوت، لكن اليوزربوت يقرؤها
+# ---------- بيانات اليوزربوت (حسابك الشخصي) ----------
+USERBOT_CHAT_ID = 729970974  # معرف حسابك على تيليجرام (المطور)
 
 # ذاكرة مؤقتة لتخزين الطلبات: request_id -> (chat_id, message_id)
 pending_requests = {}
@@ -48,7 +48,6 @@ def fmt_dur(seconds) -> str:
         return ""
 
 # ---------- دوال التحميل المباشر (للاستخدام الطارئ فقط، لكننا عطلناها) ----------
-# أبقينا الدوال لأغراض أخرى، لكن لن تُستخدم مع يوتيوب.
 
 def _get_common_opts():
     opts = {
@@ -76,7 +75,7 @@ def _get_common_opts():
     return opts
 
 async def _send_to_userbot(url: str, audio_only: bool, chat_id: int, message_id: int):
-    """إرسال أمر التحميل إلى اليوزربوت وتخزين الطلب لإعادة التوجيه"""
+    """إرسال أمر التحميل إلى حسابك الشخصي (اليوزربوت)"""
     global request_counter
     request_counter += 1
     req_id = f"{chat_id}_{message_id}_{request_counter}"
@@ -88,55 +87,56 @@ async def _send_to_userbot(url: str, audio_only: bool, chat_id: int, message_id:
         cmd += " audio"
     
     try:
-        # نرسل الأمر إلى نفس البوت (في الخاص)، وسيلتقطه اليوزربوت
         from telegram import Bot
-        bot = Bot(token=os.environ.get("TELEGRAM_BOT_TOKEN"))
-        await bot.send_message(chat_id=USERBOT_USERNAME, text=cmd)
+        import os as _os
+        bot = Bot(token=_os.environ.get("TELEGRAM_BOT_TOKEN"))
+        # نرسل الأمر إلى حسابك الشخصي
+        await bot.send_message(chat_id=USERBOT_CHAT_ID, text=cmd)
         logger.info(f"أرسلنا أمر التحميل إلى اليوزربوت: {cmd}")
         return req_id
     except Exception as e:
         logger.error(f"فشل إرسال الأمر لليوزربوت: {e}")
-        # إزالة الطلب من الذاكرة
         pending_requests.pop(req_id, None)
         return None
 
 async def handle_userbot_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """استقبال الملفات القادمة من اليوزربوت وإرسالها للمستخدم الأصلي"""
+    """استقبال الملفات القادمة من اليوزربوت (حسابك الشخصي) وإرسالها للمستخدم الأصلي"""
     msg = update.message
     if not msg or not msg.from_user:
         return
     
-    # التأكد أن المرسل هو اليوزربوت (حسابك الشخصي)
-    if msg.from_user.username != USERBOT_USERNAME.replace("@", ""):
+    # التأكد أن المرسل هو حسابك الشخصي وليس أي أحد آخر
+    if msg.from_user.id != USERBOT_CHAT_ID:
         return
     
-    # البحث عن الطلب الأصلي (نعتمد على أن اليوزربوت يرسل الملف مباشرة بعد التحميل)
-    # بما أننا لا نستطيع معرفة الطلب المحدد بسهولة، نعتمد على آخر طلب في الذاكرة (أو نستخدم نظام أكثر تطورا لاحقا)
+    # نبحث عن أول طلب معلق (نظام بسيط، يمكن تحسينه لاحقًا)
     if not pending_requests:
         return
     
-    # نأخذ أول طلب في الذاكرة (مؤقت، يمكن تحسينه)
+    # نأخذ أول طلب في الذاكرة
     req_id, (chat_id, message_id) = next(iter(pending_requests.items()))
     del pending_requests[req_id]
     
     # إعادة إرسال الملف للمستخدم
-    if msg.video:
-        await context.bot.send_video(chat_id=chat_id, video=msg.video.file_id,
-                                     caption=msg.caption or "تم التحميل بواسطة شفق")
-    elif msg.audio:
-        await context.bot.send_audio(chat_id=chat_id, audio=msg.audio.file_id,
-                                     title=msg.audio.title, performer=msg.audio.performer)
-    elif msg.document:
-        await context.bot.send_document(chat_id=chat_id, document=msg.document.file_id)
-    else:
-        # ربما رسالة نصية (خطأ)
-        pass
-
-    # حذف الرسالة المؤقتة من اليوزربوت (اختياري)
     try:
-        await msg.delete()
-    except:
-        pass
+        if msg.video:
+            await context.bot.send_video(chat_id=chat_id, video=msg.video.file_id,
+                                         caption=msg.caption or "تم التحميل بواسطة شفق")
+        elif msg.audio:
+            await context.bot.send_audio(chat_id=chat_id, audio=msg.audio.file_id,
+                                         title=msg.audio.title, performer=msg.audio.performer)
+        elif msg.document:
+            await context.bot.send_document(chat_id=chat_id, document=msg.document.file_id)
+        else:
+            pass  # ربما رسالة نصية (خطأ)
+    except Exception as e:
+        logger.error(f"فشل إعادة إرسال الملف للمستخدم: {e}")
+    finally:
+        # حذف الرسالة المؤقتة من اليوزربوت (اختياري)
+        try:
+            await msg.delete()
+        except:
+            pass
 
 # ---------- معالجة الرابط المباشر (من المستخدم) ----------
 async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -149,21 +149,18 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url_type = get_url_type(url)
     
     if url_type == "audio":
-        # ساوند كلاود – نرسح أمر التحميل إلى اليوزربوت (نوع audio)
         req_id = await _send_to_userbot(url, True, msg.chat.id, msg.message_id)
         if req_id:
             await msg.reply_text("🎵 تم إرسال الطلب إلى مساعد التحميل... قد يستغرق الأمر قليلاً.")
         else:
             await msg.reply_text("❌ تعذر الاتصال بمساعد التحميل.")
     elif url_type == "tiktok":
-        # تيك توك – فيديو فقط
         req_id = await _send_to_userbot(url, False, msg.chat.id, msg.message_id)
         if req_id:
             await msg.reply_text("📱 تم إرسال الطلب إلى مساعد التحميل...")
         else:
             await msg.reply_text("❌ تعذر الاتصال بمساعد التحميل.")
     else:
-        # روابط أخرى (يوتيوب إلخ) – نعرض أزرار فيديو/صوت
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو",    callback_data=f"dl_video|{url}"),
@@ -180,7 +177,6 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = query.message.chat.id
         message_id = query.message.message_id
         
-        # نرسل أمر التحميل إلى اليوزربوت
         req_id = await _send_to_userbot(url, audio_only, chat_id, message_id)
         if req_id:
             await query.message.edit_text("⏳ جارٍ إرسال الطلب لمساعد التحميل...")
@@ -199,7 +195,6 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not url:
         await update.message.reply_text("❌ لم يُعثر على رابط مدعوم.")
         return
-    # نفس سلوك الرابط المباشر
     url_type = get_url_type(url)
     if url_type == "audio":
         req_id = await _send_to_userbot(url, True, update.effective_chat.id, update.message.message_id)
@@ -219,11 +214,10 @@ async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
     status = await update.message.reply_text("🔍 جاري البحث في يوتيوب...")
     try:
-        results = _search_youtube(query)  # نفس دالة البحث السابقة (موجودة أدناه)
+        results = _search_youtube(query)
         if not results:
             await status.edit_text("❌ لم يتم العثور على نتائج.")
             return
-        # تخزين مؤقت لنتائج البحث (نستخدم متغيراً عاماً بسيطاً)
         SEARCH_CACHE[query] = results
         keyboard = []
         for i, result in enumerate(results, 1):
@@ -283,7 +277,6 @@ def _search_youtube(query: str) -> List[Dict]:
         return []
 
 # ---------- الدوال المتبقية (تيك توك، ساوند كلاود) ----------
-# أبقيناها فارغة أو للاستخدام المستقبلي
 async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("ساوند كلاود غير متاح حالياً. استخدم يوتيوب.")
 
