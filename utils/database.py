@@ -808,6 +808,58 @@ async def get_assistants(chat_id: int) -> list:
     except Exception as e:
         print(f"خطأ في جلب المساعدين: {e}")
         return []
+# ==================== دوال المطورين ====================
+async def add_developer(user_id: int) -> bool:
+    """إضافة مطور إلى القائمة الدائمة"""
+    if not supabase:
+        return False
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("developers").insert({"user_id": user_id}).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في إضافة مطور: {e}")
+        return False
+
+async def remove_developer(user_id: int) -> bool:
+    """حذف مطور من القائمة"""
+    if not supabase:
+        return False
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("developers").delete().eq("user_id", user_id).execute()
+        )
+        return len(result.data) > 0
+    except Exception as e:
+        print(f"خطأ في حذف مطور: {e}")
+        return False
+
+async def is_developer(user_id: int) -> bool:
+    """التحقق مما إذا كان المستخدم مطوراً"""
+    if not supabase:
+        return False
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("developers").select("*").eq("user_id", user_id).execute()
+        )
+        return len(result.data) > 0
+    except Exception as e:
+        print(f"خطأ في التحقق من المطور: {e}")
+        return False
+
+async def get_developers() -> list:
+    """جلب قائمة المطورين"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("developers").select("*").execute()
+        )
+        return [row["user_id"] for row in result.data]
+    except Exception as e:
+        print(f"خطأ في جلب المطورين: {e}")
+        return []
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
     if supabase:
