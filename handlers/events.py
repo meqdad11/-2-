@@ -16,7 +16,6 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
     chat_id = result.chat.id
     user = new_member.user
 
-    # التحقق مما إذا كان العضو جديداً تماماً (ليس له حالة سابقة)
     is_new_member = old_member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED) or old_member.status is None
 
     if new_member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED):
@@ -42,9 +41,7 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
                     pass
                 await db.log_bot_action(chat_id, "auto_kick_banned", user_id=user.id, detail=reason)
             else:
-                # عضو جديد أو عائد، ويستحق الترحيب
                 try:
-                    # جلب البايو
                     bio = "غير محدد"
                     try:
                         full_chat = await context.bot.get_chat(user.id)
@@ -57,7 +54,7 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
                     username = f"@{user.username}" if user.username else "بدون يوزر"
                     welcome = (
                         f"👋 أهلاً وسهلاً {user.first_name}!\n"
-                        f"🆔 المعرف: `{user.id}`\n"
+                        f"🆔 المعرف: {user.id}\n"
                         f"📎 اليوزر: {username}\n"
                         f"📝 البايو: {bio}\n\n"
                         f"نرحب بك في مجموعتنا. 😊\n"
@@ -75,4 +72,4 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
                     await context.bot.send_message(
                         chat_id,
                         f"👋 أهلاً {user.first_name}! نرحب بك في مجموعتنا. 😊"
-                    ) 
+                    )
