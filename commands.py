@@ -67,6 +67,7 @@ from handlers.crisis import (
     cmd_add_crisis_words, cmd_remove_crisis_word, cmd_list_crisis_words,
     cmd_set_crisis_reply, cmd_enable_crisis, cmd_disable_crisis, cmd_crisis_status,
 )
+from handlers.userbot import cmd_send_invite  # ✅ أمر إرسال الرابط
 
 ARABIC_COMMANDS = {
     "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
@@ -159,4 +160,6 @@ ARABIC_COMMANDS = {
 
     "تعيين القواعد": cmd_setrules,
     "تعيين القوانين": cmd_setrules,
+
+    "ارسل_رابط": cmd_send_invite,  # ✅ أمر إرسال رابط المجموعة للمحظور
 }
