@@ -809,6 +809,33 @@ async def get_assistants(chat_id: int) -> list:
         print(f"خطأ في جلب المساعدين: {e}")
         return []
 
+# ===== دوال جديدة للمساعدين =====
+async def force_remove_assistant(chat_id: int, user_id: int) -> bool:
+    """حذف مشرف مساعد (يتجاهل إذا لم يكن موجوداً)"""
+    if not supabase:
+        return False
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("assistants").delete().eq("chat_id", chat_id).eq("user_id", user_id).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في حذف مساعد (force): {e}")
+        return False
+
+async def clear_assistants(chat_id: int) -> bool:
+    """مسح جميع المشرفين المساعدين في المجموعة"""
+    if not supabase:
+        return False
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("assistants").delete().eq("chat_id", chat_id).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في مسح المساعدين: {e}")
+        return False
+
 # ==================== دوال المطورين ====================
 async def add_developer(user_id: int) -> bool:
     """إضافة مطور إلى القائمة الدائمة"""
