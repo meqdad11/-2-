@@ -751,6 +751,63 @@ async def get_user_reminders(user_id: int):
         print(f"خطأ في جلب التذكيرات: {e}")
         return []
 
+# ==================== دوال المشرفين المساعدين ====================
+async def add_assistant(chat_id: int, user_id: int) -> bool:
+    """إضافة مشرف مساعد"""
+    if not supabase:
+        return False
+    try:
+        existing = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("assistants").select("*").eq("chat_id", chat_id).eq("user_id", user_id).execute()
+        )
+        if existing.data:
+            return False
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("assistants").insert({"chat_id": chat_id, "user_id": user_id}).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في إضافة مساعد: {e}")
+        return False
+
+async def remove_assistant(chat_id: int, user_id: int) -> bool:
+    """حذف مشرف مساعد"""
+    if not supabase:
+        return False
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("assistants").delete().eq("chat_id", chat_id).eq("user_id", user_id).execute()
+        )
+        return len(result.data) > 0
+    except Exception as e:
+        print(f"خطأ في حذف مساعد: {e}")
+        return False
+
+async def is_assistant(chat_id: int, user_id: int) -> bool:
+    """التحقق مما إذا كان المستخدم مشرفاً مساعداً"""
+    if not supabase:
+        return False
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("assistants").select("*").eq("chat_id", chat_id).eq("user_id", user_id).execute()
+        )
+        return len(result.data) > 0
+    except Exception as e:
+        print(f"خطأ في التحقق من المساعد: {e}")
+        return False
+
+async def get_assistants(chat_id: int) -> list:
+    """جلب قائمة المشرفين المساعدين"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("assistants").select("*").eq("chat_id", chat_id).execute()
+        )
+        return result.data
+    except Exception as e:
+        print(f"خطأ في جلب المساعدين: {e}")
+        return []
 # ========== تهيئة قاعدة البيانات ==========
 async def init_db():
     if supabase:
