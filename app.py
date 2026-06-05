@@ -28,6 +28,7 @@ from handlers.admin import (
 from handlers.user import (
     cmd_start, cmd_id, cmd_rules,
     auto_reply, track_message, cmd_my_reminders,
+    handle_whisper_message,  # <-- معالج التقاط رسالة الهمسة
 )
 from handlers.moderation import (
     cmd_add_word, cmd_remove_word, cmd_list_words,
@@ -268,6 +269,9 @@ def register_handlers(app):
     # ⭐ معالج الهمسات عبر Inline Query (الجديد) ⭐
     app.add_handler(InlineQueryHandler(handle_inline_query))
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
+
+    # ⭐ معالج التقاط رسالة الهمسة المرسلة بعد النافذة ⭐
+    app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_whisper_message))
 
 # ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
