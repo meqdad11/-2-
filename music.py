@@ -55,7 +55,7 @@ def _get_common_opts():
         "retries": 5,
         "extractor_args": {
             "youtube": {
-                "player_client": ["tv_embedded", "web_embedded", "web"],
+                "player_client": ["ios", "android", "tv_embedded"],
                 "skip": ["hls", "dash"],
             }
         },
@@ -270,7 +270,7 @@ def _search_youtube(query: str) -> List[Dict]:
             'playlistend': 5,
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['tv_embedded', 'web_embedded', 'web'],
+                    'player_client': ['ios', 'android', 'tv_embedded'],
                     'skip': ['hls', 'dash'],
                 }
             },
