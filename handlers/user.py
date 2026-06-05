@@ -324,6 +324,56 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
+async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    if not msg or not msg.text:
+        return
+
+    # التحقق من أن المستخدم لديه جلسة همسة نشطة
+    target_id = context.user_data.get('whisper_target_id')
+    if not target_id:
+        return  # ليست همسة، تابع المعالجة العادية
+
+    # جلب بيانات الجلسة
+    target_name = context.user_data.pop('whisper_target_name', 'مجهول')
+    chat_id = context.user_data.pop('whisper_chat_id', None)
+    sender = msg.from_user
+    sender_name = context.user_data.pop('whisper_sender_name', sender.first_name)
+    whisper_text = msg.text
+
+    # تنظيف الجلسة
+    context.user_data.pop('whisper_target_id', None)
+
+    # حذف رسالة الهمسة من المجموعة (سري)
+    try:
+        await msg.delete()
+    except:
+        pass
+
+    # إنشاء معرف فريد للهمسة
+    whisper_id = str(uuid.uuid4())[:12]
+
+    # تخزين الهمسة في bot_data
+    context.bot_data[f'whisper_{whisper_id}'] = {
+        'sender_id': sender.id,
+        'sender_name': sender_name,
+        'target_id': target_id,
+        'target_name': target_name,
+        'text': whisper_text,
+        'created_at': datetime.now().isoformat()
+    }
+
+    # إرسال زر الهمسة إلى المجموعة
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("👁️ عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
+    ]])
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"💌 **همسة خاصة** من {sender_name} إلى {target_name}",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
 async def handle_whisper_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالج استقبال الرد على طلب الهمسة (ForceReply)"""
     msg = update.message
