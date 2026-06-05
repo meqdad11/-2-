@@ -1,36 +1,46 @@
 import uuid
 from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultArticle, InputTextMessageContent
 from telegram.ext import ContextTypes
 
 async def handle_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.inline_query
-    if not query or not query.query:
+    if not query:
         return
+    # نافذة الكتابة
+    results = [
+        InlineQueryResultArticle(
+            id="whisper_input",
+            title="اكتب همستك هنا...",
+            description="اضغط إرسال بعد كتابة الهمسة",
+            input_message_content=InputTextMessageContent(
+                message_text="✍️ جاري إرسال الهمسة..."
+            )
+        )
+    ]
+    await query.answer(results, cache_time=0, is_personal=True)
 
-    user_id = query.from_user.id
-    whisper_text = query.query.strip()
+async def handle_chosen_inline_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chosen = update.chosen_inline_result
+    if not chosen:
+        return
+    user_id = chosen.from_user.id
+    whisper_text = chosen.query.strip()
 
-    # استرجاع بيانات الجلسة
     target_id = context.user_data.get('whisper_target_id')
     target_name = context.user_data.get('whisper_target_name', 'مجهول')
-    sender_name = context.user_data.get('whisper_sender_name', query.from_user.first_name)
+    sender_name = context.user_data.get('whisper_sender_name', chosen.from_user.first_name)
     chat_id = context.user_data.get('whisper_chat_id')
 
-    if not target_id or not chat_id:
-        # إذا لم تكن هناك جلسة، لا تفعل شيئاً (أو أرسل نتيجة فارغة)
+    if not target_id or not chat_id or not whisper_text:
         return
 
-    # تنظيف الجلسة
     context.user_data.pop('whisper_target_id', None)
     context.user_data.pop('whisper_target_name', None)
     context.user_data.pop('whisper_sender_name', None)
     context.user_data.pop('whisper_chat_id', None)
 
-    # إنشاء معرف فريد للهمسة
     whisper_id = str(uuid.uuid4())[:12]
-
-    # تخزين الهمسة في bot_data
     context.bot_data[f'whisper_{whisper_id}'] = {
         'sender_id': user_id,
         'sender_name': sender_name,
@@ -40,7 +50,6 @@ async def handle_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE
         'created_at': datetime.now().isoformat()
     }
 
-    # إرسال رسالة إلى القروب تحتوي على زر "عرض الهمسة"
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("👁️ عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
     ]])
