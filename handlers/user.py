@@ -1,5 +1,5 @@
 """
-ملف المستخدم - مع تعدد التذكيرات اليومية
+ملف المستخدم - مع تعدد التذكيرات اليومية ونظام الهمسات الجديد
 """
 
 import logging
@@ -9,8 +9,9 @@ import aiohttp
 from datetime import datetime, time as dtime
 from zoneinfo import ZoneInfo
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ForceReply
 from telegram.ext import ContextTypes
+from telegram import Chat as TGChat
 
 from utils import database as db
 from config import TIMEZONE
@@ -55,7 +56,6 @@ async def cmd_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     reply_user = get_reply_user(update)
 
-    from telegram import Chat as TGChat
     in_group = chat.type in (TGChat.GROUP, TGChat.SUPERGROUP)
 
     if reply_user and reply_user.id != user.id:
@@ -258,7 +258,6 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not msg or not msg.text:
         return
 
-    from telegram import Chat as TGChat
     if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
         return
 
@@ -276,7 +275,6 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.effective_user:
         return
 
-    from telegram import Chat as TGChat
     if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
         return
 
@@ -288,71 +286,102 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
-# ==================== WHISPER ====================
+# ==================== WHISPER (النظام الجديد) ====================
+async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+
+    if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
+        await msg.reply_text("❌ هذا الأمر للمجموعات فقط.")
+        return
+
+    if not msg.reply_to_message:
+        await msg.reply_text("❗️ رد على رسالة الشخص ثم اكتب: همسة")
+        return
+
+    target = msg.reply_to_message.from_user
+    sender = msg.from_user
+
+    if target.is_bot:
+        await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
+        return
+
+    if target.id == sender.id:
+        await msg.reply_text("❌ لا يمكنك إرسال همسة لنفسك.")
+        return
+
+    # تخزين بيانات الهمسة مؤقتاً
+    context.user_data['whisper_target_id'] = target.id
+    context.user_data['whisper_target_name'] = target.first_name
+    context.user_data['whisper_chat_id'] = update.effective_chat.id
+
+    # طلب الهمسة باستخدام ForceReply
+    await msg.reply_text(
+        f"✍️ {sender.first_name}، أرسل همستك الآن.\n"
+        "ستكون سرية ولن يراها أحد غيره.",
+        reply_markup=ForceReply(selective=True)
+    )
+
+async def handle_whisper_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالج استقبال الرد على طلب الهمسة (ForceReply)"""
+    msg = update.message
+    if not msg or not msg.reply_to_message:
+        return
+
+    # التحقق من أن المستخدم لديه جلسة همسة نشطة
+    target_id = context.user_data.get('whisper_target_id')
+    if not target_id:
+        return
+
+    # التحقق من أن الرد هو على رسالة البوت التي طلبت الهمسة
+    if not msg.reply_to_message.from_user.is_bot:
+        return
+
+    target_name = context.user_data.pop('whisper_target_name', 'المستلم')
+    chat_id = context.user_data.pop('whisper_chat_id', None)
+    sender = msg.from_user
+    whisper_text = msg.text
+
+    # تنظيف الحالة
+    context.user_data.pop('whisper_target_id', None)
+
+    # حذف رسالة الأمر الأصلية ورسالة الطلب ورسالة الهمسة
+    try:
+        await msg.delete()
+        await msg.reply_to_message.delete()
+    except:
+        pass
+
+    # إنشاء معرف فريد للهمسة
+    whisper_id = str(uuid.uuid4())[:12]
+
+    # تخزين الهمسة في bot_data
+    context.bot_data[f'whisper_{whisper_id}'] = {
+        'sender_id': sender.id,
+        'sender_name': sender.first_name,
+        'target_id': target_id,
+        'target_name': target_name,
+        'text': whisper_text,
+        'created_at': datetime.now().isoformat()
+    }
+
+    # إرسال زر الهمسة إلى المجموعة
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("💌 عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
+    ]])
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"💌 **همسة خاصة**\nمن {sender.first_name} إلى {target_name}",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
+    )
+
+# دوال الهمسة القديمة (للحفاظ على التوافق)
 async def delete_whisper_job(context: ContextTypes.DEFAULT_TYPE, whisper_id: str):
     storage = context.bot_data.get('whisper_storage', {})
     if whisper_id in storage:
         del storage[whisper_id]
         print(f"🗑️ تم حذف الهمسة {whisper_id} (انتهت صلاحيتها)")
 
-async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-
-    from telegram import Chat as TGChat
-    if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
-        await msg.reply_text("❌ هذا الأمر للمجموعات فقط.")
-        return
-
-    if not msg.reply_to_message:
-        await msg.reply_text("❗️ رد على رسالة الشخص ثم اكتب: اهمس")
-        return
-
-    target = msg.reply_to_message.from_user
-
-    if target.is_bot:
-        await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
-        return
-
-    if target.id == msg.from_user.id:
-        await msg.reply_text("❌ لا يمكنك إرسال همسة لنفسك.")
-        return
-
-    # استخراج نص الهمسة (كل النص بعد الأمر)
-    full_text = msg.text
-    parts = full_text.split(None, 1)
-    whisper_text = parts[1] if len(parts) > 1 else ""
-    if not whisper_text:
-        await msg.reply_text("❌ اكتب الهمسة بعد الأمر.\nمثال: اهمس هذا سر بيننا")
-        return
-
-    whisper_id = str(uuid.uuid4())[:12]
-
-    # تخزين الهمسة
-    whisper_data = {
-        "sender_id": msg.from_user.id,
-        "sender_name": msg.from_user.first_name,
-        "target_id": target.id,
-        "target_name": target.first_name,
-        "text": whisper_text,
-        "created_at": datetime.now().isoformat()
-    }
-    context.bot_data[f'whisper_{whisper_id}'] = whisper_data
-
-    # حذف رسالة الأمر من القروب (سري)
-    try:
-        await msg.delete()
-    except:
-        pass
-
-    # إرسال زر الهمسة (بدون parse_mode لتجنب الأخطاء)
-    keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("🔒 عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
-    ]])
-    await context.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=f"💌 همسة سرية لـ {target.first_name}",
-        reply_markup=keyboard
-    )
 async def handle_whisper_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
 
@@ -586,10 +615,8 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as resp:
                 if resp.status != 200:
-                    raise Exception(f"HTTP {resp.status}")
+                    raise Exception("API error")
                 data = await resp.json()
-                
-                # تجميع كل أجزاء الترجمة (وليس فقط الجزء الأول)
                 translated_parts = [part[0] for part in data[0] if part[0]]
                 translated = ''.join(translated_parts)
                 
@@ -600,13 +627,21 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     except Exception as e:
         logger.error(f"خطأ في الترجمة: {e}")
-        await msg.reply_text(f"❌ خطأ في الترجمة ({str(e)[:150]}).")
+        await msg.reply_text("❌ خدمة الترجمة غير متاحة حالياً، حاول لاحقاً.")
+
 # ==================== HANDLE PRIVATE MESSAGES ====================
 async def handle_private_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or update.effective_chat.type != "private":
         return
 
+    # ---- معالجة استقبال الهمسة (النظام الجديد) ----
+    target_id = context.user_data.get('whisper_target_id')
+    if target_id:
+        await handle_whisper_reply(update, context)
+        return
+
+    # ---- النظام القديم للهمسات والرسائل المجهولة ----
     if context.user_data.get("active_whisper_id"):
         await handle_whisper_message(update, context)
         return
@@ -631,3 +666,5 @@ async def handle_private_messages(update: Update, context: ContextTypes.DEFAULT_
 def register_user_handlers(app):
     from telegram.ext import MessageHandler, filters
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_private_messages))
+    # تسجيل معالج استقبال الرد على ForceReply (للهمسات)
+    app.add_handler(MessageHandler(filters.REPLY & filters.TEXT & filters.ChatType.GROUPS, handle_whisper_reply))
