@@ -1,7 +1,6 @@
 import logging
 import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
-from telegram.constants import ChatMemberStatus
 from telegram.ext import ContextTypes
 from utils import database as db
 from utils.helpers import is_admin
@@ -30,8 +29,11 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.delete()
         return
 
-    # ========== إحصائيات سريعة ==========
+    # ========== إحصائيات (نُقلت إلى المشرفين) ==========
     if data == "exec_stats":
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
         try:
             members_count = await context.bot.get_chat_member_count(chat_id)
             admins = await context.bot.get_chat_administrators(chat_id)
@@ -39,14 +41,14 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = f"📊 إحصائيات المجموعة:\n👥 الأعضاء: {members_count}\n👮 المشرفون: {admins_count}"
         except:
             text = "📊 لا يمكن جلب الإحصائيات حالياً."
-        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_main"),
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_manage"),
                      InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     if data == "exec_quote":
         text = f"💬 اقتباس اليوم:\n\n{random.choice(DAILY_QUOTES)}"
-        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_main"),
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_user"),
                      InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
@@ -262,7 +264,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(update, context):
             await query.answer("⛔ هذه القائمة للمشرفين فقط", show_alert=True)
             return
-        # تم حذف ذكر "رفع مساعد / تنزيل مساعد" و"المساعدين"
         text = (
             "👮 **أوامر الإدارة (للمشرفين):**\n"
             "• كتم / رفع الكتم\n"
@@ -319,30 +320,23 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
-    # ================= القائمة الرئيسية (ثنائية) =================
+    # ================= القائمة الرئيسية (فهرس فقط) =================
     if data == "menu_main":
         keyboard = [
             [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin"),
              InlineKeyboardButton("👥 للجميع", callback_data="menu_user")],
             [InlineKeyboardButton("🎵 الميديا", callback_data="menu_media"),
              InlineKeyboardButton("📚 الموارد", callback_data="menu_resources")],
-            [InlineKeyboardButton("📊 إحصائيات", callback_data="exec_stats"),
-             InlineKeyboardButton("💬 اقتباس اليوم", callback_data="exec_quote")],
-            [InlineKeyboardButton("📋 تذكيراتي", callback_data="exec_my_reminders"),
-             InlineKeyboardButton("❌ إلغاء تذكير يومي", callback_data="exec_cancel_daily_reminder")],
-            [InlineKeyboardButton("📁 ملف", callback_data="exec_userfile"),
-             InlineKeyboardButton("📜 سجل", callback_data="exec_eventlog")],
-            [InlineKeyboardButton("📋 الأوامر", callback_data="menu_commands"),
+            [InlineKeyboardButton("📋 الأوامر المتقدمة", callback_data="menu_commands"),
              InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
             [InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google"),
-             InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")],
-            [InlineKeyboardButton("📞 تواصل", callback_data="menu_contact"),
-             InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
+             InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text("🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # ========== قائمة المشرفين (بدون أزرار المساعدين) ==========
+    # ========== قائمة المشرفين (بدون مساعدين) ==========
     if data == "menu_admin":
         if not await is_admin(update, context):
             await query.answer("⛔ هذه القائمة للمشرفين فقط", show_alert=True)
@@ -424,13 +418,14 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
              InlineKeyboardButton("🚫 الكلمات المحظورة", callback_data="exec_wordlist")],
             [InlineKeyboardButton("🧹 مسح المحظورين", callback_data="exec_purge_bans"),
              InlineKeyboardButton("🧹 مسح المكتومين", callback_data="exec_purge_muted")],
+            [InlineKeyboardButton("📊 إحصائيات المجموعة", callback_data="exec_stats")],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin"),
              InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text("⚙️ الإدارة — اختر أمراً:", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # ========== قائمة المستخدمين ==========
+    # ========== قائمة المستخدمين (شاملة) ==========
     if data == "menu_user":
         keyboard = [
             [InlineKeyboardButton("🪪 معلوماتي", callback_data="exec_id"),
@@ -444,7 +439,8 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🔄 تذكير يومي", callback_data="exec_daily_remind"),
              InlineKeyboardButton("📋 تذكيراتي", callback_data="exec_my_reminders")],
             [InlineKeyboardButton("❌ إلغاء تذكير يومي", callback_data="exec_cancel_daily_reminder"),
-             InlineKeyboardButton("👤 المالك", callback_data="exec_owner")],
+             InlineKeyboardButton("💬 اقتباس اليوم", callback_data="exec_quote")],
+            [InlineKeyboardButton("👤 المالك", callback_data="exec_owner")],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main"),
              InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
@@ -646,8 +642,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # تم حذف أقسام المساعدين نهائياً
-
     # ========== معالج الهمسة الجديد (نافذة منبثقة) ==========
     if data.startswith("show_whisper_"):
         whisper_id = data.split("_")[2]
@@ -664,13 +658,11 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ هذه الهمسة ليست لك!", show_alert=True)
             return
         
-        # عرض الهمسة في نافذة منبثقة (pop-up)
         await query.answer(
             f"💬 {whisper['text']}",
             show_alert=True
         )
         
-        # حذف الهمسة بعد القراءة
         del context.bot_data[f'whisper_{whisper_id}']
         await msg.delete()
         return
