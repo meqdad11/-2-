@@ -685,6 +685,36 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
+    # ========== معالج الهمسة الجديد (تم إصلاحه) ==========
+    if data.startswith("show_whisper_"):
+        whisper_id = data.split("_")[2]
+        user_id = update.effective_user.id
+        
+        whisper = context.bot_data.get(f'whisper_{whisper_id}')
+        
+        if not whisper:
+            await query.answer("❌ هذه الهمسة غير متاحة (انتهت صلاحيتها).", show_alert=True)
+            await msg.delete()
+            return
+        
+        if user_id not in [whisper['sender_id'], whisper['target_id']]:
+            await query.answer("❌ هذه الهمسة ليست لك!", show_alert=True)
+            return
+        
+        await query.answer("🔓 همسة خاصة", show_alert=True)
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=f"🔓 **همسة خاصة**\n\n"
+                 f"✉️ من: {whisper['sender_name']}\n"
+                 f"📩 إلى: {whisper['target_name']}\n\n"
+                 f"💬 النص: {whisper['text']}",
+            parse_mode="Markdown"
+        )
+        
+        del context.bot_data[f'whisper_{whisper_id}']
+        await msg.delete()
+        return
+
     # ========== الميديا والموارد ==========
     if data == "menu_media":
         keyboard = [
@@ -827,39 +857,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
-
-    # ================= عرض الهمسة =================
-  if data.startswith("show_whisper_"):
-    whisper_id = data.split("_")[2]
-    user_id = update.effective_user.id
-    
-    whisper = context.bot_data.get(f'whisper_{whisper_id}')
-    
-    if not whisper:
-        await query.answer("❌ هذه الهمسة غير متاحة (انتهت صلاحيتها).", show_alert=True)
-        await msg.delete()
-        return
-    
-    # التحقق من الهوية: فقط المرسل أو المستهدف يمكنه القراءة
-    if user_id not in [whisper['sender_id'], whisper['target_id']]:
-        await query.answer("❌ هذه الهمسة ليست لك!", show_alert=True)
-        return
-    
-    # عرض الهمسة للمستهدف أو المرسل
-    await query.answer("🔓 همسة خاصة", show_alert=True)
-    await context.bot.send_message(
-        chat_id=user_id,
-        text=f"🔓 **همسة خاصة**\n\n"
-             f"✉️ من: {whisper['sender_name']}\n"
-             f"📩 إلى: {whisper['target_name']}\n\n"
-             f"💬 النص: {whisper['text']}",
-        parse_mode="Markdown"
-    )
-    
-    # حذف الهمسة بعد قراءتها
-    del context.bot_data[f'whisper_{whisper_id}']
-    await msg.delete()
-    return
 
 
 async def show_lock_result(msg, text, back_callback):
