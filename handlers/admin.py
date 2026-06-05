@@ -14,6 +14,18 @@ from utils.helpers import (
 
 logger = logging.getLogger(__name__)
 
+def get_target_id(update, context):
+    """جلب target_id من الرد أو من context.args"""
+    reply_user = get_reply_user(update)
+    if reply_user:
+        return reply_user.id, fmt_user(reply_user)
+    if context.args:
+        try:
+            return int(context.args[0]), str(context.args[0])
+        except ValueError:
+            return None, None
+    return None, None
+
 # ==================== الحظر ====================
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
@@ -59,38 +71,20 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """رفع الحظر عن عضو (فقط إذا كان محظوراً فعلاً)"""
     if not await require_admin(update, context):
         return
-    reply_user = get_reply_user(update)
-    target_id = None
-    if reply_user:
-        target_id = reply_user.id
-    elif context.args:
-        try:
-            target_id = int(context.args[0])
-        except ValueError:
-            await update.message.reply_text("❌ معرف المستخدم غير صالح.")
-            return
+    target_id, target_name = get_target_id(update, context)
     if not target_id:
-        await update.message.reply_text("❌ استخدم: رفع الحظر <معرف>")
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
 
     try:
-        # التحقق من حالة العضو الحالية في المجموعة
         member = await context.bot.get_chat_member(update.effective_chat.id, target_id)
-        
-        # إذا كان العضو موجوداً وعضواً طبيعياً (غير محظور)، لا داعي لرفع الحظر
         if member.status == 'member' or member.status == 'administrator' or member.status == 'creator':
             await update.message.reply_text("⚠️ هذا العضو ليس محظوراً، بل هو موجود في المجموعة.")
             return
         
-        # إذا كان العضو محظوراً (kicked) أو مقيداً، نرفع الحظر
         await context.bot.unban_chat_member(update.effective_chat.id, target_id)
         await db.remove_ban(target_id, update.effective_chat.id, update.effective_user.id)
-        
-        if reply_user:
-            await update.message.reply_text(f"✅ تم رفع الحظر عن {fmt_user(reply_user)}.")
-        else:
-            await update.message.reply_text(f"✅ تم رفع الحظر عن {target_id}")
-            
+        await update.message.reply_text(f"✅ تم رفع الحظر عن {target_name}")
     except Exception as e:
         logger.error(f"فشل رفع الحظر: {e}")
         await update.message.reply_text("❌ لا يمكن رفع الحظر عن هذا المستخدم.")
@@ -100,18 +94,9 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-    reply_user = get_reply_user(update)
-    target_id = None
-    if reply_user:
-        target_id = reply_user.id
-    elif context.args:
-        try:
-            target_id = int(context.args[0])
-        except ValueError:
-            await update.message.reply_text("❌ معرف غير صالح.")
-            return
+    target_id, target_name = get_target_id(update, context)
     if not target_id:
-        await update.message.reply_text("❌ استخدم: كتم <معرف> [مدة]")
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
 
     duration = None
@@ -130,7 +115,6 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
             until = datetime.now(timezone.utc) + duration
         await context.bot.restrict_chat_member(update.effective_chat.id, target_id, perms, until_date=until)
         await db.log_event(update.effective_chat.id, "mute", user_id=update.effective_user.id, target_id=target_id)
-        target_name = fmt_user(reply_user) if reply_user else str(target_id)
         duration_str = fmt_duration(duration)
         await update.message.reply_text(f"🔇 تم كتم {target_name} - {duration_str}")
     except Exception as e:
@@ -141,18 +125,9 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-    reply_user = get_reply_user(update)
-    target_id = None
-    if reply_user:
-        target_id = reply_user.id
-    elif context.args:
-        try:
-            target_id = int(context.args[0])
-        except ValueError:
-            await update.message.reply_text("❌ معرف غير صالح.")
-            return
+    target_id, target_name = get_target_id(update, context)
     if not target_id:
-        await update.message.reply_text("❌ استخدم: رفع الكتم <معرف>")
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
 
     try:
@@ -162,7 +137,6 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await context.bot.restrict_chat_member(update.effective_chat.id, target_id, perms)
         await db.log_event(update.effective_chat.id, "unmute", user_id=update.effective_user.id, target_id=target_id)
-        target_name = fmt_user(reply_user) if reply_user else str(target_id)
         await update.message.reply_text(f"🔊 تم رفع الكتم عن {target_name}")
     except Exception as e:
         logger.error(f"فشل رفع الكتم: {e}")
@@ -173,26 +147,24 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-    reply_user = get_reply_user(update)
-    if not reply_user:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو.")
+    target_id, target_name = get_target_id(update, context)
+    if not target_id:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
 
-    if await is_admin(update, context, reply_user.id):
+    if await is_admin(update, context, target_id):
         await update.message.reply_text("❌ لا يمكن تحذير مشرف.")
         return
 
-    count = await db.add_warning(reply_user.id, update.effective_chat.id)
-    await update.message.reply_text(
-        f"⚠️ {fmt_user(reply_user)} تلقى تحذيراً ({count}/{MAX_WARNINGS})"
-    )
+    count = await db.add_warning(target_id, update.effective_chat.id)
+    await update.message.reply_text(f"⚠️ {target_name} تلقى تحذيراً ({count}/{MAX_WARNINGS})")
 
     if count >= MAX_WARNINGS:
         try:
-            await context.bot.ban_chat_member(update.effective_chat.id, reply_user.id)
-            await db.add_ban(reply_user.id, update.effective_chat.id, f"حظر تلقائي بعد {MAX_WARNINGS} تحذيرات", 0)
-            await db.clear_warnings(reply_user.id, update.effective_chat.id)
-            await update.message.reply_text(f"🚫 تم حظر {fmt_user(reply_user)} تلقائياً.")
+            await context.bot.ban_chat_member(update.effective_chat.id, target_id)
+            await db.add_ban(target_id, update.effective_chat.id, f"حظر تلقائي بعد {MAX_WARNINGS} تحذيرات", 0)
+            await db.clear_warnings(target_id, update.effective_chat.id)
+            await update.message.reply_text(f"🚫 تم حظر {target_name} تلقائياً.")
         except Exception as e:
             logger.error(f"فشل الحظر التلقائي: {e}")
 
@@ -200,21 +172,21 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-    reply_user = get_reply_user(update)
-    if not reply_user:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو.")
+    target_id, target_name = get_target_id(update, context)
+    if not target_id:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
-    await db.clear_warnings(reply_user.id, update.effective_chat.id)
-    await update.message.reply_text(f"✅ تم مسح تحذيرات {fmt_user(reply_user)}")
+    await db.clear_warnings(target_id, update.effective_chat.id)
+    await update.message.reply_text(f"✅ تم مسح تحذيرات {target_name}")
 
 
 async def cmd_warnings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    reply_user = get_reply_user(update)
-    if not reply_user:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو.")
+    target_id, target_name = get_target_id(update, context)
+    if not target_id:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
-    count = await db.get_warnings(reply_user.id, update.effective_chat.id)
-    await update.message.reply_text(f"📊 {fmt_user(reply_user)} لديه {count}/{MAX_WARNINGS} تحذيرات.")
+    count = await db.get_warnings(target_id, update.effective_chat.id)
+    await update.message.reply_text(f"📊 {target_name} لديه {count}/{MAX_WARNINGS} تحذيرات.")
 
 
 # ==================== القوائم ====================
@@ -232,18 +204,9 @@ async def cmd_banlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_baninfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-    reply_user = get_reply_user(update)
-    target_id = None
-    if reply_user:
-        target_id = reply_user.id
-    elif context.args:
-        try:
-            target_id = int(context.args[0])
-        except ValueError:
-            await update.message.reply_text("❌ معرف غير صالح.")
-            return
+    target_id, target_name = get_target_id(update, context)
     if not target_id:
-        await update.message.reply_text("❌ استخدم: معلومات <معرف>")
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
 
     ban = await db.get_ban(target_id, update.effective_chat.id)
@@ -260,15 +223,15 @@ async def cmd_baninfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_checkban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-    reply_user = get_reply_user(update)
-    if not reply_user:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو.")
+    target_id, target_name = get_target_id(update, context)
+    if not target_id:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
-    ban = await db.get_ban(reply_user.id, update.effective_chat.id)
+    ban = await db.get_ban(target_id, update.effective_chat.id)
     if ban:
-        await update.message.reply_text(f"🚫 {fmt_user(reply_user)} محظور.")
+        await update.message.reply_text(f"🚫 {target_name} محظور.")
     else:
-        await update.message.reply_text(f"✅ {fmt_user(reply_user)} غير محظور.")
+        await update.message.reply_text(f"✅ {target_name} غير محظور.")
 
 
 async def cmd_eventlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -324,20 +287,20 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-    reply_user = get_reply_user(update)
-    if not reply_user:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو.")
+    target_id, target_name = get_target_id(update, context)
+    if not target_id:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
     try:
         await update.message.chat.promote_member(
-            reply_user.id,
+            target_id,
             can_change_info=True,
             can_delete_messages=True,
             can_restrict_members=True,
             can_invite_users=True,
             can_pin_messages=True,
         )
-        await update.message.reply_text(f"✅ تم رفع {fmt_user(reply_user)} مشرفاً.")
+        await update.message.reply_text(f"✅ تم رفع {target_name} مشرفاً.")
     except Exception as e:
         logger.error(f"فشل الرفع: {e}")
         await update.message.reply_text("❌ تعذر الرفع.")
@@ -346,13 +309,13 @@ async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-    reply_user = get_reply_user(update)
-    if not reply_user:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو.")
+    target_id, target_name = get_target_id(update, context)
+    if not target_id:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
     try:
-        await update.message.chat.demote_member(reply_user.id)
-        await update.message.reply_text(f"⬇️ تم تنزيل {fmt_user(reply_user)}.")
+        await update.message.chat.demote_member(target_id)
+        await update.message.reply_text(f"⬇️ تم تنزيل {target_name}.")
     except Exception as e:
         logger.error(f"فشل التنزيل: {e}")
         await update.message.reply_text("❌ تعذر التنزيل.")
@@ -447,12 +410,12 @@ async def cmd_my_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_his_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    reply_user = get_reply_user(update)
-    if not reply_user:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو.")
+    target_id, target_name = get_target_id(update, context)
+    if not target_id:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
     try:
-        member = await update.message.chat.get_member(reply_user.id)
+        member = await update.message.chat.get_member(target_id)
         status_map = {
             'creator': '👑 المالك',
             'administrator': '👮 مشرف',
@@ -462,7 +425,7 @@ async def cmd_his_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
             'kicked': '🚫 محظور',
         }
         rank = status_map.get(member.status, member.status)
-        await update.message.reply_text(f"🏅 رتبة {fmt_user(reply_user)}: {rank}")
+        await update.message.reply_text(f"🏅 رتبة {target_name}: {rank}")
     except:
         await update.message.reply_text("❌ لا يمكن تحديد الرتبة.")
 
@@ -504,32 +467,20 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
 
-    # تحديد الهدف
-    target = user
-    if msg.reply_to_message:
-        if await is_admin(update, context):
-            target = msg.reply_to_message.from_user
-        else:
-            # إذا لم يكن مشرفاً، نبلغه بشكل سري أيضاً (رسالة تحذف)
-            try:
-                temp = await msg.reply_text("⛔ فقط المشرفون يمكنهم عرض ملف عضو آخر.")
-                await asyncio.sleep(3)
-                await temp.delete()
-            except:
-                pass
-            await msg.delete()
-            return
+    target_id, target_name = get_target_id(update, context)
+    if not target_id:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
+        return
 
-    # جمع المعلومات
-    warnings = await db.get_warnings(target.id, chat.id)
-    ban_info = await db.get_ban(target.id, chat.id)
-    msg_count = await db.get_message_count(target.id, chat.id)
-    first_seen = await db.get_user_first_seen(target.id, chat.id)
+    warnings = await db.get_warnings(target_id, chat.id)
+    ban_info = await db.get_ban(target_id, chat.id)
+    msg_count = await db.get_message_count(target_id, chat.id)
+    first_seen = await db.get_user_first_seen(target_id, chat.id)
 
     is_banned = "✅ محظور" if ban_info else "❌ غير محظور"
     is_muted = "❓ غير معروف"
     try:
-        member = await context.bot.get_chat_member(chat.id, target.id)
+        member = await context.bot.get_chat_member(chat.id, target_id)
         if member.status == 'restricted' and not member.can_send_messages:
             is_muted = "✅ مكتوم"
         else:
@@ -537,11 +488,11 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-    username = f"@{target.username}" if target.username else "لا يوجد"
+    username = f"@{member.user.username}" if member.user.username else "لا يوجد"
     text = (
         f"📁 **ملف العضو**\n\n"
-        f"👤 الاسم: {target.full_name or target.first_name}\n"
-        f"🆔 المعرف: `{target.id}`\n"
+        f"👤 الاسم: {member.user.full_name or member.user.first_name}\n"
+        f"🆔 المعرف: {target_id}\n"
         f"📎 اليوزر: {username}\n"
         f"📅 أول ظهور: {first_seen or 'غير معروف'}\n"
         f"💬 عدد الرسائل: {msg_count}\n"
@@ -550,47 +501,40 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"🔇 الكتم: {is_muted}\n"
     )
 
-    # حذف رسالة الأمر من المجموعة
     try:
         await msg.delete()
     except:
         pass
 
-    # إرسال الملف إلى الخاص
     try:
-        await context.bot.send_message(
-            chat_id=user.id,
-            text=text,
-            parse_mode="Markdown"
-        )
+        await context.bot.send_message(chat_id=user.id, text=text, parse_mode="Markdown")
     except Exception:
-        # إذا فشل الإرسال، نرسل إشعاراً مؤقتاً
         try:
             temp = await context.bot.send_message(
                 chat_id=chat.id,
                 text="❌ لم أستطع إرسال الملف إلى الخاص. تأكد من فتح محادثة خاصة مع البوت.",
-                parse_mode="Markdown"
             )
             await asyncio.sleep(5)
             await temp.delete()
         except:
             pass
+
 # ==================== المشرفين المساعدين ====================
 async def cmd_promote_assistant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """رفع عضو كمشرف مساعد"""
     if not await require_admin(update, context):
         return
     
-    reply_user = get_reply_user(update)
-    if not reply_user:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو الذي تريد رفعه.")
+    target_id, target_name = get_target_id(update, context)
+    if not target_id:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
     
     chat_id = update.effective_chat.id
-    success = await db.add_assistant(chat_id, reply_user.id)
+    success = await db.add_assistant(chat_id, target_id)
     
     if success:
-        await update.message.reply_text(f"✅ تم رفع {fmt_user(reply_user)} كمشرف مساعد.")
+        await update.message.reply_text(f"✅ تم رفع {target_name} كمشرف مساعد.")
     else:
         await update.message.reply_text("⚠️ هذا العضو مشرف مساعد بالفعل.")
 
@@ -599,16 +543,16 @@ async def cmd_demote_assistant(update: Update, context: ContextTypes.DEFAULT_TYP
     if not await require_admin(update, context):
         return
     
-    reply_user = get_reply_user(update)
-    if not reply_user:
-        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو الذي تريد تنزيله.")
+    target_id, target_name = get_target_id(update, context)
+    if not target_id:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
     
     chat_id = update.effective_chat.id
-    success = await db.remove_assistant(chat_id, reply_user.id)
+    success = await db.remove_assistant(chat_id, target_id)
     
     if success:
-        await update.message.reply_text(f"⬇️ تم تنزيل {fmt_user(reply_user)} من المشرفين المساعدين.")
+        await update.message.reply_text(f"⬇️ تم تنزيل {target_name} من المشرفين المساعدين.")
     else:
         await update.message.reply_text("⚠️ هذا العضو ليس مشرفاً مساعداً.")
 
