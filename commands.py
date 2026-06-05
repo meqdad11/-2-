@@ -14,6 +14,7 @@ from handlers.admin import (
     cmd_demote_all, cmd_purge_bans, cmd_purge_muted,
     cmd_tag_all, cmd_my_rank, cmd_his_rank,
     cmd_pin, cmd_unpin, cmd_warn_user, cmd_userfile,
+    cmd_promote_assistant, cmd_demote_assistant, cmd_list_assistants,
 )
 from handlers.moderation import (
     cmd_add_word, cmd_remove_word, cmd_list_words,
@@ -118,7 +119,9 @@ ARABIC_COMMANDS = {
     "نسخ احتياطي": cmd_backup,
 
     "رفع مشرف": cmd_promote_admin, "تنزيل مشرف": cmd_demote_admin,
-    "المشرفين": cmd_list_admins, "تنزيل الكل": cmd_demote_all,
+    "رفع مساعد": cmd_promote_assistant, "تنزيل مساعد": cmd_demote_assistant,
+    "المشرفين": cmd_list_admins, "المساعدين": cmd_list_assistants,
+    "تنزيل الكل": cmd_demote_all,
     "مسح المحظورين": cmd_purge_bans, "مسح المكتومين": cmd_purge_muted,
     "تاك للكل": cmd_tag_all, "رتبتي": cmd_my_rank, "رتبته": cmd_his_rank,
 
