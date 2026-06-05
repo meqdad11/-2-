@@ -152,8 +152,9 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
 
-    if await is_admin(update, context, target_id):
-        await update.message.reply_text("❌ لا يمكن تحذير مشرف.")
+    # ✅ استخدام can_restrict بدلاً من is_admin
+    if not await can_restrict(update, context, target_id):
+        await update.message.reply_text("❌ لا يمكن تحذير مشرف أو مالك المجموعة.")
         return
 
     count = await db.add_warning(target_id, update.effective_chat.id)
@@ -167,7 +168,6 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(f"🚫 تم حظر {target_name} تلقائياً.")
         except Exception as e:
             logger.error(f"فشل الحظر التلقائي: {e}")
-
 
 async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
