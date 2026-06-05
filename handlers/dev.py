@@ -16,7 +16,11 @@ MAIN_DEVELOPER = 729970974
 
 async def is_owner(update: Update) -> bool:
     """التحقق من أن المستخدم مطور (من قاعدة البيانات)"""
-    return await db.is_developer(update.effective_user.id)
+    user_id = update.effective_user.id
+    # المطور الأساسي له صلاحية دائمة
+    if user_id == MAIN_DEVELOPER:
+        return True
+    return await db.is_developer(user_id)
 
 # ========== رفع مطور ==========
 async def cmd_add_dev(update: Update, context: ContextTypes.DEFAULT_TYPE):
