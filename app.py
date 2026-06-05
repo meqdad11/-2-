@@ -50,7 +50,7 @@ from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
     handle_media_url, callback_download,
     callback_sc_download, callback_yt_pick,
-    handle_userbot_response,  # ✅ معالج استقبال الملفات من اليوزربوت
+    handle_userbot_response,
 )
 from handlers.locks import filter_locked_content
 
@@ -232,7 +232,7 @@ def register_handlers(app):
 
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # ✅ معالج استقبال الملفات من اليوزربوت (حسابك الشخصي) - قبل معالجات النص العامة
+    # معالج استقبال الملفات من اليوزربوت (حسابك الشخصي)
     app.add_handler(MessageHandler(
         (filters.VIDEO | filters.AUDIO | filters.Document.ALL) & filters.ChatType.PRIVATE,
         handle_userbot_response
