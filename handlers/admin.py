@@ -249,12 +249,13 @@ async def cmd_eventlog(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
-    text = " ".join(context.args) if context.args else ""
+    # التعديل: تحويل النقطة والمسافة إلى سطر جديد
+    text = " ".join(context.args).replace(". ", ".\n") if context.args else ""
     if not text:
-        await update.message.reply_text("❌ استخدم: تعيين القوانين <القوانين>")
+        await update.message.reply_text("❌ استخدم: تعيين القواعد <القوانين>")
         return
     await db.set_setting(update.effective_chat.id, "rules", text)
-    await update.message.reply_text("✅ تم تعيين القوانين.")
+    await update.message.reply_text("✅ تم تعيين القواعد.")
 
 
 # ==================== القفل / الفتح ====================
