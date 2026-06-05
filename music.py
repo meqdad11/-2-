@@ -186,6 +186,7 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]])
         await update.message.reply_text("اختر نوع التحميل:", reply_markup=keyboard)
 
+# ---------- البحث في يوتيوب ----------
 async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("الاستخدام: يوتيوب <اسم الفيديو>")
@@ -255,13 +256,20 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     try:
-        _, cache_key, index = query.data.split("|")
+        data_parts = query.data.split("|")
+        if len(data_parts) != 3:
+            await query.message.reply_text("❌ بيانات غير صحيحة.")
+            return
+        _, cache_key, index = data_parts
         index = int(index)
         results = SEARCH_CACHE.get(cache_key)
         if not results or index >= len(results):
-            await query.message.reply_text("❌ انتهت مدة البحث. حاول مجددا.")
+            await query.message.reply_text("❌ انتهت مدة البحث. حاول مجدداً.")
             return
-        url = results[index]['url']
+        url = results[index].get('url')
+        if not url:
+            await query.message.reply_text("❌ رابط غير متوفر.")
+            return
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 تحميل الصوت", callback_data=f"dl_audio|{url}"),
         ]])
@@ -308,12 +316,14 @@ def _search_soundcloud(query: str) -> List[Dict]:
             results = []
             if 'entries' in info:
                 for entry in info['entries'][:5]:
-                    if entry and entry.get('url'):
-                        results.append({
-                            'title': entry.get('title', 'بدون عنوان'),
-                            'url': entry.get('url'),
-                            'duration': fmt_dur(entry.get('duration', 0)),
-                        })
+                    if entry:
+                        url = entry.get('webpage_url') or entry.get('url') or ''
+                        if url:
+                            results.append({
+                                'title': entry.get('title', 'بدون عنوان'),
+                                'url': url,
+                                'duration': fmt_dur(entry.get('duration', 0)),
+                            })
             return results
     except Exception as e:
         logger.error(f"خطأ البحث في ساوند كلاود: {e}")
