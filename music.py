@@ -227,6 +227,49 @@ async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في callback_yt_pick: {e}")
         await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
 
+# ---------- البحث في ساوند كلاود ----------
+async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not context.args:
+        await update.message.reply_text("الاستخدام: بحث <اسم الأغنية>\nمثال: بحث فيروز")
+        return
+    query = " ".join(context.args)
+    status = await update.message.reply_text("🔍 جاري البحث في ساوند كلاود...")
+    try:
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, _search_soundcloud, query)
+        if not results:
+            await status.edit_text("❌ لم يتم العثور على نتائج.")
+            return
+        cache_id = f"sc_{query[:20]}"
+        SEARCH_CACHE[cache_id] = results
+        keyboard = []
+        for i, result in enumerate(results, 1):
+            btn_text = f"{i}. {result['title'][:20]}..." if len(result['title']) > 20 else f"{i}. {result['title']}"
+            keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"sc_pick|{cache_id}|{i-1}")])
+        await status.edit_text(f"🎵 نتائج البحث عن '{query}':\n\nاختر مقطعاً:", reply_markup=InlineKeyboardMarkup(keyboard))
+    except Exception as e:
+        logger.error(f"خطأ في cmd_sc_search: {e}")
+        await status.edit_text(f"❌ حدث خطأ في البحث: {str(e)[:40]}")
+
+async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    try:
+        _, cache_key, index = query.data.split("|")
+        index = int(index)
+        results = SEARCH_CACHE.get(cache_key)
+        if not results or index >= len(results):
+            await query.message.reply_text("❌ انتهت مدة البحث. حاول مجددا.")
+            return
+        url = results[index]['url']
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🎵 تحميل الصوت", callback_data=f"dl_audio|{url}"),
+        ]])
+        await query.message.edit_text("اختر:", reply_markup=keyboard)
+    except Exception as e:
+        logger.error(f"خطأ في callback_sc_pick: {e}")
+        await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
+
 SEARCH_CACHE = {}
 
 def _search_youtube(query: str) -> List[Dict]:
@@ -253,8 +296,28 @@ def _search_youtube(query: str) -> List[Dict]:
         logger.error(f"خطأ البحث في يوتيوب: {e}")
         return []
 
-async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ساوند كلاود غير متاح حالياً. استخدم يوتيوب.")
+def _search_soundcloud(query: str) -> List[Dict]:
+    try:
+        ydl_opts = {
+            'quiet': True, 'no_warnings': True,
+            'extract_flat': 'in_playlist', 'playlistend': 5,
+            'user_agent': "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(f"scsearch5:{query}", download=False)
+            results = []
+            if 'entries' in info:
+                for entry in info['entries'][:5]:
+                    if entry and entry.get('url'):
+                        results.append({
+                            'title': entry.get('title', 'بدون عنوان'),
+                            'url': entry.get('url'),
+                            'duration': fmt_dur(entry.get('duration', 0)),
+                        })
+            return results
+    except Exception as e:
+        logger.error(f"خطأ البحث في ساوند كلاود: {e}")
+        return []
 
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.callback_query.answer("غير متاح")
