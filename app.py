@@ -49,7 +49,7 @@ from handlers.resources import (
 from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
     handle_media_url, callback_download,
-    callback_sc_download, callback_yt_pick,
+    callback_sc_download, callback_yt_pick, callback_sc_pick,
     handle_userbot_response,
 )
 from handlers.locks import filter_locked_content
@@ -227,12 +227,12 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
     app.add_handler(CallbackQueryHandler(callback_yt_pick, pattern=r"^yt_pick\|"))
+    app.add_handler(CallbackQueryHandler(callback_sc_pick, pattern=r"^sc_pick\|"))
     app.add_handler(CallbackQueryHandler(callback_choose_model, pattern=r"^model_"))
     app.add_handler(CallbackQueryHandler(callback_menu))
 
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # معالج استقبال الملفات من اليوزربوت (حسابك الشخصي)
     app.add_handler(MessageHandler(
         (filters.VIDEO | filters.AUDIO | filters.Document.ALL) & filters.ChatType.PRIVATE,
         handle_userbot_response
