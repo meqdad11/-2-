@@ -198,7 +198,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text("🔐 اختر نوع القفل:", reply_markup=InlineKeyboardMarkup(buttons))
         return
 
-    # منطق القفل/الفتح كما هو مع تعديل المسارات ...
     if data.startswith("lock_") and not data.startswith("lock_all"):
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
@@ -268,7 +267,8 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "• كتم / رفع الكتم\n"
             "• حظر / رفع الحظر\n"
             "• رفع مشرف / تنزيل مشرف\n"
-            "• المشرفين / تنزيل الكل\n"
+            "• رفع مساعد / تنزيل مساعد\n"
+            "• المشرفين / المساعدين / تنزيل الكل\n"
             "• مسح المحظورين / مسح المكتومين\n"
             "• تاك للكل / رتبتي / رتبته\n"
             "• ملف - ملف العضو (بالرد)\n"
@@ -352,6 +352,9 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⚠️ التحذيرات", callback_data="menu_warn")],
             [InlineKeyboardButton("🔇 الكتم", callback_data="menu_mute")],
             [InlineKeyboardButton("⚙️ الإدارة", callback_data="menu_manage")],
+            [InlineKeyboardButton("👥 المساعدين", callback_data="exec_list_assistants")],
+            [InlineKeyboardButton("⬆️ رفع مساعد", callback_data="exec_promote_assistant"),
+             InlineKeyboardButton("⬇️ تنزيل مساعد", callback_data="exec_demote_assistant")],
             [InlineKeyboardButton("📄 ملف عضو", callback_data="exec_userfile")],
             [InlineKeyboardButton("📢 تاك للكل", callback_data="exec_tagall")],
             [InlineKeyboardButton("📌 تثبيت", callback_data="exec_pin_menu")],
@@ -644,6 +647,42 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_user")],
                     [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    # ========== تنفيذ أوامر المشرف المساعد الجديدة ==========
+    if data == "exec_list_assistants":
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
+        assistants = await db.get_assistants(chat_id)
+        if not assistants:
+            text = "📭 لا يوجد مشرفون مساعدون."
+        else:
+            lines = [f"• `{a['user_id']}`" for a in assistants]
+            text = "👥 **المشرفون المساعدون:**\n" + "\n".join(lines)
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin")],
+                    [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
+        await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        return
+
+    if data == "exec_promote_assistant":
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
+        text = "⬆️ **رفع مساعد:**\nرد على العضو واكتب: `رفع مساعد`"
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin")],
+                    [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
+        await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        return
+
+    if data == "exec_demote_assistant":
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
+        text = "⬇️ **تنزيل مساعد:**\nرد على العضو واكتب: `تنزيل مساعد`"
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin")],
+                    [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
+        await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
     # ========== الميديا والموارد ==========
