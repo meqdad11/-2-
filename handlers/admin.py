@@ -636,7 +636,7 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
 
-# ==================== المشرفين المساعدين ====================
+# ==================== المشرفين المساعدين (معدّل) ====================
 async def cmd_promote_assistant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """رفع عضو كمشرف مساعد"""
     if not await require_admin(update, context):
@@ -656,7 +656,7 @@ async def cmd_promote_assistant(update: Update, context: ContextTypes.DEFAULT_TY
         await update.message.reply_text("⚠️ هذا العضو مشرف مساعد بالفعل.")
 
 async def cmd_demote_assistant(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تنزيل مشرف مساعد"""
+    """تنزيل مشرف مساعد (حتى لو مش موجود بالقائمة، يتأكد ويزيله)"""
     if not await require_admin(update, context):
         return
     
@@ -666,12 +666,22 @@ async def cmd_demote_assistant(update: Update, context: ContextTypes.DEFAULT_TYP
         return
     
     chat_id = update.effective_chat.id
-    success = await db.remove_assistant(chat_id, target_id)
     
+    # نحاول الحذف باستخدام force_remove_assistant (يتجاهل إذا مش موجود)
+    await db.force_remove_assistant(chat_id, target_id)
+    await update.message.reply_text(f"⬇️ تم تنزيل {target_name} من المشرفين المساعدين.")
+
+async def cmd_clear_assistants(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """مسح جميع المشرفين المساعدين في المجموعة"""
+    if not await require_admin(update, context):
+        return
+    
+    chat_id = update.effective_chat.id
+    success = await db.clear_assistants(chat_id)
     if success:
-        await update.message.reply_text(f"⬇️ تم تنزيل {target_name} من المشرفين المساعدين.")
+        await update.message.reply_text("🧹 تم مسح جميع المشرفين المساعدين.")
     else:
-        await update.message.reply_text("⚠️ هذا العضو ليس مشرفاً مساعداً.")
+        await update.message.reply_text("❌ فشل المسح.")
 
 async def cmd_list_assistants(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض قائمة المشرفين المساعدين"""
