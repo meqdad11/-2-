@@ -317,38 +317,42 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ لا يمكنك إرسال همسة لنفسك.")
         return
 
+    # استخراج نص الهمسة (كل النص بعد الأمر)
+    full_text = msg.text
+    # البحث عن المسافة الأولى التي تلي الأمر
+    parts = full_text.split(None, 1)
+    whisper_text = parts[1] if len(parts) > 1 else ""
+    if not whisper_text:
+        await msg.reply_text("❌ اكتب الهمسة بعد الأمر.\nمثال: اهمس هذا سر بيننا")
+        return
+
     whisper_id = str(uuid.uuid4())[:12]
 
+    # تخزين الهمسة
     whisper_data = {
         "sender_id": msg.from_user.id,
         "sender_name": msg.from_user.first_name,
         "target_id": target.id,
         "target_name": target.first_name,
-        "chat_id": update.effective_chat.id,
-        "chat_title": update.effective_chat.title or "المجموعة",
+        "text": whisper_text,
         "created_at": datetime.now().isoformat()
     }
+    context.bot_data[f'whisper_{whisper_id}'] = whisper_data
 
-    if 'whisper_storage' not in context.bot_data:
-        context.bot_data['whisper_storage'] = {}
-    context.bot_data['whisper_storage'][whisper_id] = whisper_data
+    # حذف رسالة الأمر من القروب (سري)
+    try:
+        await msg.delete()
+    except:
+        pass
 
-    if context.job_queue:
-        context.job_queue.run_once(
-            lambda ctx: delete_whisper_job(ctx, whisper_id),
-            when=300,
-            name=f"del_whisper_{whisper_id}"
-        )
-
-    bot_username = (await context.bot.get_me()).username
-    link = f"https://t.me/{bot_username}?start=whisper_{whisper_id}"
-
-    await msg.reply_text(
-        f"🔒 **همسة لـ {target.first_name}**\n\n"
-        f"اضغط على الرابط وأرسل الهمسة:\n"
-        f"{link}\n\n"
-        f"⏳ الرابط صالح لمدة 5 دقائق فقط.\n"
-        f"📌 سيُرسل الهمس باسمك: **{msg.from_user.first_name}**",
+    # إرسال زر الهمسة
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔒 عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
+    ]])
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"💌 **همسة سرية** لـ {target.first_name}",
+        reply_markup=keyboard,
         parse_mode="Markdown"
     )
 
