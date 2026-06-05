@@ -68,7 +68,7 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """رفع الحظر عن عضو (فقط إذا كان محظوراً فعلاً)"""
+    """رفع الحظر عن عضو وإرسال رابط المجموعة للمشرف"""
     if not await require_admin(update, context):
         return
     target_id, target_name = get_target_id(update, context)
@@ -76,19 +76,53 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
 
+    chat = update.effective_chat
+
+    # ✅ التحقق من وجود العضو في حالة حظر
     try:
-        member = await context.bot.get_chat_member(update.effective_chat.id, target_id)
-        if member.status == 'member' or member.status == 'administrator' or member.status == 'creator':
+        member = await context.bot.get_chat_member(chat.id, target_id)
+        if member.status in ('member', 'administrator', 'creator'):
             await update.message.reply_text("⚠️ هذا العضو ليس محظوراً، بل هو موجود في المجموعة.")
             return
-        
-        await context.bot.unban_chat_member(update.effective_chat.id, target_id)
-        await db.remove_ban(target_id, update.effective_chat.id, update.effective_user.id)
-        await update.message.reply_text(f"✅ تم رفع الحظر عن {target_name}")
+    except Exception:
+        pass  # العضو غير موجود أصلاً (طبيعي للمحظورين)
+
+    # ✅ رفع الحظر
+    try:
+        await context.bot.unban_chat_member(chat.id, target_id)
+        await db.remove_ban(target_id, chat.id, update.effective_user.id)
     except Exception as e:
         logger.error(f"فشل رفع الحظر: {e}")
         await update.message.reply_text("❌ لا يمكن رفع الحظر عن هذا المستخدم.")
+        return
 
+    # ✅ تجهيز يوزر العضو
+    target_username = f"@{member.user.username}" if member.user.username else "بدون يوزر"
+
+    # ✅ إنشاء رابط دعوة (إن أمكن)
+    invite_link = None
+    try:
+        link_obj = await context.bot.create_chat_invite_link(
+            chat.id,
+            member_limit=1,
+            creates_join_request=False
+        )
+        invite_link = link_obj.invite_link
+    except Exception:
+        pass
+
+    # ✅ إرسال رسالة إلى الشخص الذي فك الحظر
+    msg_parts = [
+        f"✅ **تم رفع الحظر عن:** {target_name}",
+        f"👤 **اليوزر:** {target_username}",
+    ]
+    if invite_link:
+        msg_parts.append(f"🔗 **رابط المجموعة:** {invite_link}")
+        msg_parts.append("\n📩 أرسل هذا الرابط للعضو ليتمكن من العودة.")
+    else:
+        msg_parts.append("\n⚠️ تعذر إنشاء رابط. يمكنك نسخ رابط المجموعة يدوياً وإرساله له.")
+
+    await update.message.reply_text("\n".join(msg_parts), parse_mode="Markdown")
 
 # ==================== الكتم ====================
 async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
