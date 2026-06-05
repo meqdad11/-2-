@@ -14,19 +14,16 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
             update.effective_chat.id,
             update.effective_user.id
         )
-        return member.status in ("administrator", "creator")
-    except Exception:
-        return False
-async def is_assistant_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """التحقق مما إذا كان المستخدم مشرفاً مساعداً (يملك صلاحيات محدودة)"""
-    try:
-        # المشرف الكامل يعتبر أيضاً مساعداً
-        if await is_admin(update, context):
+        # المشرف الكامل
+        if member.status in ("administrator", "creator"):
             return True
         
-        # التحقق من قاعدة البيانات
+        # مشرف مساعد
         from utils import database as db
-        return await db.is_assistant(update.effective_chat.id, update.effective_user.id)
+        if await db.is_assistant(update.effective_chat.id, update.effective_user.id):
+            return True
+        
+        return False
     except Exception:
         return False
 
