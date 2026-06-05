@@ -685,7 +685,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
-    # ========== معالج الهمسة الجديد (تم إصلاحه) ==========
+    # ========== معالج الهمسة الجديد (نافذة منبثقة) ==========
     if data.startswith("show_whisper_"):
         whisper_id = data.split("_")[2]
         user_id = update.effective_user.id
@@ -701,16 +701,13 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ هذه الهمسة ليست لك!", show_alert=True)
             return
         
-        await query.answer("🔓 همسة خاصة", show_alert=True)
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=f"🔓 **همسة خاصة**\n\n"
-                 f"✉️ من: {whisper['sender_name']}\n"
-                 f"📩 إلى: {whisper['target_name']}\n\n"
-                 f"💬 النص: {whisper['text']}",
-            parse_mode="Markdown"
+        # عرض الهمسة في نافذة منبثقة (pop-up)
+        await query.answer(
+            f"💬 {whisper['text']}",
+            show_alert=True
         )
         
+        # حذف الهمسة بعد القراءة
         del context.bot_data[f'whisper_{whisper_id}']
         await msg.delete()
         return
