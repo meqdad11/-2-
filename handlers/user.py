@@ -289,48 +289,37 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ==================== WHISPER (النظام الجديد) ====================
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-
     if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
         await msg.reply_text("❌ هذا الأمر للمجموعات فقط.")
         return
-
     if not msg.reply_to_message:
         await msg.reply_text("❗️ رد على رسالة الشخص ثم اكتب: همسة")
         return
-
     target = msg.reply_to_message.from_user
     sender = msg.from_user
-
     if target.is_bot:
         await msg.reply_text("❌ لا يمكن إرسال همسة لبوت.")
         return
-
     if target.id == sender.id:
         await msg.reply_text("❌ لا يمكنك إرسال همسة لنفسك.")
         return
 
-    # حذف رسالة الأمر فوراً
-    try:
-        await msg.delete()
-    except:
-        pass
-
-    # تخزين معرف المستهدف في user_data
     context.user_data['whisper_target_id'] = target.id
     context.user_data['whisper_target_name'] = target.first_name
     context.user_data['whisper_sender_name'] = sender.first_name
     context.user_data['whisper_chat_id'] = update.effective_chat.id
 
-    # زر يفتح نافذة Inline Query في نفس القروب
+    try:
+        await msg.delete()
+    except:
+        pass
+
     keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton(
-            "✍️ اكتب همستك",
-            switch_inline_query_current_chat=""
-        )
+        InlineKeyboardButton("✍️ اكتب همستك", switch_inline_query_current_chat="")
     ]])
-    await msg.reply_to_message.reply_text(
-        f"💌 **همسة خاصة** من {sender.first_name} إلى {target.first_name}\n\n"
-        "اضغط الزر أعلاه 👆 واكتب همستك.",
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"💌 **همسة خاصة** من {sender.first_name} إلى {target.first_name}",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
