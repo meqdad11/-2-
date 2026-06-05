@@ -304,7 +304,8 @@ async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
     try:
-        await chat.promote_member(
+        await context.bot.promote_chat_member(
+            chat.id,
             target_id,
             can_change_info=True,
             can_delete_messages=True,
@@ -355,7 +356,7 @@ async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # محاولة التنزيل
     try:
-        await chat.demote_member(target_id)
+        await context.bot.demote_chat_member(chat.id, target_id)
         await update.message.reply_text(f"⬇️ تم تنزيل {target_name} من المشرفين.")
     except Exception as e:
         logger.error(f"فشل التنزيل: {e}")
@@ -405,7 +406,7 @@ async def confirm_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE)
         for admin in admins:
             if admin.status == 'administrator' and not admin.user.is_bot:
                 try:
-                    await update.message.chat.demote_member(admin.user.id)
+                    await context.bot.demote_chat_member(update.effective_chat.id, admin.user.id)
                     count += 1
                 except:
                     pass
