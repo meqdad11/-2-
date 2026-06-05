@@ -17,7 +17,7 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
     user = new_member.user
 
     # التحقق مما إذا كان العضو جديداً تماماً (ليس له حالة سابقة)
-    is_new_member = old_member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED) or old_member.status == None
+    is_new_member = old_member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED) or old_member.status is None
 
     if new_member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED):
         if is_new_member:
@@ -44,11 +44,22 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
             else:
                 # عضو جديد أو عائد، ويستحق الترحيب
                 try:
+                    # جلب البايو
+                    bio = "غير محدد"
+                    try:
+                        full_chat = await context.bot.get_chat(user.id)
+                        if full_chat.bio:
+                            bio = full_chat.bio
+                    except:
+                        pass
+
                     photos = await context.bot.get_user_profile_photos(user.id, limit=1)
                     username = f"@{user.username}" if user.username else "بدون يوزر"
                     welcome = (
                         f"👋 أهلاً وسهلاً {user.first_name}!\n"
-                        f"اليوزر: {username}\n"
+                        f"🆔 المعرف: `{user.id}`\n"
+                        f"📎 اليوزر: {username}\n"
+                        f"📝 البايو: {bio}\n\n"
                         f"نرحب بك في مجموعتنا. 😊\n"
                         f"يرجى الالتزام بالقواعد واحترام الجميع."
                     )
