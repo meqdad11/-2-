@@ -284,16 +284,27 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يمكن الفتح.")
 
 
-# ==================== رفع/تنزيل مشرف ====================
+# ==================== رفع/تنزيل مشرف (حصري للمالك والمطور) ====================
 async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
+    user = update.effective_user
+    chat = update.effective_chat
+    try:
+        member = await chat.get_member(user.id)
+        is_creator = (member.status == 'creator')
+        is_dev = await db.is_developer(user.id)
+        if not (is_creator or is_dev):
+            await update.message.reply_text("⛔ هذا الأمر حصري لمالك المجموعة أو المطور فقط.")
+            return
+    except:
+        await update.message.reply_text("❌ لا يمكن التحقق من صلاحياتك.")
         return
+
     target_id, target_name = get_target_id(update, context)
     if not target_id:
         await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
     try:
-        await update.message.chat.promote_member(
+        await chat.promote_member(
             target_id,
             can_change_info=True,
             can_delete_messages=True,
@@ -304,22 +315,33 @@ async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ تم رفع {target_name} مشرفاً.")
     except Exception as e:
         logger.error(f"فشل الرفع: {e}")
-        await update.message.reply_text("❌ تعذر الرفع.")
+        await update.message.reply_text("❌ تعذر الرفع. تأكد من صلاحيات البوت.")
 
 
 async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
+    user = update.effective_user
+    chat = update.effective_chat
+    try:
+        member = await chat.get_member(user.id)
+        is_creator = (member.status == 'creator')
+        is_dev = await db.is_developer(user.id)
+        if not (is_creator or is_dev):
+            await update.message.reply_text("⛔ هذا الأمر حصري لمالك المجموعة أو المطور فقط.")
+            return
+    except:
+        await update.message.reply_text("❌ لا يمكن التحقق من صلاحياتك.")
         return
+
     target_id, target_name = get_target_id(update, context)
     if not target_id:
         await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
     try:
-        await update.message.chat.demote_member(target_id)
-        await update.message.reply_text(f"⬇️ تم تنزيل {target_name}.")
+        await chat.demote_member(target_id)
+        await update.message.reply_text(f"⬇️ تم تنزيل {target_name} من المشرفين.")
     except Exception as e:
         logger.error(f"فشل التنزيل: {e}")
-        await update.message.reply_text("❌ تعذر التنزيل.")
+        await update.message.reply_text("❌ تعذر التنزيل. تأكد من أن البوت مشرف ويملك صلاحية إضافة مشرفين.")
 
 
 async def cmd_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
