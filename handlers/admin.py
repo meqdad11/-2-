@@ -560,3 +560,57 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await temp.delete()
         except:
             pass
+# ==================== المشرفين المساعدين ====================
+async def cmd_promote_assistant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """رفع عضو كمشرف مساعد"""
+    if not await require_admin(update, context):
+        return
+    
+    reply_user = get_reply_user(update)
+    if not reply_user:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو الذي تريد رفعه.")
+        return
+    
+    chat_id = update.effective_chat.id
+    success = await db.add_assistant(chat_id, reply_user.id)
+    
+    if success:
+        await update.message.reply_text(f"✅ تم رفع {fmt_user(reply_user)} كمشرف مساعد.")
+    else:
+        await update.message.reply_text("⚠️ هذا العضو مشرف مساعد بالفعل.")
+
+async def cmd_demote_assistant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تنزيل مشرف مساعد"""
+    if not await require_admin(update, context):
+        return
+    
+    reply_user = get_reply_user(update)
+    if not reply_user:
+        await update.message.reply_text("❌ استخدم الأمر بالرد على العضو الذي تريد تنزيله.")
+        return
+    
+    chat_id = update.effective_chat.id
+    success = await db.remove_assistant(chat_id, reply_user.id)
+    
+    if success:
+        await update.message.reply_text(f"⬇️ تم تنزيل {fmt_user(reply_user)} من المشرفين المساعدين.")
+    else:
+        await update.message.reply_text("⚠️ هذا العضو ليس مشرفاً مساعداً.")
+
+async def cmd_list_assistants(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عرض قائمة المشرفين المساعدين"""
+    if not await require_admin(update, context):
+        return
+    
+    chat_id = update.effective_chat.id
+    assistants = await db.get_assistants(chat_id)
+    
+    if not assistants:
+        await update.message.reply_text("📭 لا يوجد مشرفون مساعدون.")
+        return
+    
+    lines = []
+    for a in assistants:
+        lines.append(f"• `{a['user_id']}`")
+    
+    await update.message.reply_text("👥 **المشرفون المساعدون:**\n" + "\n".join(lines), parse_mode="Markdown")
