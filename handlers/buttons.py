@@ -829,7 +829,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ================= عرض الهمسة =================
-    if data.startswith("show_whisper_"):
+  if data.startswith("show_whisper_"):
     whisper_id = data.split("_")[2]
     user_id = update.effective_user.id
     
@@ -852,7 +852,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text=f"🔓 **همسة خاصة**\n\n"
              f"✉️ من: {whisper['sender_name']}\n"
              f"📩 إلى: {whisper['target_name']}\n\n"
-             f"💬 النص: _{whisper['text']}_",
+             f"💬 النص: {whisper['text']}",
         parse_mode="Markdown"
     )
     
