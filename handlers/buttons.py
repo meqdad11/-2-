@@ -1,6 +1,7 @@
 import logging
 import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ChatPermissions
+from telegram.constants import ChatMemberStatus
 from telegram.ext import ContextTypes
 from utils import database as db
 from utils.helpers import is_admin
@@ -29,11 +30,8 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.delete()
         return
 
-    # ========== إحصائيات (نُقلت إلى المشرفين) ==========
+    # ========== إحصائيات سريعة ==========
     if data == "exec_stats":
-        if not await is_admin(update, context):
-            await query.answer("⛔ للمشرفين فقط", show_alert=True)
-            return
         try:
             members_count = await context.bot.get_chat_member_count(chat_id)
             admins = await context.bot.get_chat_administrators(chat_id)
@@ -41,14 +39,14 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text = f"📊 إحصائيات المجموعة:\n👥 الأعضاء: {members_count}\n👮 المشرفون: {admins_count}"
         except:
             text = "📊 لا يمكن جلب الإحصائيات حالياً."
-        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_manage"),
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_main"),
                      InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     if data == "exec_quote":
         text = f"💬 اقتباس اليوم:\n\n{random.choice(DAILY_QUOTES)}"
-        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_user"),
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_main"),
                      InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
@@ -321,22 +319,21 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # ================= القائمة الرئيسية (فهرس فقط) =================
-    # ================= القائمة الرئيسية (فهرس فقط) =================
-if data == "menu_main":
-    keyboard = [
-        [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin"),
-         InlineKeyboardButton("👥 للجميع", callback_data="menu_user")],
-        [InlineKeyboardButton("🎵 الميديا", callback_data="menu_media"),
-         InlineKeyboardButton("📚 الموارد", callback_data="menu_resources")],
-        [InlineKeyboardButton("📋 الأوامر المتقدمة", callback_data="menu_commands"),
-         InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
-        [InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google"),
-         InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
-        [InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")],
-        [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
-    ]
-    await msg.edit_text("🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:", reply_markup=InlineKeyboardMarkup(keyboard))
-    return
+    if data == "menu_main":
+        keyboard = [
+            [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin"),
+             InlineKeyboardButton("👥 للجميع", callback_data="menu_user")],
+            [InlineKeyboardButton("🎵 الميديا", callback_data="menu_media"),
+             InlineKeyboardButton("📚 الموارد", callback_data="menu_resources")],
+            [InlineKeyboardButton("📋 الأوامر المتقدمة", callback_data="menu_commands"),
+             InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
+            [InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google"),
+             InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
+            [InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
+        ]
+        await msg.edit_text("🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
 
     # ========== قائمة المشرفين (بدون مساعدين) ==========
     if data == "menu_admin":
