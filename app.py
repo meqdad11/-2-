@@ -9,6 +9,7 @@ from telegram.ext import (
     MessageHandler,
     ChatMemberHandler,
     CallbackQueryHandler,
+    InlineQueryHandler,
     filters,
 )
 from telegram import Update
@@ -77,6 +78,9 @@ from handlers.dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_sta
 from handlers.crisis import (
     check_crisis_words,
 )
+
+# ========== معالج الهمسات عبر Inline ==========
+from handlers.inline import handle_inline_query
 
 # ========== إعداد التسجيل ==========
 logging.basicConfig(
@@ -261,8 +265,8 @@ def register_handlers(app):
     # فلترة المحتوى للمجموعات فقط
     app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
 
-    # ⭐ معالج استقبال الرد على طلب الهمسة (ForceReply) ⭐
-    app.add_handler(MessageHandler(filters.REPLY & filters.TEXT & filters.ChatType.GROUPS, handle_whisper_reply))
+    # ⭐ معالج الهمسات عبر Inline Query (الجديد) ⭐
+    app.add_handler(InlineQueryHandler(handle_inline_query))
 
 # ========== تسجيل الجوبز الدورية ==========
 def register_jobs(app):
@@ -290,7 +294,7 @@ def main():
 
     # ⭐ إضافة channel_post و edited_channel_post إلى allowed_updates ⭐
     app.run_polling(
-        allowed_updates=["message", "channel_post", "edited_channel_post", "chat_member", "callback_query"],
+        allowed_updates=["message", "channel_post", "edited_channel_post", "chat_member", "callback_query", "inline_query"],
         drop_pending_updates=True,
     )
 
