@@ -392,18 +392,47 @@ async def cmd_tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # ==================== رتبتي / رتبته ====================
+async def get_full_rank(user_id: int, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> str:
+    """جلب الرتبة الكاملة (تشمل المطور والمساعد)"""
+    # 1. التحقق من المطور
+    if await db.is_developer(user_id):
+        return "👨‍💻 مطور"
+    
+    # 2. التحقق من حالة العضو في تيليجرام
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        status = member.status
+        
+        if status == 'creator':
+            return "👑 المالك"
+        elif status == 'administrator':
+            return "👮 مشرف"
+        elif status == 'restricted':
+            # التحقق من المساعد
+            if await db.is_assistant(chat_id, user_id):
+                return "⭐ مشرف مساعد (مكتوم)"
+            return "🔇 مكتوم"
+        elif status == 'left':
+            return "🚪 غادر"
+        elif status == 'kicked':
+            return "🚫 محظور"
+        elif status == 'member':
+            # التحقق من المساعد
+            if await db.is_assistant(chat_id, user_id):
+                return "⭐ مشرف مساعد"
+            return "👤 عضو"
+    except:
+        pass
+    
+    # 3. التحقق من المساعد حتى لو لم نستطع جلب حالة تيليجرام
+    if await db.is_assistant(chat_id, user_id):
+        return "⭐ مشرف مساعد"
+    
+    return "❓ غير معروف"
+
 async def cmd_my_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        member = await update.message.chat.get_member(update.effective_user.id)
-        status_map = {
-            'creator': '👑 المالك',
-            'administrator': '👮 مشرف',
-            'member': '👤 عضو',
-            'restricted': '🔇 مكتوم',
-            'left': '🚪 غادر',
-            'kicked': '🚫 محظور',
-        }
-        rank = status_map.get(member.status, member.status)
+        rank = await get_full_rank(update.effective_user.id, update.effective_chat.id, context)
         await update.message.reply_text(f"🏅 رتبتك: {rank}")
     except:
         await update.message.reply_text("❌ لا يمكن تحديد الرتبة.")
@@ -415,16 +444,7 @@ async def cmd_his_rank(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ استخدم الأمر بالرد على العضو أو بمعرفه الرقمي.")
         return
     try:
-        member = await update.message.chat.get_member(target_id)
-        status_map = {
-            'creator': '👑 المالك',
-            'administrator': '👮 مشرف',
-            'member': '👤 عضو',
-            'restricted': '🔇 مكتوم',
-            'left': '🚪 غادر',
-            'kicked': '🚫 محظور',
-        }
-        rank = status_map.get(member.status, member.status)
+        rank = await get_full_rank(target_id, update.effective_chat.id, context)
         await update.message.reply_text(f"🏅 رتبة {target_name}: {rank}")
     except:
         await update.message.reply_text("❌ لا يمكن تحديد الرتبة.")
