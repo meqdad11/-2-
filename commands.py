@@ -158,4 +158,7 @@ ARABIC_COMMANDS = {
     "تفعيل الازمة": cmd_enable_crisis,
     "تعطيل الازمة": cmd_disable_crisis,
     "حالة الازمة": cmd_crisis_status,
+
+    "تعيين القواعد": cmd_setrules,
+    "تعيين القوانين": cmd_setrules,
 }
