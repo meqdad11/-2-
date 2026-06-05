@@ -16,8 +16,11 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
     chat_id = result.chat.id
     user = new_member.user
 
+    # التحقق مما إذا كان العضو جديداً تماماً (ليس له حالة سابقة)
+    is_new_member = old_member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED) or old_member.status == None
+
     if new_member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED):
-        if old_member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED):
+        if is_new_member:
             ban = await db.get_ban(user.id, chat_id)
             if ban:
                 try:
@@ -39,6 +42,7 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
                     pass
                 await db.log_bot_action(chat_id, "auto_kick_banned", user_id=user.id, detail=reason)
             else:
+                # عضو جديد أو عائد، ويستحق الترحيب
                 try:
                     photos = await context.bot.get_user_profile_photos(user.id, limit=1)
                     username = f"@{user.username}" if user.username else "بدون يوزر"
