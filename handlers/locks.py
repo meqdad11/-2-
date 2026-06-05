@@ -377,7 +377,7 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     # --- توجيه (إعادة إرسال) ---
-    if msg.forward_date and await db.is_locked(chat_id, "forward"):
+    if getattr(msg, 'forward_date', None) and await db.is_locked(chat_id, "forward"):
         await msg.delete()
         await db.add_violation(user.id, chat_id, "forward", "إعادة توجيه")
         await msg.reply_text("🚫 التوجيه مقفل.")
