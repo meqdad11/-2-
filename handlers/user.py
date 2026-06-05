@@ -319,7 +319,6 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # استخراج نص الهمسة (كل النص بعد الأمر)
     full_text = msg.text
-    # البحث عن المسافة الأولى التي تلي الأمر
     parts = full_text.split(None, 1)
     whisper_text = parts[1] if len(parts) > 1 else ""
     if not whisper_text:
@@ -345,17 +344,15 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         pass
 
-    # إرسال زر الهمسة
+    # إرسال زر الهمسة (بدون parse_mode لتجنب الأخطاء)
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("🔒 عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
     ]])
     await context.bot.send_message(
         chat_id=update.effective_chat.id,
-        text=f"💌 **همسة سرية** لـ {target.first_name}",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
+        text=f"💌 همسة سرية لـ {target.first_name}",
+        reply_markup=keyboard
     )
-
 async def handle_whisper_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
 
