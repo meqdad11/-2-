@@ -4,7 +4,7 @@ from handlers.user import (
     cmd_speak, cmd_voice_to_text, cmd_kickme,
     cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
     cmd_create_anon_link, cmd_my_messages, cmd_active_users,
-    cmd_start, cmd_id, cmd_rules, cmd_translate‚ cmd_avatar‚
+    cmd_start, cmd_id, cmd_rules, cmd_translate, cmd_avatar,
 )
 from handlers.admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
@@ -128,7 +128,7 @@ ARABIC_COMMANDS = {
     "ملف": cmd_userfile,
 
     "اهمس": cmd_whisper, "افتاري": cmd_avatar, "رابط": cmd_get_invite,
-"سورة": cmd_surah, "قران": cmd_quran_page,
+    "سورة": cmd_surah, "قران": cmd_quran_page,
     "انطقي": cmd_speak, "وش يقول": cmd_voice_to_text,
     "اطردني": cmd_kickme,
     "تفعيل الترحيب": cmd_enable_welcome, "تعطيل الترحيب": cmd_disable_welcome,
