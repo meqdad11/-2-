@@ -354,9 +354,22 @@ async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"❌ لا يمكن العثور على العضو: {e}")
         return
 
-    # محاولة التنزيل
+    # محاولة التنزيل (بإلغاء جميع صلاحيات المشرف)
     try:
-        await context.bot.demote_chat_member(chat.id, target_id)
+        await context.bot.promote_chat_member(
+            chat.id,
+            target_id,
+            can_change_info=False,
+            can_delete_messages=False,
+            can_restrict_members=False,
+            can_invite_users=False,
+            can_pin_messages=False,
+            can_manage_topics=False,
+            is_anonymous=False,
+            can_manage_chat=False,
+            can_post_messages=False,
+            can_edit_messages=False,
+        )
         await update.message.reply_text(f"⬇️ تم تنزيل {target_name} من المشرفين.")
     except Exception as e:
         logger.error(f"فشل التنزيل: {e}")
@@ -364,17 +377,12 @@ async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if "not enough rights" in error_msg or "rights" in error_msg:
             await update.message.reply_text(
                 "❌ **البوت لا يملك صلاحية كافية!**\n\n"
-                "تأكد من أن البوت مشرف ولديه الصلاحيات التالية:\n"
-                "1. **إضافة مشرفين جدد** (Add New Admins).\n"
-                "2. رتبة البوت أعلى من العضو المطلوب تنزيله.\n\n"
+                "تأكد من أن البوت مشرف ولديه صلاحية 'إضافة مشرفين جدد'.\n"
                 "اذهب إلى: إعدادات المجموعة → المشرفين → بوت شفق → الصلاحيات.",
                 parse_mode="Markdown"
             )
-        elif "user not found" in error_msg or "member not found" in error_msg:
-            await update.message.reply_text("❌ هذا العضو غير موجود في المجموعة.")
         else:
             await update.message.reply_text(f"❌ تعذر التنزيل: {e}")
-
 
 async def cmd_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
