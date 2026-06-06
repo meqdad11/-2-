@@ -43,6 +43,7 @@ from handlers.ai import (
     cmd_shafaq, cmd_choose_model, callback_choose_model,
     cmd_gemini, cmd_limit,
     handle_ai_reply,  # ✅ معالج متابعة المحادثة
+    cmd_list_groq_models,  # ✅ عرض نماذج Groq
 )
 from handlers.events import on_chat_member_updated
 from handlers.resources import (
@@ -229,6 +230,7 @@ def register_handlers(app):
     app.add_handler(CommandHandler("download", cmd_download))
     app.add_handler(CommandHandler("model", cmd_choose_model))
     app.add_handler(CommandHandler("myreminders", cmd_my_reminders))
+    app.add_handler(CommandHandler("models", cmd_list_groq_models))  # ✅ جديد
 
     app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
