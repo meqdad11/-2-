@@ -23,16 +23,28 @@ MODELS = {
         "key_env": "GEMINI_API_KEY",
     },
     "llama": {
-        "name": "LLaMA 3 (Groq)",
+        "name": "LLaMA 3.3 (Groq)",
         "url": "https://api.groq.com/openai/v1/chat/completions",
         "key_env": "GROQ_API_KEY",
         "model_name": "llama-3.3-70b-versatile",
     },
-    "mistral": {
-        "name": "Mistral Saba (Groq)",
+    "llama4": {
+        "name": "LLaMA 4 Scout (Groq)",
         "url": "https://api.groq.com/openai/v1/chat/completions",
         "key_env": "GROQ_API_KEY",
-        "model_name": "mistral-saba-24b",
+        "model_name": "meta-llama/llama-4-scout-17b-16e-instruct",
+    },
+    "qwen": {
+        "name": "Qwen 3 (Groq)",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "key_env": "GROQ_API_KEY",
+        "model_name": "qwen/qwen3-32b",
+    },
+    "orpheus": {
+        "name": "Orpheus عربي سعودي (Groq)",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "key_env": "GROQ_API_KEY",
+        "model_name": "canopylabs/orpheus-arabic-saudi",
     },
     "sambanova": {
         "name": "SambaNova (Llama 3.1)",
@@ -51,11 +63,11 @@ def _get_available_models():
             available[key] = model
     return available
 
-# ========== اختيار النموذج (معدلة) ==========
+# ========== اختيار النموذج ==========
 async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض أزرار اختيار النموذج (للنماذج المتاحة فقط) أو تعيينه مباشرة"""
     available = _get_available_models()
-    
+
     if context.args:
         choice = context.args[0].lower()
         if choice not in MODELS:
@@ -68,7 +80,6 @@ async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"✅ تم اختيار نموذج {MODELS[choice]['name']}")
         return
 
-    # عرض أزرار النماذج المتاحة فقط
     if not available:
         await update.message.reply_text("❌ لا توجد نماذج ذكاء اصطناعي مفعّلة حالياً.")
         return
@@ -125,7 +136,6 @@ async def _call_ai(model_key: str, messages: list) -> str:
     headers = {"Content-Type": "application/json"}
 
     if model_key == "gemini":
-        # تحويل messages إلى نص واحد (مبسط)
         prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -138,7 +148,7 @@ async def _call_ai(model_key: str, messages: list) -> str:
             "temperature": 0.7,
             "max_tokens": 2048,
         }
-        if model_key in ("deepseek", "llama", "mistral", "sambanova"):
+        if model_key in ("deepseek", "llama", "llama4", "qwen", "orpheus", "sambanova"):
             headers["Authorization"] = f"Bearer {api_key}"
         url = model["url"]
 
@@ -164,42 +174,33 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
 
-    # هل هو أمر صريح أم رد على رسالة بوت؟
     if msg.reply_to_message and msg.reply_to_message.from_user and msg.reply_to_message.from_user.is_bot:
-        # رد على رسالة بوت ← استمرار المحادثة
         user_input = msg.text
         is_continuation = True
     elif msg.text.startswith("شفق "):
-        user_input = msg.text[5:].strip()  # إزالة "شفق "
+        user_input = msg.text[5:].strip()
         is_continuation = False
     else:
-        return  # ليس له علاقة بالذكاء
+        return
 
     if not user_input:
         await msg.reply_text("⚠️ اكتب شيئًا بعد 'شفق'.")
         return
 
-    # النموذج المختار (الافتراضي llama إن لم يختر شيئاً)
     model_key = context.user_data.get("ai_model", "llama")
 
-    # جلب السياق السابق
     history = await db.get_conversation(user.id, chat.id)
     if not is_continuation:
-        # بداية محادثة جديدة: نفرغ السياق القديم ونبدأ برسالة النظام
         history = [{"role": "system", "content": "أنت شفق، مساعد ذكي مفيد ومهذب. تجيب بالعربية الفصحى المختصرة."}]
 
-    # إضافة رسالة المستخدم الحالية
     history.append({"role": "user", "content": user_input})
 
-    # استدعاء النموذج
     await msg.reply_chat_action("typing")
     reply_text = await _call_ai(model_key, history)
 
-    # إضافة رد البوت للسياق وحفظه
     history.append({"role": "assistant", "content": reply_text})
     await db.save_conversation(user.id, chat.id, history)
 
-    # إرسال الرد
     await msg.reply_text(reply_text, parse_mode="Markdown")
 
 # ========== معالجة الردود على رسائل البوت الذكية ==========
@@ -213,10 +214,9 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not replied_msg.from_user or not replied_msg.from_user.is_bot:
         return False
 
-    # تحقق من وجود محادثة سابقة في قاعدة البيانات
     history = await db.get_conversation(msg.from_user.id, msg.chat.id)
     if not history:
-        return False  # لا توجد محادثة سابقة، نتجاهل
+        return False
 
     user_input = msg.text
     if not user_input:
