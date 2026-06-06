@@ -8,8 +8,9 @@ logger = logging.getLogger(__name__)
 USERBOT_CHAT_ID = 729970974  # معرف حسابك على تيليجرام (المطور)
 
 async def cmd_send_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إرسال رابط المجموعة إلى عضو محظور سابقًا عبر اليوزربوت"""
+    """إرسال رابط المجموعة إلى عضو محظور سابقًا عبر اليوزربوت (بصمت)"""
     if not context.args:
+        # يحتاج ردًا حتى يعرف المستخدم الخطأ
         await update.message.reply_text("❌ استخدم: ارسل_رابط <معرف_العضو>")
         return
     try:
@@ -18,15 +19,22 @@ async def cmd_send_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ معرف العضو يجب أن يكون رقمًا.")
         return
 
+    # نحاول حذف رسالة الأمر التي كتبتها
+    try:
+        await update.message.delete()
+    except:
+        pass
+
+    # نرسل الأمر إلى اليوزربوت دون أي رد
     try:
         from telegram import Bot
         import os as _os
         bot = Bot(token=_os.environ.get("TELEGRAM_BOT_TOKEN"))
         cmd = f"/send_invite {target_id}"
         await bot.send_message(chat_id=USERBOT_CHAT_ID, text=cmd)
-        await update.message.reply_text(f"✅ تم إرسال رابط المجموعة إلى {target_id} عبر المساعد.")
     except Exception as e:
         logger.error(f"فشل إرسال أمر الدعوة: {e}")
+        # في حالة الفشل فقط نخبر المستخدم
         await update.message.reply_text("❌ تعذر إرسال الدعوة حاليًا.")
 
 async def cmd_msg(update: Update, context: ContextTypes.DEFAULT_TYPE):
