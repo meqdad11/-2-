@@ -25,7 +25,7 @@ URL_PATTERN = re.compile(
 )
 
 USERBOT_CHAT_ID = 729970974          # معرف حسابك الشخصي (اليوزربوت)
-pending_requests = {}                # تخزين الطلبات المعلقة
+pending_requests = {}                # تخزين الطلبات المعلقة (بالـ status_msg)
 request_counter = 0                  # عداد للطلبات
 SEARCH_CACHE = {}                    # ذاكرة مؤقتة لنتائج البحث
 
@@ -143,12 +143,12 @@ def _search_soundcloud(query: str) -> List[Dict]:
 # =============================================================================
 # دوال التواصل مع اليوزربوت
 # =============================================================================
-async def _send_to_userbot(url: str, audio_only: bool, chat_id: int, message_id: int):
-    """إرسال أمر التحميل إلى حسابك الشخصي (اليوزربوت)"""
+async def _send_to_userbot(url: str, audio_only: bool, chat_id: int, message_id: int, status_msg=None):
+    """إرسال أمر التحميل إلى حسابك الشخصي (اليوزربوت) مع تخزين رسالة الحالة لحذفها لاحقاً"""
     global request_counter
     request_counter += 1
     req_id = f"{chat_id}_{message_id}_{request_counter}"
-    pending_requests[req_id] = (chat_id, message_id)
+    pending_requests[req_id] = (chat_id, message_id, status_msg)  # ✅ نخزن رسالة الحالة
     
     cmd = f"/download {url}"
     if audio_only:
@@ -182,8 +182,15 @@ async def handle_userbot_response(update: Update, context: ContextTypes.DEFAULT_
     if not pending_requests:
         return
     
-    req_id, (chat_id, message_id) = next(iter(pending_requests.items()))
+    req_id, (chat_id, message_id, status_msg) = next(iter(pending_requests.items()))
     del pending_requests[req_id]
+    
+    # ✅ حذف رسالة "تم إرسال الطلب..." إذا وجدت
+    if status_msg:
+        try:
+            await status_msg.delete()
+        except:
+            pass
     
     # ✅ زر قناة التحديثات
     channel_button = InlineKeyboardMarkup([[
@@ -235,17 +242,15 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url_type = get_url_type(url)
     
     if url_type == "audio":
-        req_id = await _send_to_userbot(url, True, msg.chat.id, msg.message_id)
-        if req_id:
-            await msg.reply_text("🎵 تم إرسال الطلب إلى مساعد التحميل... قد يستغرق الأمر قليلاً.")
-        else:
-            await msg.reply_text("❌ تعذر الاتصال بمساعد التحميل.")
+        status = await msg.reply_text("🎵 تم إرسال الطلب إلى مساعد التحميل...")
+        req_id = await _send_to_userbot(url, True, msg.chat.id, msg.message_id, status)
+        if not req_id:
+            await status.edit_text("❌ تعذر الاتصال بمساعد التحميل.")
     elif url_type == "tiktok":
-        req_id = await _send_to_userbot(url, False, msg.chat.id, msg.message_id)
-        if req_id:
-            await msg.reply_text("📱 تم إرسال الطلب إلى مساعد التحميل...")
-        else:
-            await msg.reply_text("❌ تعذر الاتصال بمساعد التحميل.")
+        status = await msg.reply_text("📱 تم إرسال الطلب إلى مساعد التحميل...")
+        req_id = await _send_to_userbot(url, False, msg.chat.id, msg.message_id, status)
+        if not req_id:
+            await status.edit_text("❌ تعذر الاتصال بمساعد التحميل.")
     else:
         # روابط يوتيوب وإنستغرام وغيرها ← أزرار اختيار فيديو/صوت
         keyboard = InlineKeyboardMarkup([[
@@ -268,11 +273,12 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = query.message.chat.id
         message_id = query.message.message_id
         
-        req_id = await _send_to_userbot(url, audio_only, chat_id, message_id)
-        if req_id:
-            await query.message.edit_text("⏳ جارٍ إرسال الطلب لمساعد التحميل...")
+        status = await query.message.reply_text("⏳ جارٍ إرسال الطلب لمساعد التحميل...")
+        req_id = await _send_to_userbot(url, audio_only, chat_id, message_id, status)
+        if not req_id:
+            await status.edit_text("❌ تعذر الاتصال بمساعد التحميل.")
         else:
-            await query.message.edit_text("❌ تعذر الاتصال بمساعد التحميل.")
+            await query.message.edit_text("اختر نوع التحميل:", reply_markup=None)
     except Exception as e:
         logger.error(f"خطأ في callback_download: {e}")
         await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
@@ -292,8 +298,10 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     url_type = get_url_type(url)
     if url_type == "audio":
-        req_id = await _send_to_userbot(url, True, update.effective_chat.id, update.message.message_id)
-        await update.message.reply_text("🎵 تم إرسال الطلب..." if req_id else "❌ فشل")
+        status = await update.message.reply_text("🎵 تم إرسال الطلب...")
+        req_id = await _send_to_userbot(url, True, update.effective_chat.id, update.message.message_id, status)
+        if not req_id:
+            await status.edit_text("❌ فشل")
     else:
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
