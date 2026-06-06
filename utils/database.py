@@ -353,7 +353,6 @@ async def add_crisis_word(chat_id: int, word: str) -> bool:
         )
         if existing.data:
             return False
-        
         await asyncio.get_event_loop().run_in_executor(
             None, lambda: supabase.table("crisis_words").insert({
                 "chat_id": chat_id,
@@ -499,7 +498,6 @@ async def add_custom_reply(chat_id: int, keyword: str, reply: str) -> bool:
         )
         if existing.data:
             return False
-        
         await asyncio.get_event_loop().run_in_executor(
             None, lambda: supabase.table("custom_replies").insert({
                 "chat_id": chat_id,
@@ -547,7 +545,6 @@ async def add_custom_command(chat_id: int, shortcut: str, target_command: str) -
         )
         if existing.data:
             return False
-        
         await asyncio.get_event_loop().run_in_executor(
             None, lambda: supabase.table("custom_commands").insert({
                 "chat_id": chat_id,
@@ -635,7 +632,6 @@ async def delete_whisper_link(whisper_id: str) -> bool:
 
 # ==================== دوال سجل المستخدمين ====================
 async def log_user_action(user_id: int, chat_id: int, action_type: str, action_by: int = 0, by_name: str = "", reason: str = None, duration: str = None):
-    """تسجيل أي إجراء ضد عضو (تحذير، حظر، كتم، تقرير)"""
     if not supabase:
         return
     try:
@@ -695,7 +691,6 @@ async def clear_all_mutes(chat_id: int):
 
 # ==================== دوال التذكيرات ====================
 async def save_reminder(user_id: int, chat_id: int, reminder_time: str, reminder_text: str) -> Optional[Dict]:
-    """حفظ تذكير يومي جديد وإرجاع السجل المُنشأ (لا يحذف السابق)"""
     if not supabase:
         return None
     try:
@@ -713,7 +708,6 @@ async def save_reminder(user_id: int, chat_id: int, reminder_time: str, reminder
         return None
 
 async def delete_reminder(user_id: int, chat_id: int):
-    """حذف جميع تذكيرات المستخدم في محادثة معينة"""
     if not supabase:
         return False
     try:
@@ -726,7 +720,6 @@ async def delete_reminder(user_id: int, chat_id: int):
         return False
 
 async def load_all_reminders():
-    """تحميل جميع التذكيرات اليومية من قاعدة البيانات (مع id)"""
     if not supabase:
         return []
     try:
@@ -739,7 +732,6 @@ async def load_all_reminders():
         return []
 
 async def get_user_reminders(user_id: int):
-    """جلب تذكيرات مستخدم معين"""
     if not supabase:
         return []
     try:
@@ -753,7 +745,6 @@ async def get_user_reminders(user_id: int):
 
 # ==================== دوال المشرفين المساعدين ====================
 async def add_assistant(chat_id: int, user_id: int) -> bool:
-    """إضافة مشرف مساعد"""
     if not supabase:
         return False
     try:
@@ -771,7 +762,6 @@ async def add_assistant(chat_id: int, user_id: int) -> bool:
         return False
 
 async def remove_assistant(chat_id: int, user_id: int) -> bool:
-    """حذف مشرف مساعد"""
     if not supabase:
         return False
     try:
@@ -784,7 +774,6 @@ async def remove_assistant(chat_id: int, user_id: int) -> bool:
         return False
 
 async def is_assistant(chat_id: int, user_id: int) -> bool:
-    """التحقق مما إذا كان المستخدم مشرفاً مساعداً"""
     if not supabase:
         return False
     try:
@@ -797,7 +786,6 @@ async def is_assistant(chat_id: int, user_id: int) -> bool:
         return False
 
 async def get_assistants(chat_id: int) -> list:
-    """جلب قائمة المشرفين المساعدين"""
     if not supabase:
         return []
     try:
@@ -809,9 +797,7 @@ async def get_assistants(chat_id: int) -> list:
         print(f"خطأ في جلب المساعدين: {e}")
         return []
 
-# ===== دوال جديدة للمساعدين =====
 async def force_remove_assistant(chat_id: int, user_id: int) -> bool:
-    """حذف مشرف مساعد (يتجاهل إذا لم يكن موجوداً)"""
     if not supabase:
         return False
     try:
@@ -824,7 +810,6 @@ async def force_remove_assistant(chat_id: int, user_id: int) -> bool:
         return False
 
 async def clear_assistants(chat_id: int) -> bool:
-    """مسح جميع المشرفين المساعدين في المجموعة"""
     if not supabase:
         return False
     try:
@@ -838,7 +823,6 @@ async def clear_assistants(chat_id: int) -> bool:
 
 # ==================== دوال المطورين ====================
 async def add_developer(user_id: int) -> bool:
-    """إضافة مطور إلى القائمة الدائمة"""
     if not supabase:
         return False
     try:
@@ -851,7 +835,6 @@ async def add_developer(user_id: int) -> bool:
         return False
 
 async def remove_developer(user_id: int) -> bool:
-    """حذف مطور من القائمة"""
     if not supabase:
         return False
     try:
@@ -864,7 +847,6 @@ async def remove_developer(user_id: int) -> bool:
         return False
 
 async def is_developer(user_id: int) -> bool:
-    """التحقق مما إذا كان المستخدم مطوراً"""
     if not supabase:
         return False
     try:
@@ -877,7 +859,6 @@ async def is_developer(user_id: int) -> bool:
         return False
 
 async def get_developers() -> list:
-    """جلب قائمة المطورين"""
     if not supabase:
         return []
     try:
@@ -896,9 +877,8 @@ async def init_db():
     else:
         print("❌ فشل الاتصال بـ Supabase")
 
-# ==================== دوال الذاكرة للمحادثات (معدلة) ====================
+# ==================== دوال الذاكرة للمحادثات ====================
 async def get_conversation(user_id: int, chat_id: int) -> list:
-    """جلب سجل المحادثة بين المستخدم والبوت (قائمة الرسائل)"""
     if not supabase:
         return []
     try:
@@ -911,7 +891,6 @@ async def get_conversation(user_id: int, chat_id: int) -> list:
                 .execute()
         )
         messages = result.data[0]["messages"] if result.data else []
-        # ✅ تأكد من أن messages هي قائمة
         if not isinstance(messages, list):
             return []
         return messages
@@ -920,23 +899,16 @@ async def get_conversation(user_id: int, chat_id: int) -> list:
         return []
 
 async def save_conversation(user_id: int, chat_id: int, messages: list):
-    """حفظ سجل المحادثة مع الحفاظ على system prompt"""
     if not supabase:
         return
     try:
-        # ✅ تأكد من وجود system prompt في البداية
-        if not messages or messages[0].get("role") != "system":
-            # إذا لم يكن هناك system prompt، أضفه تلقائياً
-            from handlers.ai import SYSTEM_PROMPT
-            messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
-        
-        # نحتفظ بآخر 20 رسالة فقط، ولكن نحافظ على system prompt
-        system_msgs = [m for m in messages if m["role"] == "system"]
-        other_msgs = [m for m in messages if m["role"] != "system"]
+        # نحتفظ بآخر 20 رسالة مع الحفاظ على system prompt
+        system_msgs = [m for m in messages if m.get("role") == "system"]
+        other_msgs = [m for m in messages if m.get("role") != "system"]
         if len(other_msgs) > 20:
             other_msgs = other_msgs[-20:]
         trimmed = system_msgs + other_msgs
-        
+
         data = {
             "user_id": user_id,
             "chat_id": chat_id,
@@ -951,7 +923,6 @@ async def save_conversation(user_id: int, chat_id: int, messages: list):
         print(f"خطأ في حفظ المحادثة: {e}")
 
 async def delete_conversation(user_id: int, chat_id: int):
-    """مسح محادثة (اختياري)"""
     if not supabase:
         return
     try:
