@@ -225,7 +225,16 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     model_key = context.user_data.get("ai_model", "llama")
 
     history = await db.get_conversation(user.id, chat.id)
-    if not is_continuation:
+
+    # ✅ التأكد من وجود system prompt دائماً
+    if not history or history[0].get("role") != "system":
+        system_msg = {"role": "system", "content": SYSTEM_PROMPT}
+        if not is_continuation:
+            history = [system_msg]
+        else:
+            history.insert(0, system_msg)
+    elif not is_continuation:
+        # إذا كانت بداية محادثة جديدة، نمسح السياق القديم ونبدأ من جديد
         history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     history.append({"role": "user", "content": user_input})
@@ -254,8 +263,10 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return False
 
     history = await db.get_conversation(msg.from_user.id, msg.chat.id)
-    if not history:
-        return False
+
+    # ✅ تأكد من وجود system prompt
+    if not history or history[0].get("role") != "system":
+        history.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
 
     user_input = msg.text
     if not user_input:
