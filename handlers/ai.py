@@ -28,6 +28,12 @@ MODELS = {
         "key_env": "GROQ_API_KEY",
         "model_name": "llama-3.3-70b-versatile",
     },
+    "mistral": {
+        "name": "Mistral Saba (Groq)",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "key_env": "GROQ_API_KEY",
+        "model_name": "mistral-saba-24b",
+    },
     "sambanova": {
         "name": "SambaNova (Llama 3.1)",
         "url": "https://api.sambanova.ai/v1/chat/completions",
@@ -109,7 +115,7 @@ async def _call_ai(model_key: str, messages: list) -> str:
             "temperature": 0.7,
             "max_tokens": 2048,
         }
-        if model_key in ("deepseek", "llama", "sambanova"):
+        if model_key in ("deepseek", "llama", "mistral", "sambanova"):
             headers["Authorization"] = f"Bearer {api_key}"
         url = model["url"]
 
