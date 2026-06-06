@@ -52,6 +52,7 @@ from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
     handle_media_url, callback_download,
     callback_sc_download, callback_yt_pick, callback_sc_pick,
+    handle_wttt_response,  # ✅ معالج استقبال الملفات من @wtttbot
 )
 from handlers.locks import filter_locked_content
 
@@ -81,9 +82,6 @@ from handlers.crisis import (
 )
 from handlers.inline import handle_inline_query, handle_chosen_inline_result
 
-# ✅ المعالج الجديد لاستقبال ملفات اليوزربوت وإرسالها باسم شفق
-from handlers.media_bridge import handle_media_from_userbot
-
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     level=logging.INFO,
@@ -100,7 +98,6 @@ async def handle_text(update: Update, context):
     chat_id = msg.chat.id
     user = update.effective_user
 
-    # متابعة محادثة الذكاء الاصطناعي (الرد على رسالة البوت)
     if msg.reply_to_message and msg.reply_to_message.from_user and msg.reply_to_message.from_user.is_bot:
         if await handle_ai_reply(update, context):
             return
@@ -163,7 +160,6 @@ async def handle_text(update: Update, context):
     await track_message(update, context)
     await check_crisis_words(update, context)
 
-# ========== معالج القنوات ==========
 async def handle_channel_post(update: Update, context):
     msg = update.channel_post
     if not msg or not msg.text:
@@ -171,7 +167,6 @@ async def handle_channel_post(update: Update, context):
     logger.info(f"📢 رسالة جديدة في القناة: {msg.text[:100]}")
     await handle_media_url(update, context)
 
-# ========== تهيئة التطبيق ==========
 async def post_init(app):
     await db.init_db()
     reminders = await db.load_all_reminders()
@@ -193,9 +188,7 @@ async def post_init(app):
         if count:
             logger.info(f"✅ تم إعادة جدولة {count} تذكير يومي")
 
-# ========== تسجيل الهاندلرز ==========
 def register_handlers(app):
-    # أوامر سلاش
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("id", cmd_id))
     app.add_handler(CommandHandler("ban", cmd_ban))
@@ -223,7 +216,6 @@ def register_handlers(app):
     app.add_handler(CommandHandler("model", cmd_choose_model))
     app.add_handler(CommandHandler("myreminders", cmd_my_reminders))
 
-    # أزرار inline
     app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
     app.add_handler(CallbackQueryHandler(callback_yt_pick, pattern=r"^yt_pick\|"))
@@ -231,29 +223,24 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(callback_choose_model, pattern=r"^model_"))
     app.add_handler(CallbackQueryHandler(callback_menu))
 
-    # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # ✅ معالج استقبال الملفات من اليوزربوت (حسابك) وإرسالها باسم شفق
+    # ✅ معالج استقبال الملفات من @wtttbot وإرسالها للمستخدم
     app.add_handler(MessageHandler(
         (filters.VIDEO | filters.AUDIO | filters.Document.ALL) & filters.ChatType.PRIVATE,
-        handle_media_from_userbot
+        handle_wttt_response
     ))
 
-    # معالجات النصوص
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
 
-    # فلترة المحتوى
     app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
 
-    # الهمسات
     app.add_handler(InlineQueryHandler(handle_inline_query))
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_whisper_message))
 
-# ========== المهام الدورية ==========
 def register_jobs(app):
     jq = app.job_queue
     jq.run_repeating(job_expire_bans, interval=300, first=10)
@@ -262,7 +249,6 @@ def register_jobs(app):
         time=datetime.time(hour=9, minute=0, second=0, tzinfo=SAUDI_TZ)
     )
 
-# ========== نقطة الدخول ==========
 def main():
     if not TELEGRAM_BOT_TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN غير محدد")
