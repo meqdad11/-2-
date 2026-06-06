@@ -789,4 +789,179 @@ async def is_assistant(chat_id: int, user_id: int) -> bool:
         return False
     try:
         result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: supabase
+            None, lambda: supabase.table("assistants").select("*").eq("chat_id", chat_id).eq("user_id", user_id).execute()
+        )
+        return len(result.data) > 0
+    except Exception as e:
+        print(f"خطأ في التحقق من المساعد: {e}")
+        return False
+
+async def get_assistants(chat_id: int) -> list:
+    """جلب قائمة المشرفين المساعدين"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("assistants").select("*").eq("chat_id", chat_id).execute()
+        )
+        return result.data
+    except Exception as e:
+        print(f"خطأ في جلب المساعدين: {e}")
+        return []
+
+# ===== دوال جديدة للمساعدين =====
+async def force_remove_assistant(chat_id: int, user_id: int) -> bool:
+    """حذف مشرف مساعد (يتجاهل إذا لم يكن موجوداً)"""
+    if not supabase:
+        return False
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("assistants").delete().eq("chat_id", chat_id).eq("user_id", user_id).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في حذف مساعد (force): {e}")
+        return False
+
+async def clear_assistants(chat_id: int) -> bool:
+    """مسح جميع المشرفين المساعدين في المجموعة"""
+    if not supabase:
+        return False
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("assistants").delete().eq("chat_id", chat_id).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في مسح المساعدين: {e}")
+        return False
+
+# ==================== دوال المطورين ====================
+async def add_developer(user_id: int) -> bool:
+    """إضافة مطور إلى القائمة الدائمة"""
+    if not supabase:
+        return False
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("developers").insert({"user_id": user_id}).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في إضافة مطور: {e}")
+        return False
+
+async def remove_developer(user_id: int) -> bool:
+    """حذف مطور من القائمة"""
+    if not supabase:
+        return False
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("developers").delete().eq("user_id", user_id).execute()
+        )
+        return len(result.data) > 0
+    except Exception as e:
+        print(f"خطأ في حذف مطور: {e}")
+        return False
+
+async def is_developer(user_id: int) -> bool:
+    """التحقق مما إذا كان المستخدم مطوراً"""
+    if not supabase:
+        return False
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("developers").select("*").eq("user_id", user_id).execute()
+        )
+        return len(result.data) > 0
+    except Exception as e:
+        print(f"خطأ في التحقق من المطور: {e}")
+        return False
+
+async def get_developers() -> list:
+    """جلب قائمة المطورين"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("developers").select("*").execute()
+        )
+        return [row["user_id"] for row in result.data]
+    except Exception as e:
+        print(f"خطأ في جلب المطورين: {e}")
+        return []
+
+# ========== تهيئة قاعدة البيانات ==========
+async def init_db():
+    if supabase:
+        print("✅ Supabase جاهز للعمل")
+    else:
+        print("❌ فشل الاتصال بـ Supabase")
+
+# ==================== دوال الذاكرة للمحادثات (معدلة) ====================
+async def get_conversation(user_id: int, chat_id: int) -> list:
+    """جلب سجل المحادثة بين المستخدم والبوت (قائمة الرسائل)"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("conversations")
+                .select("messages")
+                .eq("user_id", user_id)
+                .eq("chat_id", chat_id)
+                .execute()
+        )
+        messages = result.data[0]["messages"] if result.data else []
+        # ✅ تأكد من أن messages هي قائمة
+        if not isinstance(messages, list):
+            return []
+        return messages
+    except Exception as e:
+        print(f"خطأ في جلب المحادثة: {e}")
+        return []
+
+async def save_conversation(user_id: int, chat_id: int, messages: list):
+    """حفظ سجل المحادثة مع الحفاظ على system prompt"""
+    if not supabase:
+        return
+    try:
+        # ✅ تأكد من وجود system prompt في البداية
+        if not messages or messages[0].get("role") != "system":
+            # إذا لم يكن هناك system prompt، أضفه تلقائياً
+            from handlers.ai import SYSTEM_PROMPT
+            messages.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
+        
+        # نحتفظ بآخر 20 رسالة فقط، ولكن نحافظ على system prompt
+        system_msgs = [m for m in messages if m["role"] == "system"]
+        other_msgs = [m for m in messages if m["role"] != "system"]
+        if len(other_msgs) > 20:
+            other_msgs = other_msgs[-20:]
+        trimmed = system_msgs + other_msgs
+        
+        data = {
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "messages": trimmed,
+            "updated_at": now_iso()
+        }
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("conversations").upsert(data).execute()
+        )
+    except Exception as e:
+        print(f"خطأ في حفظ المحادثة: {e}")
+
+async def delete_conversation(user_id: int, chat_id: int):
+    """مسح محادثة (اختياري)"""
+    if not supabase:
+        return
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("conversations")
+                .delete()
+                .eq("user_id", user_id)
+                .eq("chat_id", chat_id)
+                .execute()
+        )
+    except Exception as e:
+        print(f"خطأ في مسح المحادثة: {e}")
