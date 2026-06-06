@@ -1,6 +1,6 @@
 import logging
 import os
-import re
+import json
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import aiohttp
@@ -23,22 +23,10 @@ MODELS = {
         "key_env": "GEMINI_API_KEY",
     },
     "llama": {
-        "name": "LLaMA 3.3 (Groq)",
+        "name": "LLaMA 3 (Groq)",
         "url": "https://api.groq.com/openai/v1/chat/completions",
         "key_env": "GROQ_API_KEY",
         "model_name": "llama-3.3-70b-versatile",
-    },
-    "llama4": {
-        "name": "LLaMA 4 Scout (Groq)",
-        "url": "https://api.groq.com/openai/v1/chat/completions",
-        "key_env": "GROQ_API_KEY",
-        "model_name": "meta-llama/llama-4-scout-17b-16e-instruct",
-    },
-    "qwen": {
-        "name": "Qwen 3 (Groq)",
-        "url": "https://api.groq.com/openai/v1/chat/completions",
-        "key_env": "GROQ_API_KEY",
-        "model_name": "qwen/qwen3-32b",
     },
     "sambanova": {
         "name": "SambaNova (Llama 3.1)",
@@ -47,41 +35,6 @@ MODELS = {
         "model_name": "Meta-Llama-3.1-8B-Instruct",
     },
 }
-
-# ========== System Prompt ==========
-SYSTEM_PROMPT = """/no_think
-أنت شفق، مساعد ذكي ومهذب يتحدث العربية فقط.
-- رد دائماً بالعربية بغض النظر عن لغة السؤال
-- إذا سألك أحد "كيفك" أو "كيف حالك" فأجب بشكل ودي طبيعي
-- اجعل ردودك مختصرة ومفيدة
-- لا تفكر بصوت عالٍ ولا تكتب تفكيرك، فقط الجواب النهائي
-- لا تستخدم وسوم مثل <think> أو </think>"""
-
-# ========== عدد الرسائل المحفوظة في الذاكرة ==========
-MAX_HISTORY = 10
-
-# ========== كلمات تدل على رسائل البوت غير الذكاء ==========
-BOT_NON_AI_PREFIXES = (
-    "📱", "⏳", "✅", "❌", "🔗", "📥", "📤", "🎵", "🎬",
-    "/download", "تم إرسال", "بدأ التحميل", "اكتمل التحميل",
-)
-
-# ========== دالة تقليص السياق ==========
-def _trim_history(history: list) -> list:
-    system_msgs = [m for m in history if m["role"] == "system"]
-    other_msgs = [m for m in history if m["role"] != "system"]
-    if len(other_msgs) > MAX_HISTORY:
-        other_msgs = other_msgs[-MAX_HISTORY:]
-    return system_msgs + other_msgs
-
-# ========== هل رسالة البوت من محادثة ذكاء؟ ==========
-def _is_ai_message(text: str) -> bool:
-    if not text:
-        return False
-    for prefix in BOT_NON_AI_PREFIXES:
-        if text.startswith(prefix):
-            return False
-    return True
 
 # ========== دالة مساعدة: النماذج المتاحة فقط ==========
 def _get_available_models():
@@ -94,7 +47,7 @@ def _get_available_models():
 # ========== اختيار النموذج ==========
 async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
     available = _get_available_models()
-
+    
     if context.args:
         choice = context.args[0].lower()
         if choice not in MODELS:
@@ -130,37 +83,6 @@ async def callback_choose_model(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data["ai_model"] = choice
     await query.message.edit_text(f"✅ النموذج: {MODELS[choice]['name']}")
 
-# ========== مسح محادثة الذكاء ==========
-async def cmd_clear_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    chat = update.effective_chat
-    # ✅ احفظ محادثة فارغة مع system prompt فقط
-    initial_conversation = [{"role": "system", "content": SYSTEM_PROMPT}]
-    await db.save_conversation(user.id, chat.id, initial_conversation)
-    await update.message.reply_text("🧹 تم مسح محادثة الذكاء الاصطناعي.")
-
-# ========== أمر عرض نماذج Groq المتاحة ==========
-async def cmd_list_groq_models(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
-        await update.message.reply_text("❌ مفتاح GROQ_API_KEY غير موجود.")
-        return
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(
-                "https://api.groq.com/openai/v1/models",
-                headers={"Authorization": f"Bearer {api_key}"}
-            ) as resp:
-                data = await resp.json()
-                names = [m["id"] for m in data.get("data", [])]
-                if names:
-                    await update.message.reply_text("📋 نماذج Groq المتاحة:\n\n" + "\n".join(names))
-                else:
-                    await update.message.reply_text("❌ لا توجد نماذج متاحة.")
-    except Exception as e:
-        logger.error(f"Groq models error: {e}")
-        await update.message.reply_text("❌ تعذر جلب قائمة النماذج.")
-
 # ========== دالة الاتصال بالنموذج ==========
 async def _call_ai(model_key: str, messages: list) -> str:
     model = MODELS[model_key]
@@ -183,7 +105,7 @@ async def _call_ai(model_key: str, messages: list) -> str:
             "temperature": 0.7,
             "max_tokens": 2048,
         }
-        if model_key in ("deepseek", "llama", "llama4", "qwen", "sambanova"):
+        if model_key in ("deepseek", "llama", "sambanova"):
             headers["Authorization"] = f"Bearer {api_key}"
         url = model["url"]
 
@@ -198,9 +120,7 @@ async def _call_ai(model_key: str, messages: list) -> str:
                 if model_key == "gemini":
                     return data["candidates"][0]["content"]["parts"][0]["text"]
                 else:
-                    content = data["choices"][0]["message"]["content"]
-                    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
-                    return content
+                    return data["choices"][0]["message"]["content"]
     except Exception as e:
         logger.error(f"AI call error: {e}")
         return "❌ تعذر الاتصال بالذكاء الاصطناعي."
@@ -224,36 +144,20 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("⚠️ اكتب شيئًا بعد 'شفق'.")
         return
 
-    # ✅ منع الإدخالات القصيرة جداً (أقل من 3 أحرف)
-    if len(user_input.strip()) < 3:
-        await msg.reply_text("❌ الرجاء كتابة سؤال أو طلب واضح (3 أحرف على الأقل).")
-        return
-
     model_key = context.user_data.get("ai_model", "llama")
 
     history = await db.get_conversation(user.id, chat.id)
-
-    # ✅ التأكد من وجود system prompt دائماً
-    if not history or history[0].get("role") != "system":
-        system_msg = {"role": "system", "content": SYSTEM_PROMPT}
-        if not is_continuation:
-            history = [system_msg]
-        else:
-            history.insert(0, system_msg)
-    elif not is_continuation:
-        # إذا كانت بداية محادثة جديدة، نمسح السياق القديم ونبدأ من جديد
-        history = [{"role": "system", "content": SYSTEM_PROMPT}]
+    if not is_continuation:
+        # ✅ تم تعديل هذه التعليمات لجعل شفق أكثر دقة
+        history = [{"role": "system", "content": "أنت 'شفق'، مساعد ذكي مفيد ومهذب. مهمتك هي تقديم إجابات دقيقة ومفيدة باللغة العربية الفصحى المختصرة. يجب أن تلتزم بالحقائق. إذا سُئلت عن شيء لا تعرفه أو كان خارج نطاق معرفتك، يجب أن تعتذر بلطف وتقول 'لا أعلم' بدلاً من تخمين إجابة. لا تؤلف معلومات. كن مباشرًا وواضحًا."}]
 
     history.append({"role": "user", "content": user_input})
-    history = _trim_history(history)
 
     await msg.reply_chat_action("typing")
     reply_text = await _call_ai(model_key, history)
 
-    # ✅ فقط إذا كان الرد طبيعياً (ليس خطأ)، نحفظه
-    if not reply_text.startswith("❌"):
-        history.append({"role": "assistant", "content": reply_text})
-        await db.save_conversation(user.id, chat.id, history)
+    history.append({"role": "assistant", "content": reply_text})
+    await db.save_conversation(user.id, chat.id, history)
 
     await msg.reply_text(reply_text, parse_mode="Markdown")
 
@@ -267,42 +171,22 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not replied_msg.from_user or not replied_msg.from_user.is_bot:
         return False
 
-    # ✅ تحقق إن الرسالة المردود عليها من محادثة ذكاء وليست رسالة تحميل
-    if not _is_ai_message(replied_msg.text or ""):
+    history = await db.get_conversation(msg.from_user.id, msg.chat.id)
+    if not history:
         return False
 
     user_input = msg.text
     if not user_input:
         return False
-    
-    # ✅ منع الإدخالات القصيرة جداً (أقل من 3 أحرف)
-    user_input_clean = user_input.strip()
-    if len(user_input_clean) < 3:
-        await msg.reply_text("❌ الرجاء كتابة رسالة أوضح (3 أحرف على الأقل) للرد على الذكاء.")
-        return True
-    
-    # ✅ منع الأحرف المتكررة مثل "ههههه" أو "ددد"
-    if len(set(user_input_clean)) == 1:
-        await msg.reply_text("❌ الرجاء كتابة رسالة واضحة، لا أستطيع فهم الأحرف المتكررة.")
-        return True
-
-    history = await db.get_conversation(msg.from_user.id, msg.chat.id)
-
-    # ✅ تأكد من وجود system prompt
-    if not history or history[0].get("role") != "system":
-        history.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
 
     model_key = context.user_data.get("ai_model", "llama")
-    history.append({"role": "user", "content": user_input_clean})
-    history = _trim_history(history)
+    history.append({"role": "user", "content": user_input})
 
     await msg.reply_chat_action("typing")
     reply_text = await _call_ai(model_key, history)
 
-    # ✅ فقط إذا كان الرد طبيعياً (ليس خطأ)، نحفظه
-    if not reply_text.startswith("❌"):
-        history.append({"role": "assistant", "content": reply_text})
-        await db.save_conversation(msg.from_user.id, msg.chat.id, history)
+    history.append({"role": "assistant", "content": reply_text})
+    await db.save_conversation(msg.from_user.id, msg.chat.id, history)
 
     await msg.reply_text(reply_text, parse_mode="Markdown")
     return True
