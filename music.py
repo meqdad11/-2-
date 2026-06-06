@@ -114,11 +114,14 @@ def _search_youtube(query: str) -> List[Dict]:
 
 
 def _search_soundcloud(query: str) -> List[Dict]:
-    """بحث في ساوند كلاود وإرجاع قائمة بالنتائج"""
+    """بحث في ساوند كلاود وإرجاع قائمة بالنتائج (مع رابط التحميل المباشر)"""
     try:
         ydl_opts = {
-            'quiet': True, 'no_warnings': True,
-            'extract_flat': 'in_playlist', 'playlistend': 5,
+            'quiet': True,
+            'no_warnings': True,
+            'extract_flat': False,           # ← نوقف flat مؤقتاً للحصول على الرابط الحقيقي
+            'playlistend': 5,
+            'format': 'bestaudio/best',
             'user_agent': "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -126,14 +129,16 @@ def _search_soundcloud(query: str) -> List[Dict]:
             results = []
             if 'entries' in info:
                 for entry in info['entries'][:5]:
-                    if entry:
-                        url = entry.get('webpage_url') or entry.get('url') or ''
-                        if url:
-                            results.append({
-                                'title': entry.get('title', 'بدون عنوان'),
-                                'url': url,
-                                'duration': fmt_dur(entry.get('duration', 0)),
-                            })
+                    if not entry:
+                        continue
+                    # نجرب الحصول على الرابط المباشر للصوت أولاً
+                    url = entry.get('url') or entry.get('webpage_url') or ''
+                    if url:
+                        results.append({
+                            'title': entry.get('title', 'بدون عنوان'),
+                            'url': url,
+                            'duration': fmt_dur(entry.get('duration', 0)),
+                        })
             return results
     except Exception as e:
         logger.error(f"خطأ البحث في ساوند كلاود: {e}")
