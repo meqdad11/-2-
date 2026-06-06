@@ -1,7 +1,7 @@
 import logging
 import os
 import json
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import aiohttp
 
@@ -32,15 +32,25 @@ MODELS = {
 
 # ========== اختيار النموذج ==========
 async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("استخدم /model deepseek | gemini | llama")
+    """عرض أزرار اختيار النموذج أو تعيينه مباشرة"""
+    # إذا أرسل المستخدم وسيطًا (مثل: نموذج gemini)
+    if context.args:
+        choice = context.args[0].lower()
+        if choice not in MODELS:
+            await update.message.reply_text("❌ اختر: deepseek, gemini, llama")
+            return
+        context.user_data["ai_model"] = choice
+        await update.message.reply_text(f"✅ تم اختيار نموذج {MODELS[choice]['name']}")
         return
-    choice = context.args[0].lower()
-    if choice not in MODELS:
-        await update.message.reply_text("اختر: deepseek, gemini, llama")
-        return
-    context.user_data["ai_model"] = choice
-    await update.message.reply_text(f"✅ تم اختيار نموذج {MODELS[choice]['name']}")
+
+    # بدون وسيط ← عرض أزرار
+    keyboard = []
+    for key, model in MODELS.items():
+        keyboard.append([InlineKeyboardButton(model["name"], callback_data=f"model_{key}")])
+    await update.message.reply_text(
+        "🧠 اختر نموذج الذكاء الاصطناعي:",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 async def callback_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -118,8 +128,8 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("⚠️ اكتب شيئًا بعد 'شفق'.")
         return
 
-    # النموذج المختار
-    model_key = context.user_data.get("ai_model", "deepseek")
+    # النموذج المختار (الافتراضي llama إن لم يختر شيئاً)
+    model_key = context.user_data.get("ai_model", "llama")
 
     # جلب السياق السابق
     history = await db.get_conversation(user.id, chat.id)
@@ -133,7 +143,7 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # استدعاء النموذج
     await msg.reply_chat_action("typing")
     reply_text = await _call_ai(model_key, history)
-    
+
     # إضافة رد البوت للسياق وحفظه
     history.append({"role": "assistant", "content": reply_text})
     await db.save_conversation(user.id, chat.id, history)
@@ -142,38 +152,34 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.reply_text(reply_text, parse_mode="Markdown")
 
 # ========== معالجة الردود على رسائل البوت الذكية ==========
-# هذه الدالة تستخدم في app.py للردود التلقائية
 async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """تفحص ما إذا كانت الرسالة رداً على بوت (استمرار محادثة) وتعالجها"""
     msg = update.message
     if not msg or not msg.reply_to_message:
         return False
 
     replied_msg = msg.reply_to_message
-    # تحقق أن الرسالة المردود عليها هي من البوت وأنها رد ذكي (ليست أمرًا عاديًا)
     if not replied_msg.from_user or not replied_msg.from_user.is_bot:
         return False
 
-    # إذا كانت الرسالة المردود عليها تحتوي على رد من الذكاء الاصطناعي (يمكننا تمييزها بصعوبة،
-    # لكننا نعتمد على أن أي رد على بوت هو متابعة محادثة)
-    # فقط نتأكد أن المستخدم لا يزال لديه محادثة نشطة
+    # تحقق من وجود محادثة سابقة في قاعدة البيانات
     history = await db.get_conversation(msg.from_user.id, msg.chat.id)
     if not history:
-        return False  # لا توجد محادثة سابقة
+        return False  # لا توجد محادثة سابقة، نتجاهل
 
-    # تابع كما لو كان أمر شفق
     user_input = msg.text
     if not user_input:
         return False
 
-    model_key = context.user_data.get("ai_model", "deepseek")
+    model_key = context.user_data.get("ai_model", "llama")
     history.append({"role": "user", "content": user_input})
-    
+
     await msg.reply_chat_action("typing")
     reply_text = await _call_ai(model_key, history)
-    
+
     history.append({"role": "assistant", "content": reply_text})
     await db.save_conversation(msg.from_user.id, msg.chat.id, history)
-    
+
     await msg.reply_text(reply_text, parse_mode="Markdown")
     return True
 
