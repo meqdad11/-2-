@@ -677,8 +677,7 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 translated = ''.join(translated_parts)
                 
         await msg.reply_text(
-            f"🌐 **الترجمة إلى {lang_name}:**\n\n{translated}\n\n"
-            f"_النص الأصلي:_ {original_text[:100]}...",
+            f"🌐 **الترجمة إلى {lang_name}:**\n\n{translated}",
             parse_mode="Markdown"
         )
     except Exception as e:
