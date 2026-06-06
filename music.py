@@ -24,23 +24,23 @@ URL_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-USERBOT_CHAT_ID = 729970974          # معرف حسابك الشخصي (اليوزربوت)
-pending_requests = {}                # تخزين الطلبات المعلقة (بالـ status_msg)
-request_counter = 0                  # عداد للطلبات
-SEARCH_CACHE = {}                    # ذاكرة مؤقتة لنتائج البحث
+USERBOT_CHAT_ID = 729970974
+pending_requests = {}
+request_counter = 0
+SEARCH_CACHE = {}
+
+AUDIO_EXTENSIONS = (".mp3", ".m4a", ".aac", ".ogg", ".opus", ".flac", ".wav", ".wma")
 
 
 # =============================================================================
 # دوال مساعدة
 # =============================================================================
 def extract_url(text: str):
-    """استخراج الرابط من النص"""
     match = URL_PATTERN.search(text)
     return match.group(0) if match else None
 
 
 def get_url_type(url: str) -> str:
-    """تحديد نوع الرابط (صوت، تيك توك، غير ذلك)"""
     if any(d in url for d in SOUNDCLOUD_DOMAINS):
         return "audio"
     if any(d in url for d in TIKTOK_DOMAINS):
@@ -49,7 +49,6 @@ def get_url_type(url: str) -> str:
 
 
 def fmt_dur(seconds) -> str:
-    """تنسيق المدة إلى دقائق:ثواني"""
     try:
         s = int(seconds)
         return f"{s//60}:{s%60:02d}"
@@ -58,7 +57,6 @@ def fmt_dur(seconds) -> str:
 
 
 def _get_common_opts():
-    """إعدادات yt-dlp الأساسية"""
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -85,10 +83,9 @@ def _get_common_opts():
 
 
 # =============================================================================
-# دوال البحث (يوتيوب - ساوند كلاود)
+# دوال البحث
 # =============================================================================
 def _search_youtube(query: str) -> List[Dict]:
-    """بحث في يوتيوب وإرجاع قائمة بالنتائج"""
     try:
         ydl_opts = {
             'quiet': True, 'no_warnings': True,
@@ -114,12 +111,11 @@ def _search_youtube(query: str) -> List[Dict]:
 
 
 def _search_soundcloud(query: str) -> List[Dict]:
-    """بحث في ساوند كلاود وإرجاع روابط الصفحات"""
     try:
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'extract_flat': True,   # أسرع وآمن
+            'extract_flat': True,
             'playlistend': 5,
             'user_agent': "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
         }
@@ -131,7 +127,7 @@ def _search_soundcloud(query: str) -> List[Dict]:
                     if entry and entry.get('url'):
                         results.append({
                             'title': entry.get('title', 'بدون عنوان'),
-                            'url': entry.get('url'),  # رابط الصفحة
+                            'url': entry.get('url'),
                             'duration': fmt_dur(entry.get('duration', 0)),
                         })
             return results
@@ -144,16 +140,15 @@ def _search_soundcloud(query: str) -> List[Dict]:
 # دوال التواصل مع اليوزربوت
 # =============================================================================
 async def _send_to_userbot(url: str, audio_only: bool, chat_id: int, message_id: int, status_msg=None):
-    """إرسال أمر التحميل إلى حسابك الشخصي (اليوزربوت) مع تخزين رسالة الحالة لحذفها لاحقاً"""
     global request_counter
     request_counter += 1
     req_id = f"{chat_id}_{message_id}_{request_counter}"
-    pending_requests[req_id] = (chat_id, message_id, status_msg)  # ✅ نخزن رسالة الحالة
-    
+    pending_requests[req_id] = (chat_id, message_id, status_msg)
+
     cmd = f"/download {url}"
     if audio_only:
         cmd += " audio"
-    
+
     try:
         from telegram import Bot
         import os as _os
@@ -175,28 +170,27 @@ async def handle_userbot_response(update: Update, context: ContextTypes.DEFAULT_
     msg = update.message
     if not msg or not msg.from_user:
         return
-    
+
     if msg.from_user.id != USERBOT_CHAT_ID:
         return
-    
+
     if not pending_requests:
         return
-    
+
     req_id, (chat_id, message_id, status_msg) = next(iter(pending_requests.items()))
     del pending_requests[req_id]
-    
-    # ✅ حذف رسالة "تم إرسال الطلب..." إذا وجدت
+
+    # حذف رسالة الحالة
     if status_msg:
         try:
             await status_msg.delete()
         except:
             pass
-    
-    # ✅ زر قناة التحديثات
+
     channel_button = InlineKeyboardMarkup([[
         InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")
     ]])
-    
+
     try:
         if msg.video:
             await context.bot.send_video(
@@ -214,9 +208,28 @@ async def handle_userbot_response(update: Update, context: ContextTypes.DEFAULT_
                 reply_markup=channel_button
             )
         elif msg.document:
-            await context.bot.send_document(
+            # ✅ إذا كان document بامتداد صوتي، أرسله كـ audio
+            file_name = msg.document.file_name or ""
+            if any(file_name.lower().endswith(ext) for ext in AUDIO_EXTENSIONS):
+                # استخراج العنوان من اسم الملف
+                title = os.path.splitext(file_name)[0]
+                await context.bot.send_audio(
+                    chat_id=chat_id,
+                    audio=msg.document.file_id,
+                    title=title,
+                    reply_markup=channel_button
+                )
+            else:
+                await context.bot.send_document(
+                    chat_id=chat_id,
+                    document=msg.document.file_id,
+                    reply_markup=channel_button
+                )
+        elif msg.voice:
+            # ✅ voice_note → أرسله كـ audio بدل voice
+            await context.bot.send_audio(
                 chat_id=chat_id,
-                document=msg.document.file_id,
+                audio=msg.voice.file_id,
                 reply_markup=channel_button
             )
     except Exception as e:
@@ -229,10 +242,9 @@ async def handle_userbot_response(update: Update, context: ContextTypes.DEFAULT_
 
 
 # =============================================================================
-# معالجة الرابط المباشر (من المستخدم)
+# معالجة الرابط المباشر
 # =============================================================================
 async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عند إرسال رابط مباشر - تحديد النوع وتوجيهه لليوزربوت"""
     msg = update.message or update.channel_post
     if not msg or not msg.text:
         return
@@ -240,7 +252,7 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not url:
         return
     url_type = get_url_type(url)
-    
+
     if url_type == "audio":
         status = await msg.reply_text("🎵 تم إرسال الطلب إلى مساعد التحميل...")
         req_id = await _send_to_userbot(url, True, msg.chat.id, msg.message_id, status)
@@ -260,10 +272,9 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================================================================
-# أزرار اختيار فيديو/صوت (لجميع الروابط)
+# أزرار اختيار فيديو/صوت
 # =============================================================================
 async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالج الأزرار dl_audio و dl_video"""
     query = update.callback_query
     await query.answer()
     try:
@@ -271,17 +282,14 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         audio_only = (action == "dl_audio")
         chat_id = query.message.chat.id
         message_id = query.message.message_id
-        
-        # 1. حذف رسالة "اختر نوع التحميل:" الأصلية (التي تحتوي الأزرار)
+
         await query.message.delete()
-        
-        # 2. إرسال رسالة مؤقتة جديدة مكانها
+
         status = await context.bot.send_message(
             chat_id=chat_id,
             text="⏳ جارٍ إرسال الطلب لمساعد التحميل..."
         )
-        
-        # 3. إرسال الأمر إلى اليوزربوت مع تخزين status_msg لحذفها لاحقاً
+
         req_id = await _send_to_userbot(url, audio_only, chat_id, message_id, status)
         if not req_id:
             await status.edit_text("❌ تعذر الاتصال بمساعد التحميل.")
@@ -296,10 +304,9 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 # =============================================================================
-# أمر /download (للتوافق)
+# أمر /download
 # =============================================================================
 async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تحميل من رابط يرسل مع الأمر"""
     if not context.args:
         await update.message.reply_text("أرسل رابط مباشرة للتحميل")
         return
@@ -325,7 +332,6 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # البحث في يوتيوب
 # =============================================================================
 async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر البحث في يوتيوب"""
     if not context.args:
         await update.message.reply_text("الاستخدام: يوتيوب <اسم الفيديو>")
         return
@@ -348,7 +354,6 @@ async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """اختيار نتيجة من بحث يوتيوب"""
     query = update.callback_query
     await query.answer()
     try:
@@ -373,7 +378,6 @@ async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # البحث في ساوند كلاود
 # =============================================================================
 async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر البحث في ساوند كلاود"""
     if not context.args:
         await update.message.reply_text("الاستخدام: بحث <اسم الأغنية>\nمثال: بحث فيروز")
         return
@@ -398,7 +402,6 @@ async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """اختيار نتيجة من بحث ساوند كلاود"""
     query = update.callback_query
     await query.answer()
     try:
@@ -416,11 +419,9 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not url:
             await query.message.edit_text("❌ رابط غير متوفر.")
             return
-        
-        # حذف رسالة النتائج
+
         await query.message.delete()
-        
-        # إرسال أمر التحميل فوراً (كنوع صوتي تلقائيًا لساوند كلاود)
+
         status = await context.bot.send_message(
             chat_id=query.message.chat.id,
             text="⏳ جارٍ إرسال الطلب لمساعد التحميل..."
@@ -437,5 +438,4 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # أزرار قديمة (للتوافق)
 # =============================================================================
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """زر ساوند كلاود القديم - غير مستخدم حالياً"""
     await update.callback_query.answer("غير متاح")
