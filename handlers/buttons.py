@@ -673,7 +673,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
              InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text(
-            "🎵 **الميديا:**\n• أرسل رابط يوتيوب / تيك توك / انستقرام مباشرة\n• يوتيوب <اسم الأغنية> — بحث",
+            "الميزة معطلة حاليا",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown"
         )
