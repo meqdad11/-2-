@@ -52,7 +52,6 @@ from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
     handle_media_url, callback_download,
     callback_sc_download, callback_yt_pick, callback_sc_pick,
-    handle_userbot_response,
 )
 from handlers.locks import filter_locked_content
 
