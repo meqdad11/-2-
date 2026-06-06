@@ -40,12 +40,6 @@ MODELS = {
         "key_env": "GROQ_API_KEY",
         "model_name": "qwen/qwen3-32b",
     },
-    "orpheus": {
-        "name": "Orpheus عربي سعودي (Groq)",
-        "url": "https://api.groq.com/openai/v1/chat/completions",
-        "key_env": "GROQ_API_KEY",
-        "model_name": "canopylabs/orpheus-arabic-saudi",
-    },
     "sambanova": {
         "name": "SambaNova (Llama 3.1)",
         "url": "https://api.sambanova.ai/v1/chat/completions",
@@ -54,9 +48,15 @@ MODELS = {
     },
 }
 
+# ========== System Prompt ==========
+SYSTEM_PROMPT = """أنت شفق، مساعد ذكي ومهذب يتحدث العربية فقط.
+- رد دائماً بالعربية بغض النظر عن لغة السؤال
+- إذا سألك أحد "كيفك" أو "كيف حالك" فأجب بشكل ودي طبيعي
+- اجعل ردودك مختصرة ومفيدة
+- لا تفكر بصوت عالٍ ولا تكتب تفكيرك، فقط الجواب النهائي"""
+
 # ========== دالة مساعدة: النماذج المتاحة فقط ==========
 def _get_available_models():
-    """ترجع قائمة النماذج التي لديها مفاتيح API موجودة"""
     available = {}
     for key, model in MODELS.items():
         if os.environ.get(model["key_env"]):
@@ -65,7 +65,6 @@ def _get_available_models():
 
 # ========== اختيار النموذج ==========
 async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض أزرار اختيار النموذج (للنماذج المتاحة فقط) أو تعيينه مباشرة"""
     available = _get_available_models()
 
     if context.args:
@@ -105,7 +104,6 @@ async def callback_choose_model(update: Update, context: ContextTypes.DEFAULT_TY
 
 # ========== أمر عرض نماذج Groq المتاحة ==========
 async def cmd_list_groq_models(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """يجلب قائمة النماذج المتاحة من Groq"""
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
         await update.message.reply_text("❌ مفتاح GROQ_API_KEY غير موجود.")
@@ -148,7 +146,7 @@ async def _call_ai(model_key: str, messages: list) -> str:
             "temperature": 0.7,
             "max_tokens": 2048,
         }
-        if model_key in ("deepseek", "llama", "llama4", "qwen", "orpheus", "sambanova"):
+        if model_key in ("deepseek", "llama", "llama4", "qwen", "sambanova"):
             headers["Authorization"] = f"Bearer {api_key}"
         url = model["url"]
 
@@ -191,7 +189,7 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     history = await db.get_conversation(user.id, chat.id)
     if not is_continuation:
-        history = [{"role": "system", "content": "أنت شفق، مساعد ذكي مفيد ومهذب. تجيب بالعربية الفصحى المختصرة."}]
+        history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     history.append({"role": "user", "content": user_input})
 
@@ -205,7 +203,6 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ========== معالجة الردود على رسائل البوت الذكية ==========
 async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تفحص ما إذا كانت الرسالة رداً على بوت (استمرار محادثة) وتعالجها"""
     msg = update.message
     if not msg or not msg.reply_to_message:
         return False
