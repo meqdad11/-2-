@@ -30,22 +30,39 @@ MODELS = {
     },
 }
 
-# ========== اختيار النموذج ==========
+# ========== دالة مساعدة: النماذج المتاحة فقط ==========
+def _get_available_models():
+    """ترجع قائمة النماذج التي لديها مفاتيح API موجودة"""
+    available = {}
+    for key, model in MODELS.items():
+        if os.environ.get(model["key_env"]):
+            available[key] = model
+    return available
+
+# ========== اختيار النموذج (معدلة) ==========
 async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض أزرار اختيار النموذج أو تعيينه مباشرة"""
-    # إذا أرسل المستخدم وسيطًا (مثل: نموذج gemini)
+    """عرض أزرار اختيار النموذج (للنماذج المتاحة فقط) أو تعيينه مباشرة"""
+    available = _get_available_models()
+    
     if context.args:
         choice = context.args[0].lower()
         if choice not in MODELS:
-            await update.message.reply_text("❌ اختر: deepseek, gemini, llama")
+            await update.message.reply_text("❌ النموذج غير معروف.")
+            return
+        if choice not in available:
+            await update.message.reply_text(f"❌ النموذج {MODELS[choice]['name']} غير مفعّل (لا يوجد مفتاح API).")
             return
         context.user_data["ai_model"] = choice
         await update.message.reply_text(f"✅ تم اختيار نموذج {MODELS[choice]['name']}")
         return
 
-    # بدون وسيط ← عرض أزرار
+    # عرض أزرار النماذج المتاحة فقط
+    if not available:
+        await update.message.reply_text("❌ لا توجد نماذج ذكاء اصطناعي مفعّلة حالياً.")
+        return
+
     keyboard = []
-    for key, model in MODELS.items():
+    for key, model in available.items():
         keyboard.append([InlineKeyboardButton(model["name"], callback_data=f"model_{key}")])
     await update.message.reply_text(
         "🧠 اختر نموذج الذكاء الاصطناعي:",
@@ -56,8 +73,9 @@ async def callback_choose_model(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     choice = query.data.split("_")[1]
-    if choice not in MODELS:
-        await query.message.edit_text("❌ خيار غير صالح")
+    available = _get_available_models()
+    if choice not in available:
+        await query.message.edit_text("❌ هذا النموذج غير متاح حالياً.")
         return
     context.user_data["ai_model"] = choice
     await query.message.edit_text(f"✅ النموذج: {MODELS[choice]['name']}")
