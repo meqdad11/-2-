@@ -134,7 +134,9 @@ async def callback_choose_model(update: Update, context: ContextTypes.DEFAULT_TY
 async def cmd_clear_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
-    await db.save_conversation(user.id, chat.id, [])
+    # ✅ احفظ محادثة فارغة مع system prompt فقط
+    initial_conversation = [{"role": "system", "content": SYSTEM_PROMPT}]
+    await db.save_conversation(user.id, chat.id, initial_conversation)
     await update.message.reply_text("🧹 تم مسح محادثة الذكاء الاصطناعي.")
 
 # ========== أمر عرض نماذج Groq المتاحة ==========
