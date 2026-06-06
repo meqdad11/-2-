@@ -20,9 +20,21 @@ TIKTOK_DOMAINS = ("tiktok.com", "vt.tiktok.com", "vm.tiktok.com")
 SOUNDCLOUD_DOMAINS = ("soundcloud.com",)
 
 URL_PATTERN = re.compile(
-    r'https?://(?:www\.)?(?:instagram\.com|youtube\.com|youtu\.be|tiktok\.com|soundcloud\.com|'
-    r'x\.com|twitter\.com|reddit\.com|snapchat\.com|facebook\.com|fb\.watch|pinterest\.com|'
-    r'pin\.it|vimeo\.com|dailymotion\.com|twitch\.tv|spotify\.com)[^\s]*',
+    r'(https?://(?:www\.)?(?:'
+    r'instagram\.com|'
+    r'youtube\.com|youtu\.be|'
+    r'tiktok\.com|'
+    r'soundcloud\.com|'
+    r'x\.com|twitter\.com|'
+    r'reddit\.com|'
+    r'snapchat\.com|'
+    r'facebook\.com|fb\.watch|'
+    r'pinterest\.com|pin\.it|'
+    r'vimeo\.com|'
+    r'dailymotion\.com|'
+    r'twitch\.tv|'
+    r'spotify\.com'
+    r')\S+)',
     re.IGNORECASE
 )
 
