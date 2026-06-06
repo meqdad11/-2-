@@ -1,6 +1,5 @@
 import logging
 import os
-import json
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import aiohttp
@@ -8,6 +7,9 @@ import aiohttp
 from utils import database as db
 
 logger = logging.getLogger(__name__)
+
+# ========== السيستم بروبت الموحد ==========
+SYSTEM_PROMPT = "أنت 'شفق'، مساعد ذكي مفيد ومهذب. مهمتك هي تقديم إجابات دقيقة ومفيدة باللغة العربية الفصحى المختصرة. يجب أن تلتزم بالحقائق. إذا سُئلت عن شيء لا تعرفه أو كان خارج نطاق معرفتك، يجب أن تعتذر بلطف وتقول 'لا أعلم' بدلاً من تخمين إجابة. لا تؤلف معلومات. كن مباشرًا وواضحًا."
 
 # ========== إعدادات النماذج ==========
 MODELS = {
@@ -162,7 +164,7 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     history = await db.get_conversation(user.id, chat.id)
     if not is_continuation:
-        history = [{"role": "system", "content": "أنت 'شفق'، مساعد ذكي مفيد ومهذب. مهمتك هي تقديم إجابات دقيقة ومفيدة باللغة العربية الفصحى المختصرة. يجب أن تلتزم بالحقائق. إذا سُئلت عن شيء لا تعرفه أو كان خارج نطاق معرفتك، يجب أن تعتذر بلطف وتقول 'لا أعلم' بدلاً من تخمين إجابة. لا تؤلف معلومات. كن مباشرًا وواضحًا."}]
+        history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     history.append({"role": "user", "content": user_input})
 
