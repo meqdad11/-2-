@@ -34,6 +34,12 @@ MODELS = {
         "key_env": "SAMBANOVA_API_KEY",
         "model_name": "Meta-Llama-3.1-8B-Instruct",
     },
+    "openrouter": {
+        "name": "OpenRouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "key_env": "OPENROUTER_API_KEY",
+        "model_name": "meta-llama/llama-3.3-70b-instruct:free",
+    },
 }
 
 # ========== دالة مساعدة: النماذج المتاحة فقط ==========
@@ -105,8 +111,11 @@ async def _call_ai(model_key: str, messages: list) -> str:
             "temperature": 0.7,
             "max_tokens": 2048,
         }
-        if model_key in ("deepseek", "llama", "sambanova"):
+        if model_key in ("deepseek", "llama", "sambanova", "openrouter"):
             headers["Authorization"] = f"Bearer {api_key}"
+        if model_key == "openrouter":
+            headers["HTTP-Referer"] = "https://github.com/shafaq-bot"
+            headers["X-Title"] = "Shafaq Bot"
         url = model["url"]
 
     try:
@@ -144,11 +153,10 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("⚠️ اكتب شيئًا بعد 'شفق'.")
         return
 
-    model_key = context.user_data.get("ai_model", "llama")
+    model_key = context.user_data.get("ai_model", "openrouter")
 
     history = await db.get_conversation(user.id, chat.id)
     if not is_continuation:
-        # ✅ تم تعديل هذه التعليمات لجعل شفق أكثر دقة
         history = [{"role": "system", "content": "أنت 'شفق'، مساعد ذكي مفيد ومهذب. مهمتك هي تقديم إجابات دقيقة ومفيدة باللغة العربية الفصحى المختصرة. يجب أن تلتزم بالحقائق. إذا سُئلت عن شيء لا تعرفه أو كان خارج نطاق معرفتك، يجب أن تعتذر بلطف وتقول 'لا أعلم' بدلاً من تخمين إجابة. لا تؤلف معلومات. كن مباشرًا وواضحًا."}]
 
     history.append({"role": "user", "content": user_input})
@@ -179,7 +187,7 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_input:
         return False
 
-    model_key = context.user_data.get("ai_model", "llama")
+    model_key = context.user_data.get("ai_model", "openrouter")
     history.append({"role": "user", "content": user_input})
 
     await msg.reply_chat_action("typing")
