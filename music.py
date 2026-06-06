@@ -264,7 +264,6 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # أزرار اختيار فيديو/صوت (لجميع الروابط)
 # =============================================================================
 async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالج الأزرار dl_audio و dl_video"""
     query = update.callback_query
     await query.answer()
     try:
@@ -273,16 +272,28 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         chat_id = query.message.chat.id
         message_id = query.message.message_id
         
-        status = await query.message.reply_text("⏳ جارٍ إرسال الطلب لمساعد التحميل...")
+        # 1. حذف رسالة "اختر نوع التحميل:" الأصلية (التي تحتوي الأزرار)
+        await query.message.delete()
+        
+        # 2. إرسال رسالة مؤقتة جديدة مكانها
+        status = await context.bot.send_message(
+            chat_id=chat_id,
+            text="⏳ جارٍ إرسال الطلب لمساعد التحميل..."
+        )
+        
+        # 3. إرسال الأمر إلى اليوزربوت مع تخزين status_msg لحذفها لاحقاً
         req_id = await _send_to_userbot(url, audio_only, chat_id, message_id, status)
         if not req_id:
             await status.edit_text("❌ تعذر الاتصال بمساعد التحميل.")
-        else:
-            await query.message.edit_text("اختر نوع التحميل:", reply_markup=None)
     except Exception as e:
         logger.error(f"خطأ في callback_download: {e}")
-        await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
-
+        # في حالة الخطأ، نرسل رسالة خطأ مؤقتة تختفي بعد 5 ثوان
+        try:
+            err_msg = await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
+            await asyncio.sleep(5)
+            await err_msg.delete()
+        except:
+            pass
 
 # =============================================================================
 # أمر /download (للتوافق)
