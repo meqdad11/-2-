@@ -28,6 +28,12 @@ MODELS = {
         "key_env": "GROQ_API_KEY",
         "model_name": "llama-3.3-70b-versatile",
     },
+    "sambanova": {
+        "name": "SambaNova (Llama 3.1)",
+        "url": "https://api.sambanova.ai/v1/chat/completions",
+        "key_env": "SAMBANOVA_API_KEY",
+        "model_name": "Meta-Llama-3.1-8B-Instruct",
+    },
 }
 
 # ========== دالة مساعدة: النماذج المتاحة فقط ==========
@@ -103,9 +109,7 @@ async def _call_ai(model_key: str, messages: list) -> str:
             "temperature": 0.7,
             "max_tokens": 2048,
         }
-        if model_key == "deepseek":
-            headers["Authorization"] = f"Bearer {api_key}"
-        elif model_key == "llama":
+        if model_key in ("deepseek", "llama", "sambanova"):
             headers["Authorization"] = f"Bearer {api_key}"
         url = model["url"]
 
