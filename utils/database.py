@@ -895,3 +895,58 @@ async def init_db():
         print("✅ Supabase جاهز للعمل")
     else:
         print("❌ فشل الاتصال بـ Supabase")
+
+# ==================== دوال الذاكرة للمحادثات ====================
+async def get_conversation(user_id: int, chat_id: int) -> list:
+    """جلب سجل المحادثة بين المستخدم والبوت (قائمة الرسائل)"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("conversations")
+                .select("messages")
+                .eq("user_id", user_id)
+                .eq("chat_id", chat_id)
+                .execute()
+        )
+        return result.data[0]["messages"] if result.data else []
+    except Exception as e:
+        print(f"خطأ في جلب المحادثة: {e}")
+        return []
+
+async def save_conversation(user_id: int, chat_id: int, messages: list):
+    """حفظ سجل المحادثة (آخر 20 رسالة)"""
+    if not supabase:
+        return
+    try:
+        # نحتفظ بآخر 20 رسالة فقط
+        trimmed = messages[-20:]
+        data = {
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "messages": trimmed,
+            "updated_at": now_iso()
+        }
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("conversations").upsert(data).execute()
+        )
+    except Exception as e:
+        print(f"خطأ في حفظ المحادثة: {e}")
+
+async def delete_conversation(user_id: int, chat_id: int):
+    """مسح محادثة (اختياري)"""
+    if not supabase:
+        return
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("conversations")
+                .delete()
+                .eq("user_id", user_id)
+                .eq("chat_id", chat_id)
+                .execute()
+        )
+    except Exception as e:
+        print(f"خطأ في مسح المحادثة: {e}")
