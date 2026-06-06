@@ -52,7 +52,7 @@ from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
     handle_media_url, callback_download,
     callback_sc_download, callback_yt_pick, callback_sc_pick,
-    handle_userbot_response,       # معالج استقبال الملفات من اليوزربوت
+    handle_userbot_response,
 )
 from handlers.locks import filter_locked_content
 
@@ -81,6 +81,9 @@ from handlers.crisis import (
     check_crisis_words,
 )
 from handlers.inline import handle_inline_query, handle_chosen_inline_result
+
+# ✅ المعالج الجديد لاستقبال ملفات اليوزربوت وإرسالها باسم شفق
+from handlers.media_bridge import handle_media_from_userbot
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -232,10 +235,10 @@ def register_handlers(app):
     # أحداث الأعضاء
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # معالج استقبال الملفات من اليوزربوت (يجب أن يكون قبل معالج النص العام)
+    # ✅ معالج استقبال الملفات من اليوزربوت (حسابك) وإرسالها باسم شفق
     app.add_handler(MessageHandler(
         (filters.VIDEO | filters.AUDIO | filters.Document.ALL) & filters.ChatType.PRIVATE,
-        handle_userbot_response
+        handle_media_from_userbot
     ))
 
     # معالجات النصوص
