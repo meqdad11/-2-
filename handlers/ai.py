@@ -224,6 +224,11 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("⚠️ اكتب شيئًا بعد 'شفق'.")
         return
 
+    # ✅ منع الإدخالات القصيرة جداً
+    if len(user_input.strip()) < 2:
+        await msg.reply_text("❌ الرجاء كتابة سؤال أو طلب واضح (حرفين على الأقل).")
+        return
+
     model_key = context.user_data.get("ai_model", "llama")
 
     history = await db.get_conversation(user.id, chat.id)
@@ -264,18 +269,29 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _is_ai_message(replied_msg.text or ""):
         return False
 
+    user_input = msg.text
+    if not user_input:
+        return False
+    
+    # ✅ منع الإدخالات القصيرة جداً أو غير الواضحة
+    user_input_clean = user_input.strip()
+    if len(user_input_clean) < 2:
+        await msg.reply_text("❌ الرجاء كتابة رسالة أوضح (حرفين على الأقل) للرد على الذكاء.")
+        return True
+    
+    # ✅ منع الأحرف المتكررة مثل "ههههه" أو "ددد"
+    if len(set(user_input_clean)) == 1:
+        await msg.reply_text("❌ الرجاء كتابة رسالة واضحة، لا أستطيع فهم الأحرف المتكررة.")
+        return True
+
     history = await db.get_conversation(msg.from_user.id, msg.chat.id)
 
     # ✅ تأكد من وجود system prompt
     if not history or history[0].get("role") != "system":
         history.insert(0, {"role": "system", "content": SYSTEM_PROMPT})
 
-    user_input = msg.text
-    if not user_input:
-        return False
-
     model_key = context.user_data.get("ai_model", "llama")
-    history.append({"role": "user", "content": user_input})
+    history.append({"role": "user", "content": user_input_clean})
     history = _trim_history(history)
 
     await msg.reply_chat_action("typing")
