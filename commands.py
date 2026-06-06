@@ -25,6 +25,7 @@ from handlers.resources import (
 )
 from handlers.ai import (
     cmd_shafaq, cmd_gemini, cmd_limit, cmd_choose_model,
+    cmd_clear_ai,  # ✅ تمت إضافته لمسح محادثة الذكاء
 )
 from handlers.dev import (
     cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats, cmd_backup,
