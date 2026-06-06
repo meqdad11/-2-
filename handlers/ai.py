@@ -38,8 +38,7 @@ MODELS = {
         "name": "OpenRouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "key_env": "OPENROUTER_API_KEY",
-        "model_name": "meta-llama/llama-3.3-70b-instruct:free",
-    },
+        "model_name": "google/gemini-2.0-flash-exp:free",  },
 }
 
 # ========== دالة مساعدة: النماذج المتاحة فقط ==========
