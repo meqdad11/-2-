@@ -92,6 +92,29 @@ async def callback_choose_model(update: Update, context: ContextTypes.DEFAULT_TY
     context.user_data["ai_model"] = choice
     await query.message.edit_text(f"✅ النموذج: {MODELS[choice]['name']}")
 
+# ========== أمر عرض نماذج Groq المتاحة ==========
+async def cmd_list_groq_models(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """يجلب قائمة النماذج المتاحة من Groq"""
+    api_key = os.environ.get("GROQ_API_KEY")
+    if not api_key:
+        await update.message.reply_text("❌ مفتاح GROQ_API_KEY غير موجود.")
+        return
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                "https://api.groq.com/openai/v1/models",
+                headers={"Authorization": f"Bearer {api_key}"}
+            ) as resp:
+                data = await resp.json()
+                names = [m["id"] for m in data.get("data", [])]
+                if names:
+                    await update.message.reply_text("📋 نماذج Groq المتاحة:\n\n" + "\n".join(names))
+                else:
+                    await update.message.reply_text("❌ لا توجد نماذج متاحة.")
+    except Exception as e:
+        logger.error(f"Groq models error: {e}")
+        await update.message.reply_text("❌ تعذر جلب قائمة النماذج.")
+
 # ========== دالة الاتصال بالنموذج ==========
 async def _call_ai(model_key: str, messages: list) -> str:
     model = MODELS[model_key]
