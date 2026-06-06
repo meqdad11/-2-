@@ -5,61 +5,52 @@ from telegram.ext import ContextTypes
 
 logger = logging.getLogger(__name__)
 
-# يوزر بوت التحميل الجديد
-DOWNLOADER_BOT = "@Glory120_bot"
-
-# لتخزين معرف الدردشة الأصلي للمستخدمين مؤقتاً
+DOWNLOADER_BOT = "@Glory120_bot"  # يوزر بوت التحميل
 pending_downloads = {}
-
-# نمط استخراج أي رابط
 URL_PATTERN = re.compile(r'(https?://\S+)')
 
-# دوال وهمية للاستيراد من commands.py
-async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ℹ️ أرسل رابط الفيديو مباشرة ليتم تحميله.")
+async def cmd_download(update, context): await update.message.reply_text("ℹ️ أرسل رابطاً مباشراً.")
+async def cmd_sc_search(update, context): await update.message.reply_text("ℹ️ أرسل رابطاً مباشراً.")
+async def cmd_yt_search(update, context): await update.message.reply_text("ℹ️ أرسل رابطاً مباشراً.")
 
-async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ℹ️ أرسل رابط ساوند كلاود مباشرة ليتم تحميله.")
-
-async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ℹ️ أرسل رابط يوتيوب مباشرة ليتم تحميله.")
-
-# معالج استقبال الروابط وإرسالها إلى بوت التحميل
 async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message or update.channel_post
     if not msg or not msg.text:
         return
-
     url_match = URL_PATTERN.search(msg.text)
     if not url_match:
         return
-
     url = url_match.group()
+
     try:
-        # إعادة توجيه رسالة المستخدم كاملة إلى بوت التحميل
-        forwarded = await msg.forward(chat_id=DOWNLOADER_BOT)
-        # تخزين معرف الدردشة الأصلي لاستخدامه لاحقاً
-        pending_downloads[forwarded.message_id] = msg.chat.id
+        # إرسال الرابط كنص إلى بوت التحميل (وليس إعادة توجيه)
+        sent = await context.bot.send_message(chat_id=DOWNLOADER_BOT, text=url)
+        # ربط معرف الدردشة الأصلية بالرسالة المرسلة (لمعرفة أين نرد لاحقاً)
+        pending_downloads[sent.message_id] = msg.chat.id
         await msg.reply_text("⏳ جارٍ التحميل عبر مساعد التحميل...")
     except Exception as e:
         logger.error(f"فشل إرسال الرابط لبوت التحميل: {e}")
-        await msg.reply_text("❌ تعذر الاتصال بمساعد التحميل.")
+        await msg.reply_text("❌ تعذر الاتصال بمساعد التحميل. تأكد من أن بوت التحميل يعمل وأنك أرسلت له /start.")
 
-# معالج استقبال الملف من بوت التحميل وإرساله للمستخدم
 async def handle_downloader_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.from_user or msg.from_user.username != DOWNLOADER_BOT.replace("@", ""):
         return
 
-    # معرفة الدردشة الأصلية من الرسالة المردود عليها
+    # البحث عن الدردشة الأصلية (التي طلبت التحميل)
     chat_id = None
+    # إذا كان رداً على رسالة أرسلها شفق، نأخذ معرف الدردشة المخزن
     if msg.reply_to_message and msg.reply_to_message.message_id in pending_downloads:
         chat_id = pending_downloads.pop(msg.reply_to_message.message_id)
     else:
-        # إذا لم نجد، نرسل للمستخدم افتراضياً (يمكن تحسينه)
-        chat_id = msg.chat.id
+        # وإلا نستخدم آخر طلب معروف (حل مؤقت)
+        if pending_downloads:
+            _, chat_id = pending_downloads.popitem()
 
-    # إعادة إرسال الملف إلى الدردشة الأصلية
+    if not chat_id:
+        await msg.reply_text("❌ لا يمكن تحديد مستلم الملف.")
+        return
+
     try:
         if msg.video:
             await context.bot.send_video(chat_id=chat_id, video=msg.video.file_id, caption=msg.caption)
@@ -68,9 +59,9 @@ async def handle_downloader_response(update: Update, context: ContextTypes.DEFAU
         elif msg.document:
             await context.bot.send_document(chat_id=chat_id, document=msg.document.file_id)
         elif msg.text:
-            await context.bot.send_message(chat_id=chat_id, text=f"ℹ️ {msg.text}")
+            await context.bot.send_message(chat_id=chat_id, text=msg.text)
         else:
-            await context.bot.send_message(chat_id=chat_id, text="✅ تم استلام ملف لا يمكن إعادة توجيهه.")
+            await context.bot.send_message(chat_id=chat_id, text="✅ تم استلام ملف ولكن لا يمكن إعادة توجيهه.")
     except Exception as e:
         logger.error(f"فشل إرسال الملف للمستخدم: {e}")
 
