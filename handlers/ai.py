@@ -1,6 +1,6 @@
 import logging
 import os
-import json
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import aiohttp
@@ -58,16 +58,30 @@ SYSTEM_PROMPT = """/no_think
 - لا تستخدم وسوم مثل <think> أو </think>"""
 
 # ========== عدد الرسائل المحفوظة في الذاكرة ==========
-MAX_HISTORY = 10  # آخر 10 رسائل فقط (5 محادثات)
+MAX_HISTORY = 10
+
+# ========== كلمات تدل على رسائل البوت غير الذكاء ==========
+BOT_NON_AI_PREFIXES = (
+    "📱", "⏳", "✅", "❌", "🔗", "📥", "📤", "🎵", "🎬",
+    "/download", "تم إرسال", "بدأ التحميل", "اكتمل التحميل",
+)
 
 # ========== دالة تقليص السياق ==========
 def _trim_history(history: list) -> list:
-    """تحتفظ برسالة النظام + آخر MAX_HISTORY رسالة"""
     system_msgs = [m for m in history if m["role"] == "system"]
     other_msgs = [m for m in history if m["role"] != "system"]
     if len(other_msgs) > MAX_HISTORY:
         other_msgs = other_msgs[-MAX_HISTORY:]
     return system_msgs + other_msgs
+
+# ========== هل رسالة البوت من محادثة ذكاء؟ ==========
+def _is_ai_message(text: str) -> bool:
+    if not text:
+        return False
+    for prefix in BOT_NON_AI_PREFIXES:
+        if text.startswith(prefix):
+            return False
+    return True
 
 # ========== دالة مساعدة: النماذج المتاحة فقط ==========
 def _get_available_models():
@@ -115,6 +129,13 @@ async def callback_choose_model(update: Update, context: ContextTypes.DEFAULT_TY
         return
     context.user_data["ai_model"] = choice
     await query.message.edit_text(f"✅ النموذج: {MODELS[choice]['name']}")
+
+# ========== مسح محادثة الذكاء ==========
+async def cmd_clear_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat = update.effective_chat
+    await db.save_conversation(user.id, chat.id, [])
+    await update.message.reply_text("🧹 تم مسح محادثة الذكاء الاصطناعي.")
 
 # ========== أمر عرض نماذج Groq المتاحة ==========
 async def cmd_list_groq_models(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -175,9 +196,7 @@ async def _call_ai(model_key: str, messages: list) -> str:
                 if model_key == "gemini":
                     return data["candidates"][0]["content"]["parts"][0]["text"]
                 else:
-                    # تنظيف وسوم التفكير إن وجدت
                     content = data["choices"][0]["message"]["content"]
-                    import re
                     content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
                     return content
     except Exception as e:
@@ -228,6 +247,10 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     replied_msg = msg.reply_to_message
     if not replied_msg.from_user or not replied_msg.from_user.is_bot:
+        return False
+
+    # ✅ تحقق إن الرسالة المردود عليها من محادثة ذكاء وليست رسالة تحميل
+    if not _is_ai_message(replied_msg.text or ""):
         return False
 
     history = await db.get_conversation(msg.from_user.id, msg.chat.id)
