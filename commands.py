@@ -24,14 +24,12 @@ from handlers.resources import (
     cmd_add_resource, cmd_list_resources, cmd_delete_resource,
 )
 from handlers.ai import (
-    cmd_shafaq, cmd_gemini, cmd_limit, cmd_choose_model,
-    cmd_clear_ai,  # ✅ تمت إضافته لمسح محادثة الذكاء
+    cmd_shafaq, cmd_choose_model, cmd_gemini, cmd_limit,
 )
 from handlers.dev import (
     cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats, cmd_backup,
 )
 from handlers.jobs import cmd_report, cmd_deep_report
-from music import cmd_download, cmd_sc_search, cmd_yt_search
 from handlers.menu import cmd_menu
 from handlers.locks import (
     cmd_lock_links, cmd_unlock_links,
@@ -68,7 +66,7 @@ from handlers.crisis import (
     cmd_add_crisis_words, cmd_remove_crisis_word, cmd_list_crisis_words,
     cmd_set_crisis_reply, cmd_enable_crisis, cmd_disable_crisis, cmd_crisis_status,
 )
-from handlers.userbot import cmd_send_invite  # ✅ أمر إرسال الرابط
+from handlers.userbot import cmd_send_invite
 
 ARABIC_COMMANDS = {
     "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
@@ -81,7 +79,6 @@ ARABIC_COMMANDS = {
     "أضف كلمة": cmd_add_word, "احذف كلمة": cmd_remove_word, "الكلمات المحظورة": cmd_list_words,
     "أضف مورد": cmd_add_resource, "الموارد": cmd_list_resources, "احذف مورد": cmd_delete_resource,
     "ايدي": cmd_id, "القواعد": cmd_rules, "شفق": cmd_shafaq,
-    "تحميل": cmd_download, "بحث": cmd_sc_search, "يوتيوب": cmd_yt_search,
     "ابدا": cmd_menu, "ابدأ": cmd_menu, "أبدا": cmd_menu,
 
     "قفل الروابط": cmd_lock_links, "فتح الروابط": cmd_unlock_links,
@@ -161,8 +158,7 @@ ARABIC_COMMANDS = {
 
     "تعيين القواعد": cmd_setrules,
     "تعيين القوانين": cmd_setrules,
-    "نموذج": cmd_choose_model,
-    "مسح الذكاء": cmd_clear_ai,
 
-    "ارسل_رابط": cmd_send_invite,  # ✅ أمر إرسال رابط المجموعة للمحظور
+    "ارسل_رابط": cmd_send_invite,
+    "نموذج": cmd_choose_model,
 }
