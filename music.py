@@ -114,14 +114,13 @@ def _search_youtube(query: str) -> List[Dict]:
 
 
 def _search_soundcloud(query: str) -> List[Dict]:
-    """بحث في ساوند كلاود وإرجاع قائمة بالنتائج (مع رابط التحميل المباشر إن أمكن)"""
+    """بحث في ساوند كلاود وإرجاع روابط الصفحات"""
     try:
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
-            'extract_flat': False,           # ← نوقف flat مؤقتاً للحصول على الرابط الحقيقي
+            'extract_flat': True,   # أسرع وآمن
             'playlistend': 5,
-            'format': 'bestaudio/best',
             'user_agent': "Mozilla/5.0 (Linux; Android 13; SM-G998B) AppleWebKit/537.36",
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -129,14 +128,10 @@ def _search_soundcloud(query: str) -> List[Dict]:
             results = []
             if 'entries' in info:
                 for entry in info['entries'][:5]:
-                    if not entry:
-                        continue
-                    # نأخذ رابط التحميل المباشر، وإلا رابط الصفحة
-                    url = entry.get('url') or entry.get('webpage_url') or ''
-                    if url:
+                    if entry and entry.get('url'):
                         results.append({
                             'title': entry.get('title', 'بدون عنوان'),
-                            'url': url,
+                            'url': entry.get('url'),  # رابط الصفحة
                             'duration': fmt_dur(entry.get('duration', 0)),
                         })
             return results
@@ -419,12 +414,20 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         url = results[index].get('url')
         if not url:
-            await query.message.edit_text("❌ هذا المقطع لا يمكن تحميله حالياً.")
+            await query.message.edit_text("❌ رابط غير متوفر.")
             return
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("🎵 تحميل الصوت", callback_data=f"dl_audio|{url}"),
-        ]])
-        await query.message.edit_text("اختر:", reply_markup=keyboard)
+        
+        # حذف رسالة النتائج
+        await query.message.delete()
+        
+        # إرسال أمر التحميل فوراً (كنوع صوتي تلقائيًا لساوند كلاود)
+        status = await context.bot.send_message(
+            chat_id=query.message.chat.id,
+            text="⏳ جارٍ إرسال الطلب لمساعد التحميل..."
+        )
+        req_id = await _send_to_userbot(url, True, query.message.chat.id, query.message.message_id, status)
+        if not req_id:
+            await status.edit_text("❌ تعذر الاتصال بمساعد التحميل.")
     except Exception as e:
         logger.error(f"خطأ في callback_sc_pick: {e}")
         await query.message.edit_text("❌ حدث خطأ في معالجة الطلب.")
