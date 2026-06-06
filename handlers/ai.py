@@ -49,11 +49,25 @@ MODELS = {
 }
 
 # ========== System Prompt ==========
-SYSTEM_PROMPT = """أنت شفق، مساعد ذكي ومهذب يتحدث العربية فقط.
+SYSTEM_PROMPT = """/no_think
+أنت شفق، مساعد ذكي ومهذب يتحدث العربية فقط.
 - رد دائماً بالعربية بغض النظر عن لغة السؤال
 - إذا سألك أحد "كيفك" أو "كيف حالك" فأجب بشكل ودي طبيعي
 - اجعل ردودك مختصرة ومفيدة
-- لا تفكر بصوت عالٍ ولا تكتب تفكيرك، فقط الجواب النهائي"""
+- لا تفكر بصوت عالٍ ولا تكتب تفكيرك، فقط الجواب النهائي
+- لا تستخدم وسوم مثل <think> أو </think>"""
+
+# ========== عدد الرسائل المحفوظة في الذاكرة ==========
+MAX_HISTORY = 10  # آخر 10 رسائل فقط (5 محادثات)
+
+# ========== دالة تقليص السياق ==========
+def _trim_history(history: list) -> list:
+    """تحتفظ برسالة النظام + آخر MAX_HISTORY رسالة"""
+    system_msgs = [m for m in history if m["role"] == "system"]
+    other_msgs = [m for m in history if m["role"] != "system"]
+    if len(other_msgs) > MAX_HISTORY:
+        other_msgs = other_msgs[-MAX_HISTORY:]
+    return system_msgs + other_msgs
 
 # ========== دالة مساعدة: النماذج المتاحة فقط ==========
 def _get_available_models():
@@ -161,7 +175,11 @@ async def _call_ai(model_key: str, messages: list) -> str:
                 if model_key == "gemini":
                     return data["candidates"][0]["content"]["parts"][0]["text"]
                 else:
-                    return data["choices"][0]["message"]["content"]
+                    # تنظيف وسوم التفكير إن وجدت
+                    content = data["choices"][0]["message"]["content"]
+                    import re
+                    content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+                    return content
     except Exception as e:
         logger.error(f"AI call error: {e}")
         return "❌ تعذر الاتصال بالذكاء الاصطناعي."
@@ -192,6 +210,7 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     history.append({"role": "user", "content": user_input})
+    history = _trim_history(history)
 
     await msg.reply_chat_action("typing")
     reply_text = await _call_ai(model_key, history)
@@ -221,6 +240,7 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     model_key = context.user_data.get("ai_model", "llama")
     history.append({"role": "user", "content": user_input})
+    history = _trim_history(history)
 
     await msg.reply_chat_action("typing")
     reply_text = await _call_ai(model_key, history)
