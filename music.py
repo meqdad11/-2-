@@ -114,7 +114,7 @@ def _search_youtube(query: str) -> List[Dict]:
 
 
 def _search_soundcloud(query: str) -> List[Dict]:
-    """بحث في ساوند كلاود وإرجاع قائمة بالنتائج (مع رابط التحميل المباشر)"""
+    """بحث في ساوند كلاود وإرجاع قائمة بالنتائج (مع رابط التحميل المباشر إن أمكن)"""
     try:
         ydl_opts = {
             'quiet': True,
@@ -131,7 +131,7 @@ def _search_soundcloud(query: str) -> List[Dict]:
                 for entry in info['entries'][:5]:
                     if not entry:
                         continue
-                    # نجرب الحصول على الرابط المباشر للصوت أولاً
+                    # نأخذ رابط التحميل المباشر، وإلا رابط الصفحة
                     url = entry.get('url') or entry.get('webpage_url') or ''
                     if url:
                         results.append({
@@ -257,7 +257,6 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not req_id:
             await status.edit_text("❌ تعذر الاتصال بمساعد التحميل.")
     else:
-        # روابط يوتيوب وإنستغرام وغيرها ← أزرار اختيار فيديو/صوت
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو",    callback_data=f"dl_video|{url}"),
@@ -269,6 +268,7 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # أزرار اختيار فيديو/صوت (لجميع الروابط)
 # =============================================================================
 async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالج الأزرار dl_audio و dl_video"""
     query = update.callback_query
     await query.answer()
     try:
@@ -292,13 +292,13 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await status.edit_text("❌ تعذر الاتصال بمساعد التحميل.")
     except Exception as e:
         logger.error(f"خطأ في callback_download: {e}")
-        # في حالة الخطأ، نرسل رسالة خطأ مؤقتة تختفي بعد 5 ثوان
         try:
             err_msg = await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
             await asyncio.sleep(5)
             await err_msg.delete()
         except:
             pass
+
 
 # =============================================================================
 # أمر /download (للتوافق)
@@ -409,17 +409,17 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         data_parts = query.data.split("|")
         if len(data_parts) != 3:
-            await query.message.reply_text("❌ بيانات غير صحيحة.")
+            await query.message.edit_text("❌ بيانات غير صحيحة.")
             return
         _, cache_key, index = data_parts
         index = int(index)
         results = SEARCH_CACHE.get(cache_key)
         if not results or index >= len(results):
-            await query.message.reply_text("❌ انتهت مدة البحث. حاول مجدداً.")
+            await query.message.edit_text("❌ انتهت مدة البحث. حاول مجدداً.")
             return
         url = results[index].get('url')
         if not url:
-            await query.message.reply_text("❌ رابط غير متوفر.")
+            await query.message.edit_text("❌ هذا المقطع لا يمكن تحميله حالياً.")
             return
         keyboard = InlineKeyboardMarkup([[
             InlineKeyboardButton("🎵 تحميل الصوت", callback_data=f"dl_audio|{url}"),
@@ -427,7 +427,7 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text("اختر:", reply_markup=keyboard)
     except Exception as e:
         logger.error(f"خطأ في callback_sc_pick: {e}")
-        await query.message.reply_text("❌ حدث خطأ في معالجة الطلب.")
+        await query.message.edit_text("❌ حدث خطأ في معالجة الطلب.")
 
 
 # =============================================================================
