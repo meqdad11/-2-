@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes
 logger = logging.getLogger(__name__)
 
 # ضع يوزر بوت التحميل هنا
-DOWNLOADER_BOT = "@your_downloader_bot"
+DOWNLOADER_BOT = "@Glory120_bot"
 
 # لتخزين هوية المستخدم الأصلي (مؤقت)
 pending_downloads = {}
