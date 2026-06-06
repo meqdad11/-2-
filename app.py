@@ -52,7 +52,6 @@ from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
     handle_media_url, callback_download,
     callback_sc_download, callback_yt_pick, callback_sc_pick,
-    handle_wttt_response,  # ✅ معالج استقبال الملفات من @wtttbot
 )
 from handlers.locks import filter_locked_content
 
@@ -89,7 +88,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 SAUDI_TZ = pytz.timezone('Asia/Riyadh')
 
-# ========== معالج النصوص الرئيسي ==========
 async def handle_text(update: Update, context):
     msg = update.message
     if not msg or not msg.text:
@@ -224,12 +222,6 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(callback_menu))
 
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
-
-    # ✅ معالج استقبال الملفات من @wtttbot وإرسالها للمستخدم
-    app.add_handler(MessageHandler(
-        (filters.VIDEO | filters.AUDIO | filters.Document.ALL) & filters.ChatType.PRIVATE,
-        handle_wttt_response
-    ))
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text))
