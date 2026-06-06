@@ -224,9 +224,9 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("⚠️ اكتب شيئًا بعد 'شفق'.")
         return
 
-    # ✅ منع الإدخالات القصيرة جداً
-    if len(user_input.strip()) < 2:
-        await msg.reply_text("❌ الرجاء كتابة سؤال أو طلب واضح (حرفين على الأقل).")
+    # ✅ منع الإدخالات القصيرة جداً (أقل من 3 أحرف)
+    if len(user_input.strip()) < 3:
+        await msg.reply_text("❌ الرجاء كتابة سؤال أو طلب واضح (3 أحرف على الأقل).")
         return
 
     model_key = context.user_data.get("ai_model", "llama")
@@ -250,8 +250,10 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.reply_chat_action("typing")
     reply_text = await _call_ai(model_key, history)
 
-    history.append({"role": "assistant", "content": reply_text})
-    await db.save_conversation(user.id, chat.id, history)
+    # ✅ فقط إذا كان الرد طبيعياً (ليس خطأ)، نحفظه
+    if not reply_text.startswith("❌"):
+        history.append({"role": "assistant", "content": reply_text})
+        await db.save_conversation(user.id, chat.id, history)
 
     await msg.reply_text(reply_text, parse_mode="Markdown")
 
@@ -273,10 +275,10 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_input:
         return False
     
-    # ✅ منع الإدخالات القصيرة جداً أو غير الواضحة
+    # ✅ منع الإدخالات القصيرة جداً (أقل من 3 أحرف)
     user_input_clean = user_input.strip()
-    if len(user_input_clean) < 2:
-        await msg.reply_text("❌ الرجاء كتابة رسالة أوضح (حرفين على الأقل) للرد على الذكاء.")
+    if len(user_input_clean) < 3:
+        await msg.reply_text("❌ الرجاء كتابة رسالة أوضح (3 أحرف على الأقل) للرد على الذكاء.")
         return True
     
     # ✅ منع الأحرف المتكررة مثل "ههههه" أو "ددد"
@@ -297,8 +299,10 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await msg.reply_chat_action("typing")
     reply_text = await _call_ai(model_key, history)
 
-    history.append({"role": "assistant", "content": reply_text})
-    await db.save_conversation(msg.from_user.id, msg.chat.id, history)
+    # ✅ فقط إذا كان الرد طبيعياً (ليس خطأ)، نحفظه
+    if not reply_text.startswith("❌"):
+        history.append({"role": "assistant", "content": reply_text})
+        await db.save_conversation(msg.from_user.id, msg.chat.id, history)
 
     await msg.reply_text(reply_text, parse_mode="Markdown")
     return True
