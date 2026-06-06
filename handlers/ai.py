@@ -11,6 +11,24 @@ logger = logging.getLogger(__name__)
 
 # ========== إعدادات النماذج ==========
 MODELS = {
+    "llama": {
+        "name": "LLaMA 3 (Groq)",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "key_env": "GROQ_API_KEY",
+        "model_name": "llama-3.3-70b-versatile",
+    },
+    "cerebras": {
+        "name": "Cerebras (Llama 3.3)",
+        "url": "https://api.cerebras.ai/v1/chat/completions",
+        "key_env": "CEREBRAS_API_KEY",
+        "model_name": "llama-3.3-70b",
+    },
+    "openrouter": {
+        "name": "OpenRouter",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "key_env": "OPENROUTER_API_KEY",
+        "model_name": "mistralai/mistral-7b-instruct:free",
+    },
     "deepseek": {
         "name": "DeepSeek",
         "url": "https://api.deepseek.com/v1/chat/completions",
@@ -22,23 +40,12 @@ MODELS = {
         "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
         "key_env": "GEMINI_API_KEY",
     },
-    "llama": {
-        "name": "LLaMA 3 (Groq)",
-        "url": "https://api.groq.com/openai/v1/chat/completions",
-        "key_env": "GROQ_API_KEY",
-        "model_name": "llama-3.3-70b-versatile",
-    },
     "sambanova": {
         "name": "SambaNova (Llama 3.1)",
         "url": "https://api.sambanova.ai/v1/chat/completions",
         "key_env": "SAMBANOVA_API_KEY",
         "model_name": "Meta-Llama-3.1-8B-Instruct",
     },
-    "openrouter": {
-        "name": "OpenRouter",
-        "url": "https://openrouter.ai/api/v1/chat/completions",
-        "key_env": "OPENROUTER_API_KEY",
-        "model_name": "google/gemini-2.0-flash-exp:free",  },
 }
 
 # ========== دالة مساعدة: النماذج المتاحة فقط ==========
@@ -52,7 +59,7 @@ def _get_available_models():
 # ========== اختيار النموذج ==========
 async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
     available = _get_available_models()
-    
+
     if context.args:
         choice = context.args[0].lower()
         if choice not in MODELS:
@@ -110,8 +117,7 @@ async def _call_ai(model_key: str, messages: list) -> str:
             "temperature": 0.7,
             "max_tokens": 2048,
         }
-        if model_key in ("deepseek", "llama", "sambanova", "openrouter"):
-            headers["Authorization"] = f"Bearer {api_key}"
+        headers["Authorization"] = f"Bearer {api_key}"
         if model_key == "openrouter":
             headers["HTTP-Referer"] = "https://github.com/shafaq-bot"
             headers["X-Title"] = "Shafaq Bot"
@@ -152,7 +158,7 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("⚠️ اكتب شيئًا بعد 'شفق'.")
         return
 
-    model_key = context.user_data.get("ai_model", "openrouter")
+    model_key = context.user_data.get("ai_model", "llama")
 
     history = await db.get_conversation(user.id, chat.id)
     if not is_continuation:
@@ -186,7 +192,7 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_input:
         return False
 
-    model_key = context.user_data.get("ai_model", "openrouter")
+    model_key = context.user_data.get("ai_model", "llama")
     history.append({"role": "user", "content": user_input})
 
     await msg.reply_chat_action("typing")
