@@ -29,6 +29,24 @@ AUTO_REPLIES = {
     "مساء الورد": ["مساء السعادة 🌙"],
 }
 
+# ---------- خريطة أسماء اللغات العربية (لأمر الترجمة) ----------
+LANG_MAP = {
+    "انجليزي": "en",
+    "فرنسي": "fr",
+    "اسباني": "es",
+    "تركي": "tr",
+    "فارسي": "fa",
+    "هندي": "hi",
+    "روسي": "ru",
+    "الماني": "de",
+    "صيني": "zh-cn",
+    "ياباني": "ja",
+    "كوري": "ko",
+    "ايطالي": "it",
+    "برتغالي": "pt",
+}
+
+
 # ==================== START ====================
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args and context.args[0].startswith("whisper_"):
@@ -620,7 +638,7 @@ async def cmd_my_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += f"{i}. {msg['message']}\n   ({msg['created_at'][:16]})\n\n"
     await update.message.reply_text(text, parse_mode="Markdown")
 
-# ==================== TRANSLATE ====================
+# ==================== TRANSLATE (دعم أسماء اللغات العربية) ====================
 async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg.reply_to_message or not msg.reply_to_message.text:
@@ -628,10 +646,20 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     original_text = msg.reply_to_message.text
-    target_lang = "ar"
+
+    # تحديد اللغة الهدف
+    target_lang = "ar"          # الافتراضي العربية
+    lang_name = "العربية"       # للعرض في الرد
+    if context.args:
+        arg = " ".join(context.args)   # مثلاً "انجليزي"
+        if arg in LANG_MAP:
+            target_lang = LANG_MAP[arg]
+            lang_name = arg
+        else:
+            await msg.reply_text(f"❌ لغة غير معروفة. استخدم: ترجم انجليزي، ترجم فرنسي...")
+            return
 
     try:
-        import aiohttp
         url = "https://translate.googleapis.com/translate_a/single"
         params = {
             "client": "gtx",
@@ -649,7 +677,7 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 translated = ''.join(translated_parts)
                 
         await msg.reply_text(
-            f"🌐 **الترجمة إلى العربية:**\n\n{translated}\n\n"
+            f"🌐 **الترجمة إلى {lang_name}:**\n\n{translated}\n\n"
             f"_النص الأصلي:_ {original_text[:100]}...",
             parse_mode="Markdown"
         )
