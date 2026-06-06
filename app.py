@@ -43,8 +43,6 @@ from handlers.ai import (
     cmd_shafaq, cmd_choose_model, callback_choose_model,
     cmd_gemini, cmd_limit,
     handle_ai_reply,
-    cmd_list_groq_models,
-    cmd_clear_ai,  # ✅ مسح محادثة الذكاء
 )
 from handlers.events import on_chat_member_updated
 from handlers.resources import (
@@ -55,6 +53,7 @@ from music import (
     handle_media_url, callback_download,
     callback_sc_download, callback_yt_pick, callback_sc_pick,
     handle_userbot_response,
+    handle_downloader_response,  # ✅ معالج استقبال الملفات من بوت التحميل الجديد
 )
 from handlers.locks import filter_locked_content
 
@@ -231,8 +230,6 @@ def register_handlers(app):
     app.add_handler(CommandHandler("download", cmd_download))
     app.add_handler(CommandHandler("model", cmd_choose_model))
     app.add_handler(CommandHandler("myreminders", cmd_my_reminders))
-    app.add_handler(CommandHandler("models", cmd_list_groq_models))
-    app.add_handler(CommandHandler("clearai", cmd_clear_ai))  # ✅ جديد
 
     app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
@@ -243,6 +240,13 @@ def register_handlers(app):
 
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
+    # ✅ معالج استقبال الملفات من بوت التحميل الجديد (قبل أي معالج نصي)
+    app.add_handler(MessageHandler(
+        (filters.VIDEO | filters.AUDIO | filters.Document.ALL) & filters.ChatType.PRIVATE,
+        handle_downloader_response
+    ))
+
+    # معالج استقبال الملفات من اليوزربوت (حسابك الشخصي) - يبقى للاستخدامات الأخرى
     app.add_handler(MessageHandler(
         (filters.VIDEO | filters.AUDIO | filters.Document.ALL) & filters.ChatType.PRIVATE,
         handle_userbot_response
