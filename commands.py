@@ -160,6 +160,7 @@ ARABIC_COMMANDS = {
 
     "تعيين القواعد": cmd_setrules,
     "تعيين القوانين": cmd_setrules,
+    "نموذج": cmd_choose_model,
 
     "ارسل_رابط": cmd_send_invite,  # ✅ أمر إرسال رابط المجموعة للمحظور
 }
