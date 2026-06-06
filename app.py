@@ -41,6 +41,8 @@ from handlers.jobs import (
 )
 from handlers.ai import (
     cmd_shafaq, cmd_choose_model, callback_choose_model,
+    cmd_gemini, cmd_limit,
+    handle_ai_reply,  # ✅ معالج متابعة المحادثة
 )
 from handlers.events import on_chat_member_updated
 from handlers.resources import (
@@ -73,7 +75,6 @@ from handlers.moderation import (
     cmd_add_reply, cmd_remove_reply, cmd_list_replies,
     cmd_add_command, cmd_remove_command, cmd_list_commands,
 )
-from handlers.ai import cmd_gemini, cmd_limit
 from handlers.dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 
 from handlers.crisis import (
@@ -97,6 +98,11 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
     user = update.effective_user
+
+    # ✅ متابعة محادثة الذكاء الاصطناعي (الرد على رسالة البوت)
+    if msg.reply_to_message and msg.reply_to_message.from_user and msg.reply_to_message.from_user.is_bot:
+        if await handle_ai_reply(update, context):
+            return
 
     if context.user_data.get("anon_target"):
         target_id = context.user_data.pop("anon_target")
