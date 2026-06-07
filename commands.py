@@ -67,6 +67,10 @@ from handlers.crisis import (
     cmd_set_crisis_reply, cmd_enable_crisis, cmd_disable_crisis, cmd_crisis_status,
 )
 from handlers.userbot import cmd_send_invite
+from handlers.support import (
+    cmd_setup_admin_support, cmd_setup_members_support,
+    cmd_need_someone, cmd_send_encouragement,
+)
 from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
 )
@@ -168,4 +172,12 @@ ARABIC_COMMANDS = {
     "حمل": cmd_download,
     "يوت": cmd_yt_search,
     "بحث": cmd_sc_search,
+
+    # نظام الدعم النفسي
+    "ضبط دعم المشرفين": cmd_setup_admin_support,
+    "ضبط دعم الأعضاء": cmd_setup_members_support,
+    "أحتاج أحد": cmd_need_someone,
+    "احتاج احد": cmd_need_someone,
+    "أرسل تشجيع": cmd_send_encouragement,
+    "ارسل تشجيع": cmd_send_encouragement,
 }
