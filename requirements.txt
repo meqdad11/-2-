@@ -5,3 +5,5 @@ httpx[socks]
 aiohttp>=3.9.0
 supabase
 pytz
+youtube-search-python
+soundcloud-v2
