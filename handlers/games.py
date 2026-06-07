@@ -30,13 +30,11 @@ def reset_points(context: ContextTypes.DEFAULT_TYPE, user_id: int):
     pts = context.bot_data.setdefault("game_points", {})
     pts[user_id] = 0
 
-# ==================== معالج جميع ضغطات أزرار الألعاب ====================
-async def handle_games_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
+# ==================== معالج جميع ضغطات أزرار الألعاب (تم تصحيح التوقيع) ====================
+async def handle_games_callback(query, user, msg, context: ContextTypes.DEFAULT_TYPE):
+    """يستقبل query, user, msg, context تماماً كما يُستدعى من بوتنز"""
     await query.answer()
     data = query.data
-    user = query.from_user
-    msg = query.message
     chat_id = msg.chat.id
 
     # --- الأقسام الرئيسية ---
@@ -209,7 +207,6 @@ async def handle_games_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     # ==================== الأسرع ====================
     if data == "fastest_start":
-        # حذف أي لعبة سابقة
         context.bot_data.pop("fastest_winner", None)
         context.bot_data["fastest_game"] = {
             "chat_id": chat_id,
@@ -228,7 +225,6 @@ async def handle_games_callback(update: Update, context: ContextTypes.DEFAULT_TY
         if not game or not game["active"]:
             await query.answer("انتهت اللعبة!", show_alert=True)
             return
-        # تأكد من أن اللاعب هو الفائز الأول
         winner_name = user.full_name
         context.bot_data["fastest_game"]["active"] = False
         pts = 10
@@ -323,7 +319,6 @@ async def handle_games_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     # ==================== كرة قدم (ركلة جزاء) ====================
     if data == "football_kick":
-        # اختيار الزاوية
         keyboard = [
             [InlineKeyboardButton("↖️ يسار عالي", callback_data="foot_choice_up_left"),
              InlineKeyboardButton("⬆️ وسط عالي", callback_data="foot_choice_up_center"),
@@ -338,7 +333,6 @@ async def handle_games_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     if data.startswith("foot_choice_"):
         direction = data[len("foot_choice_"):]
-        # الحارس يختار عشوائياً
         keeper = random.choice(["up_left", "up_center", "up_right", "low_left", "low_center", "low_right"])
         if direction == keeper:
             result = "🧤 الحارس تصدى! خسرت"
