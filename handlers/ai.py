@@ -162,9 +162,14 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     model_key = context.user_data.get("ai_model", "llama")
 
-    history = await db.get_conversation(user.id, chat.id)
     if not is_continuation:
+        # مسح المحادثة القديمة من DB ثم البدء من الصفر
+        await db.delete_conversation(user.id, chat.id)
         history = [{"role": "system", "content": SYSTEM_PROMPT}]
+    else:
+        history = await db.get_conversation(user.id, chat.id)
+        if not history:
+            history = [{"role": "system", "content": SYSTEM_PROMPT}]
 
     history.append({"role": "user", "content": user_input})
 
