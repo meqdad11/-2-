@@ -35,7 +35,7 @@ from handlers.moderation import (
     filter_banned_words, process_custom_replies_and_commands,
 )
 from handlers.jobs import (
-    cmd_report, job_expire_bans, 
+    cmd_report, job_expire_bans,
     job_daily_quote, job_reschedule_reminders,
     _send_daily_reminder,
 )
@@ -158,12 +158,27 @@ async def handle_text(update: Update, context):
     await track_message(update, context)
     await check_crisis_words(update, context)
 
+# ========== معالجة منشورات القناة ==========
 async def handle_channel_post(update: Update, context):
     msg = update.channel_post
     if not msg or not msg.text:
         return
-    logger.info(f"📢 رسالة جديدة في القناة: {msg.text[:100]}")
-    await handle_media_url(update, context)
+    logger.info(f"📢 رسالة في القناة: {msg.text[:100]}")
+
+    # نعيد توجيه channel_post كـ message مؤقت لـ handle_media_url
+    from music import _is_media_url, _handle_url
+    url = _is_media_url(msg.text)
+    if url:
+        # نرسل أزرار التحميل في القناة
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+        keyboard = [[
+            InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
+            InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
+        ]]
+        await msg.reply_text(
+            "🔗 اختر صيغة التحميل:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 async def post_init(app):
     await db.init_db()
