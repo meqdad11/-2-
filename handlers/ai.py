@@ -48,6 +48,12 @@ MODELS = {
         "key_env": "SAMBANOVA_API_KEY",
         "model_name": "Meta-Llama-3.1-8B-Instruct",
     },
+    "openai": {   # ########## النموذج المضاف ##########
+        "name": "OpenAI GPT",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "key_env": "OPENAI_API_KEY",
+        "model_name": "gpt-3.5-turbo",  # غيّر إلى gpt-4o-mini أو gpt-4-turbo حسب الحاجة
+    },
 }
 
 # ========== دالة مساعدة: النماذج المتاحة فقط ==========
@@ -160,7 +166,7 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("⚠️ اكتب شيئًا بعد 'شفق'.")
         return
 
-    model_key = context.user_data.get("ai_model", "llama")
+    model_key = context.user_data.get("ai_model", "llama")   # غيّر "llama" إلى "openai" إذا أردت جعل OpenAI الافتراضي
 
     if not is_continuation:
         # مسح المحادثة القديمة من DB ثم البدء من الصفر
