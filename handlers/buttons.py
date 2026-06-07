@@ -30,7 +30,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = msg.chat.id
 
     # ---------- توجيه أزرار الألعاب إلى الملف المستقل ----------
-    if data.startswith(("game_", "guess_", "rps_")):
+    if data.startswith(("game_", "guess_", "rps_", "bank_", "slot_", "dart_", "fastest_", "cups_", "roulette_", "judge_", "bowling_", "dice_", "football_", "basketball_", "menu_games_")):
         await handle_games_callback(query, user, msg, context)
         return
 
