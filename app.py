@@ -19,6 +19,7 @@ from utils import database as db
 from config import TELEGRAM_BOT_TOKEN
 from commands import ARABIC_COMMANDS
 from utils.helpers import is_admin
+from web_dashboard import start_dashboard
 
 from handlers.admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
@@ -165,12 +166,10 @@ async def handle_channel_post(update: Update, context):
         return
     logger.info(f"📢 رسالة في القناة: {msg.text[:100]}")
 
-    # نعيد توجيه channel_post كـ message مؤقت لـ handle_media_url
-    from music import _is_media_url, _handle_url
+    from music import _is_media_url
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     url = _is_media_url(msg.text)
     if url:
-        # نرسل أزرار التحميل في القناة
-        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         keyboard = [[
             InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
@@ -182,6 +181,7 @@ async def handle_channel_post(update: Update, context):
 
 async def post_init(app):
     await db.init_db()
+    start_dashboard()
     reminders = await db.load_all_reminders()
     if reminders:
         count = 0
