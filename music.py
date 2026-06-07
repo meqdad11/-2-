@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 CHANNEL_URL = "https://t.me/shafaqmeqdad"
-COBALT_API = os.environ.get("COBALT_API", "")
+# تم تحديث الرابط الافتراضي لـ Cobalt لضمان العمل حتى لو لم يتم ضبط المتغير البيئي
+COBALT_API = os.environ.get("COBALT_API", "https://co.wuk.sh/api/json")
 
 # ========================================
 # تصنيف المواقع
@@ -54,12 +55,19 @@ def _is_media_url(text: str) -> str | None:
     return _extract_url(text)
 
 # ========================================
-# التحميل عبر Cobalt (يوتيوب)
+# التحميل عبر Cobalt (الحل البديل للحظر)
 # ========================================
 
 async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str]:
-    if not COBALT_API:
-        raise Exception("COBALT_API غير مضبوط")
+    # تأكد من أن الرابط ينتهي بـ /api/json إذا لم يكن كذلك
+    api_base = COBALT_API.rstrip('/')
+    if not api_base.endswith('/api/json'):
+        if '/api/json' not in api_base:
+            endpoint = f"{api_base}/api/json"
+        else:
+            endpoint = api_base
+    else:
+        endpoint = api_base
 
     payload = {
         "url": url,
@@ -76,11 +84,17 @@ async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str
     }
 
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
-        async with session.post(f"{COBALT_API}/", json=payload, headers=headers) as resp:
-            if resp.status != 200:
-                text = await resp.text()
-                raise Exception(f"Cobalt error: {resp.status} {text}")
-            data = await resp.json()
+        try:
+            async with session.post(endpoint, json=payload, headers=headers) as resp:
+                if resp.status != 200:
+                    text = await resp.text()
+                    raise Exception(f"Cobalt error: {resp.status} {text}")
+                data = await resp.json()
+        except Exception as e:
+            # محاولة أخيرة مع الرابط المباشر إذا فشل المتغير البيئي
+            async with session.post("https://co.wuk.sh/api/json", json=payload, headers=headers) as resp:
+                if resp.status != 200: raise e
+                data = await resp.json()
 
     status = data.get("status")
     if status == "error":
@@ -93,7 +107,6 @@ async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str
         download_url = data.get("url")
         filename = data.get("filename", filename)
     elif status == "local-processing":
-        # نأخذ أول tunnel
         tunnels = data.get("tunnel", [])
         if tunnels:
             download_url = tunnels[0]
@@ -108,7 +121,7 @@ async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str
     if not download_url:
         raise Exception(f"Cobalt status غير مدعوم: {status}")
 
-    # تحميل الملف
+    # تحميل الملف الفعلي
     tmp_dir = tempfile.mkdtemp()
     file_path = f"{tmp_dir}/{filename}"
 
@@ -189,11 +202,12 @@ async def _send_file(message, file_path: str, file_name: str, audio_only: bool):
             await message.reply_video(video=f, reply_markup=_channel_markup())
     os.remove(file_path)
 
-async def _auto_download(message, url: str, audio_only: bool, use_cobalt: bool = False):
+async def _auto_download(message, url: str, audio_only: bool, use_cobalt: bool = True):
     """تحميل تلقائي وإرسال"""
     status_msg = await message.reply_text("⏳ جارٍ التحميل...")
     try:
-        if use_cobalt and COBALT_API:
+        # استخدام Cobalt لجميع المنصات المحظورة (يوتيوب وانستا وتيك توك)
+        if use_cobalt:
             try:
                 file_path, file_name = await _cobalt_download(url, audio_only=audio_only)
             except Exception as e:
@@ -207,7 +221,7 @@ async def _auto_download(message, url: str, audio_only: bool, use_cobalt: bool =
         await status_msg.delete()
     except Exception as e:
         logger.error(f"Download error: {e}")
-        await status_msg.edit_text("❌ فشل التحميل.")
+        await status_msg.edit_text("❌ فشل التحميل. قد يكون الملف كبيراً جداً أو الرابط غير مدعوم.")
 
 # ========================================
 # البحث في YouTube
@@ -385,7 +399,6 @@ async def _handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: s
         await _auto_download(update.message, url, audio_only=False)
 
     elif mode == "youtube":
-        # يوتيوب عبر Cobalt
         keyboard = [[
             InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
@@ -417,17 +430,23 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     mode, url = parts
     audio_only = mode == "dl_audio"
-    use_cobalt = any(d in url for d in YOUTUBE_DOMAINS)
+    
+    # استخدام Cobalt لجميع الروابط في Railway لتجنب الحظر
+    use_cobalt = True 
 
     await query.message.edit_text("⏳ جارٍ التحميل...")
     try:
-        if use_cobalt and COBALT_API:
+        if use_cobalt:
             try:
                 file_path, file_name = await _cobalt_download(url, audio_only=audio_only)
             except Exception as e:
                 logger.warning(f"Cobalt failed: {e}")
-                await query.message.edit_text("❌ فشل تحميل يوتيوب.")
-                return
+                # محاولة أخيرة عبر yt-dlp في حال فشل Cobalt
+                try:
+                    file_path, file_name = await _download_media(url, audio_only=audio_only)
+                except:
+                    await query.message.edit_text("❌ فشل التحميل. قد يكون الرابط محظوراً أو الملف كبيراً جداً.")
+                    return
         else:
             file_path, file_name = await _download_media(url, audio_only=audio_only)
 
@@ -468,6 +487,7 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = results[idx]["url"]
     await query.message.edit_text("⏳ جارٍ التحميل...")
     try:
+        # ساوند كلاود لا يحتاج Cobalt عادةً ولكن يمكن استخدامه كاحتياط
         file_path, file_name = await _download_media(url, audio_only=True)
         await query.message.edit_text("📤 جارٍ الرفع...")
         await _send_file(query.message, file_path, file_name, audio_only=True)
