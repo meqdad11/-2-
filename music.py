@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 CHANNEL_URL = "https://t.me/shafaqmeqdad"
+COBALT_API = os.environ.get("COBALT_API", "")
 
 # ========================================
 # تصنيف المواقع
@@ -20,16 +21,18 @@ CHANNEL_URL = "https://t.me/shafaqmeqdad"
 
 AUDIO_ONLY_DOMAINS = ["soundcloud.com"]
 VIDEO_ONLY_DOMAINS = ["tiktok.com", "vt.tiktok.com", "instagram.com", "twitter.com", "x.com"]
+YOUTUBE_DOMAINS = ["youtube.com", "youtu.be"]
 BOTH_DOMAINS = ["facebook.com", "fb.watch", "vimeo.com", "dailymotion.com", "twitch.tv", "reddit.com", "streamable.com", "bilibili.com"]
 
-SUPPORTED_DOMAINS = AUDIO_ONLY_DOMAINS + VIDEO_ONLY_DOMAINS + BOTH_DOMAINS
+SUPPORTED_DOMAINS = AUDIO_ONLY_DOMAINS + VIDEO_ONLY_DOMAINS + YOUTUBE_DOMAINS + BOTH_DOMAINS
 
 def _detect_mode(url: str):
-    """يرجع 'audio' أو 'video' أو 'both'"""
     if any(d in url for d in AUDIO_ONLY_DOMAINS):
         return "audio"
     if any(d in url for d in VIDEO_ONLY_DOMAINS):
         return "video"
+    if any(d in url for d in YOUTUBE_DOMAINS):
+        return "youtube"
     return "both"
 
 # ========================================
@@ -49,6 +52,67 @@ def _is_media_url(text: str) -> str | None:
     if text.startswith("http") and any(d in text for d in SUPPORTED_DOMAINS):
         return text.split()[0]
     return _extract_url(text)
+
+# ========================================
+# التحميل عبر Cobalt (يوتيوب)
+# ========================================
+
+async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str]:
+    if not COBALT_API:
+        raise Exception("COBALT_API غير مضبوط")
+
+    payload = {
+        "url": url,
+        "downloadMode": "audio" if audio_only else "auto",
+        "audioFormat": "mp3" if audio_only else "best",
+        "videoQuality": "1080",
+    }
+    headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+        async with session.post(f"{COBALT_API}/", json=payload, headers=headers) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                raise Exception(f"Cobalt error: {resp.status} {text}")
+            data = await resp.json()
+
+    status = data.get("status")
+    if status == "error":
+        raise Exception(f"Cobalt: {data.get('error', {}).get('code', 'unknown error')}")
+
+    download_url = None
+    filename = "media"
+
+    if status == "redirect" or status == "tunnel":
+        download_url = data.get("url")
+        filename = data.get("filename", "media")
+    elif status == "picker":
+        # يأخذ أول عنصر
+        items = data.get("picker", [])
+        if items:
+            download_url = items[0].get("url")
+            filename = items[0].get("filename", "media")
+
+    if not download_url:
+        raise Exception("لم يُعثر على رابط تحميل من Cobalt")
+
+    # تحميل الملف
+    tmp_dir = tempfile.mkdtemp()
+    ext = "mp3" if audio_only else filename.split(".")[-1] if "." in filename else "mp4"
+    file_path = f"{tmp_dir}/{filename}"
+
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120)) as session:
+        async with session.get(download_url) as resp:
+            if resp.status != 200:
+                raise Exception("فشل تحميل الملف من Cobalt")
+            with open(file_path, "wb") as f:
+                async for chunk in resp.content.iter_chunked(1024 * 64):
+                    f.write(chunk)
+
+    return file_path, filename
 
 # ========================================
 # التحميل عبر yt-dlp
@@ -96,7 +160,7 @@ async def _download_media(url: str, audio_only: bool = False) -> tuple[str, str]
     return str(files[0]), files[0].name
 
 # ========================================
-# إرسال الملف بعد التحميل
+# إرسال الملف
 # ========================================
 
 def _channel_markup():
@@ -116,6 +180,26 @@ async def _send_file(message, file_path: str, file_name: str, audio_only: bool):
         else:
             await message.reply_video(video=f, reply_markup=_channel_markup())
     os.remove(file_path)
+
+async def _auto_download(message, url: str, audio_only: bool, use_cobalt: bool = False):
+    """تحميل تلقائي وإرسال"""
+    status_msg = await message.reply_text("⏳ جارٍ التحميل...")
+    try:
+        if use_cobalt and COBALT_API:
+            try:
+                file_path, file_name = await _cobalt_download(url, audio_only=audio_only)
+            except Exception as e:
+                logger.warning(f"Cobalt failed, fallback to yt-dlp: {e}")
+                file_path, file_name = await _download_media(url, audio_only=audio_only)
+        else:
+            file_path, file_name = await _download_media(url, audio_only=audio_only)
+
+        await status_msg.edit_text("📤 جارٍ الرفع...")
+        await _send_file(message, file_path, file_name, audio_only=audio_only)
+        await status_msg.delete()
+    except Exception as e:
+        logger.error(f"Download error: {e}")
+        await status_msg.edit_text("❌ فشل التحميل.")
 
 # ========================================
 # البحث في YouTube
@@ -191,7 +275,6 @@ async def _search_soundcloud(query: str, limit: int = 5) -> list:
             logger.warning(f"SC client_id {client_id} failed: {e}")
             continue
 
-    # fallback عبر yt-dlp
     try:
         proc = await asyncio.create_subprocess_exec(
             "yt-dlp", f"scsearch{limit}:{query}",
@@ -288,31 +371,23 @@ async def _handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: s
     mode = _detect_mode(url)
 
     if mode == "audio":
-        # تحميل تلقائي صوت
-        msg = await update.message.reply_text("⏳ جارٍ التحميل...")
-        try:
-            file_path, file_name = await _download_media(url, audio_only=True)
-            await msg.edit_text("📤 جارٍ الرفع...")
-            await _send_file(update.message, file_path, file_name, audio_only=True)
-            await msg.delete()
-        except Exception as e:
-            logger.error(f"Auto audio download error: {e}")
-            await msg.edit_text("❌ فشل التحميل.")
+        await _auto_download(update.message, url, audio_only=True)
 
     elif mode == "video":
-        # تحميل تلقائي فيديو
-        msg = await update.message.reply_text("⏳ جارٍ التحميل...")
-        try:
-            file_path, file_name = await _download_media(url, audio_only=False)
-            await msg.edit_text("📤 جارٍ الرفع...")
-            await _send_file(update.message, file_path, file_name, audio_only=False)
-            await msg.delete()
-        except Exception as e:
-            logger.error(f"Auto video download error: {e}")
-            await msg.edit_text("❌ فشل التحميل.")
+        await _auto_download(update.message, url, audio_only=False)
+
+    elif mode == "youtube":
+        # يوتيوب عبر Cobalt
+        keyboard = [[
+            InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
+            InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
+        ]]
+        await update.message.reply_text(
+            "🎬 يوتيوب — اختر الصيغة:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
     else:
-        # عرض الخيارين
         keyboard = [[
             InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
@@ -334,10 +409,20 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     mode, url = parts
     audio_only = mode == "dl_audio"
+    use_cobalt = any(d in url for d in YOUTUBE_DOMAINS)
 
     await query.message.edit_text("⏳ جارٍ التحميل...")
     try:
-        file_path, file_name = await _download_media(url, audio_only=audio_only)
+        if use_cobalt and COBALT_API:
+            try:
+                file_path, file_name = await _cobalt_download(url, audio_only=audio_only)
+            except Exception as e:
+                logger.warning(f"Cobalt failed: {e}")
+                await query.message.edit_text("❌ فشل تحميل يوتيوب.")
+                return
+        else:
+            file_path, file_name = await _download_media(url, audio_only=audio_only)
+
         await query.message.edit_text("📤 جارٍ الرفع...")
         await _send_file(query.message, file_path, file_name, audio_only=audio_only)
         await query.message.delete()
@@ -373,7 +458,6 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text("❌ انتهت صلاحية النتائج.")
         return
     url = results[idx]["url"]
-    # SoundCloud دائماً صوت — تحميل تلقائي
     await query.message.edit_text("⏳ جارٍ التحميل...")
     try:
         file_path, file_name = await _download_media(url, audio_only=True)
