@@ -41,14 +41,15 @@ async def dashboard(request: Request):
         chats = users = active_locks = total_locks = 0
         events = []
 
-    return templates.TemplateResponse("dashboard.html", {
+    context = {
         "request": request,
         "chats": chats,
         "users": users,
         "events": events,
         "active_locks": active_locks,
         "total_locks": total_locks,
-    })
+    }
+    return templates.TemplateResponse(request=request, name="dashboard.html", context=context)
 
 def run_web():
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="warning")
@@ -56,4 +57,3 @@ def run_web():
 def start_dashboard():
     threading.Thread(target=run_web, daemon=True).start()
     logger.info("✅ لوحة التحكم تعمل على البورت 8000")
- 
