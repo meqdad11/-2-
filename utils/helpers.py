@@ -191,3 +191,43 @@ def estimate_telegram_registration(user_id: int) -> str:
         if user_id < limit:
             return label
     return "2024 أو أحدث"
+
+
+# ==================== دوال جديدة لدعم المعرف واليوزر والرد ====================
+async def extract_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    استخراج المستخدم من الرد على رسالة، أو من المعرف الرقمي، أو من اليوزر (مع أو بدون @).
+    ترجع (user_id, user_name, user_mention_html) أو (None, None, None) إن لم يتم العثور.
+    """
+    # 1️⃣ رد على رسالة
+    reply = update.message.reply_to_message
+    if reply and reply.from_user:
+        u = reply.from_user
+        return u.id, u.first_name, u.mention_html()
+    
+    # 2️⃣ معرف رقمي أو يوزر من الوسيطات
+    if context.args:
+        arg = context.args[0].strip()
+        
+        # معرف رقمي
+        if arg.isdigit():
+            uid = int(arg)
+            try:
+                user = await context.bot.get_chat(uid)
+                return uid, user.first_name, user.mention_html()
+            except:
+                return uid, str(uid), f'<a href="tg://user?id={uid}">{uid}</a>'
+        
+        # يوزر (يبدأ بـ @ أو بدونه)
+        if arg.startswith('@'):
+            username = arg[1:]
+        else:
+            username = arg
+        
+        try:
+            user = await context.bot.get_chat(f"@{username}")
+            return user.id, user.first_name, user.mention_html()
+        except:
+            pass
+    
+    return None, None, None
