@@ -15,31 +15,20 @@ MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 CHANNEL_URL = "https://t.me/shafaqmeqdad"
 
 # ========================================
-# تصنيف الدومينات
+# تصنيف المواقع
 # ========================================
 
 AUDIO_ONLY_DOMAINS = ["soundcloud.com"]
-
-VIDEO_ONLY_DOMAINS = [
-    "tiktok.com", "vt.tiktok.com",
-    "instagram.com",
-    "twitter.com", "x.com",
-    "facebook.com", "fb.watch",
-    "vimeo.com", "dailymotion.com",
-    "twitch.tv", "reddit.com",
-    "streamable.com", "bilibili.com",
-]
-
-BOTH_DOMAINS = []  # يوتيوب وما شابه
+VIDEO_ONLY_DOMAINS = ["tiktok.com", "vt.tiktok.com", "instagram.com", "twitter.com", "x.com"]
+BOTH_DOMAINS = ["facebook.com", "fb.watch", "vimeo.com", "dailymotion.com", "twitch.tv", "reddit.com", "streamable.com", "bilibili.com"]
 
 SUPPORTED_DOMAINS = AUDIO_ONLY_DOMAINS + VIDEO_ONLY_DOMAINS + BOTH_DOMAINS
 
-def _detect_mode(url: str) -> str:
-    """أرجع: 'audio' أو 'video' أو 'both'"""
-    url_lower = url.lower()
-    if any(d in url_lower for d in AUDIO_ONLY_DOMAINS):
+def _detect_mode(url: str):
+    """يرجع 'audio' أو 'video' أو 'both'"""
+    if any(d in url for d in AUDIO_ONLY_DOMAINS):
         return "audio"
-    if any(d in url_lower for d in VIDEO_ONLY_DOMAINS):
+    if any(d in url for d in VIDEO_ONLY_DOMAINS):
         return "video"
     return "both"
 
@@ -105,6 +94,28 @@ async def _download_media(url: str, audio_only: bool = False) -> tuple[str, str]
         raise Exception("لم يُنشأ ملف")
 
     return str(files[0]), files[0].name
+
+# ========================================
+# إرسال الملف بعد التحميل
+# ========================================
+
+def _channel_markup():
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("📢 قناة تحديثات شفق", url=CHANNEL_URL)
+    ]])
+
+async def _send_file(message, file_path: str, file_name: str, audio_only: bool):
+    file_size = os.path.getsize(file_path)
+    if file_size > MAX_FILE_SIZE:
+        await message.reply_text("❌ الملف أكبر من 50MB.")
+        os.remove(file_path)
+        return
+    with open(file_path, "rb") as f:
+        if audio_only:
+            await message.reply_audio(audio=f, title=file_name, reply_markup=_channel_markup())
+        else:
+            await message.reply_video(video=f, reply_markup=_channel_markup())
+    os.remove(file_path)
 
 # ========================================
 # البحث في YouTube
@@ -216,8 +227,7 @@ async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("📎 أرسل رابطاً مباشرة أو: حمل [رابط]")
         return
-    url = context.args[0]
-    await _handle_url(update, context, url)
+    await _handle_url(update, context, context.args[0])
 
 async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -278,34 +288,39 @@ async def _handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: s
     mode = _detect_mode(url)
 
     if mode == "audio":
-        # تحميل مباشر بدون خيار
-        keyboard = [[
-            InlineKeyboardButton("🎵 تحميل صوت", callback_data=f"dl_audio|{url}"),
-        ]]
+        # تحميل تلقائي صوت
+        msg = await update.message.reply_text("⏳ جارٍ التحميل...")
+        try:
+            file_path, file_name = await _download_media(url, audio_only=True)
+            await msg.edit_text("📤 جارٍ الرفع...")
+            await _send_file(update.message, file_path, file_name, audio_only=True)
+            await msg.delete()
+        except Exception as e:
+            logger.error(f"Auto audio download error: {e}")
+            await msg.edit_text("❌ فشل التحميل.")
+
     elif mode == "video":
-        keyboard = [[
-            InlineKeyboardButton("🎬 تحميل فيديو", callback_data=f"dl_video|{url}"),
-            InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
-        ]]
+        # تحميل تلقائي فيديو
+        msg = await update.message.reply_text("⏳ جارٍ التحميل...")
+        try:
+            file_path, file_name = await _download_media(url, audio_only=False)
+            await msg.edit_text("📤 جارٍ الرفع...")
+            await _send_file(update.message, file_path, file_name, audio_only=False)
+            await msg.delete()
+        except Exception as e:
+            logger.error(f"Auto video download error: {e}")
+            await msg.edit_text("❌ فشل التحميل.")
+
     else:
+        # عرض الخيارين
         keyboard = [[
             InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
         ]]
-
-    await update.message.reply_text(
-        "🔗 اختر صيغة التحميل:",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
-
-# ========================================
-# زر القناة
-# ========================================
-
-def _channel_markup():
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("📢 قناة تحديثات شفق", url=CHANNEL_URL)
-    ]])
+        await update.message.reply_text(
+            "🔗 اختر صيغة التحميل:",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 # ========================================
 # معالجة الأزرار
@@ -321,32 +336,11 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     audio_only = mode == "dl_audio"
 
     await query.message.edit_text("⏳ جارٍ التحميل...")
-
     try:
         file_path, file_name = await _download_media(url, audio_only=audio_only)
-        file_size = os.path.getsize(file_path)
-
-        if file_size > MAX_FILE_SIZE:
-            await query.message.edit_text("❌ الملف أكبر من 50MB.")
-            os.remove(file_path)
-            return
-
         await query.message.edit_text("📤 جارٍ الرفع...")
-        with open(file_path, "rb") as f:
-            if audio_only:
-                await query.message.reply_audio(
-                    audio=f,
-                    title=file_name,
-                    reply_markup=_channel_markup()
-                )
-            else:
-                await query.message.reply_video(
-                    video=f,
-                    reply_markup=_channel_markup()
-                )
+        await _send_file(query.message, file_path, file_name, audio_only=audio_only)
         await query.message.delete()
-        os.remove(file_path)
-
     except Exception as e:
         logger.error(f"Download error: {e}")
         await query.message.edit_text("❌ فشل التحميل. تأكد من صحة الرابط.")
@@ -360,7 +354,6 @@ async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text("❌ انتهت صلاحية النتائج.")
         return
     url = results[idx]["url"]
-    # يوتيوب يدعم الاثنين
     keyboard = [[
         InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
         InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
@@ -380,15 +373,16 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text("❌ انتهت صلاحية النتائج.")
         return
     url = results[idx]["url"]
-    # ساوند كلاود صوت فقط
-    keyboard = [[
-        InlineKeyboardButton("🎵 تحميل صوت", callback_data=f"dl_audio|{url}"),
-    ]]
-    await query.message.edit_text(
-        f"🎵 *{results[idx]['title']}*",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    # SoundCloud دائماً صوت — تحميل تلقائي
+    await query.message.edit_text("⏳ جارٍ التحميل...")
+    try:
+        file_path, file_name = await _download_media(url, audio_only=True)
+        await query.message.edit_text("📤 جارٍ الرفع...")
+        await _send_file(query.message, file_path, file_name, audio_only=True)
+        await query.message.delete()
+    except Exception as e:
+        logger.error(f"SC download error: {e}")
+        await query.message.edit_text("❌ فشل التحميل.")
 
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await callback_download(update, context)
