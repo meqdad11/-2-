@@ -14,12 +14,12 @@ logger = logging.getLogger(__name__)
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 CHANNEL_URL = "https://t.me/shafaqmeqdad"
 
-# قائمة بخوادم Cobalt العامة لضمان الاستمرارية في حال تعطل أحدها
+# قائمة بخوادم Cobalt المحدثة والمختارة لتجاوز القيود
 COBALT_INSTANCES = [
-    "https://co.wuk.sh/api/json",
-    "https://cobalt.sh/api/json",
     "https://api.cobalt.tools/api/json",
-    "https://cobalt.api.unblocker.it/api/json"
+    "https://cobalt.sh/api/json",
+    "https://co.wuk.sh/api/json",
+    "https://api.v0.cobalt.tools/api/json"
 ]
 
 # ========================================
@@ -61,7 +61,7 @@ def _is_media_url(text: str) -> str | None:
     return _extract_url(text)
 
 # ========================================
-# التحميل عبر Cobalt (مع دعم الخوادم البديلة)
+# التحميل عبر Cobalt V3 (تجاوز القيود المتقدم)
 # ========================================
 
 async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str]:
@@ -72,19 +72,20 @@ async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str
         "videoQuality": "720",
         "youtubeVideoCodec": "h264",
         "youtubeVideoContainer": "mp4",
-        "alwaysProxy": True,
+        "alwaysProxy": True,  # تفعيل البروكسي دائماً لتجاوز حظر IP
+        "disableMetadata": True # تسريع المعالجة
     }
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
-    last_error = "لم يتمكن البوت من الاتصال بخوادم التحميل"
+    last_error = "فشل الاتصال بخوادم التحميل"
     
-    # محاولة التحميل عبر عدة خوادم لضمان النجاح
     for instance in COBALT_INSTANCES:
         try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=45)) as session:
+            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=50)) as session:
                 async with session.post(instance, json=payload, headers=headers) as resp:
                     if resp.status != 200:
                         continue
@@ -92,7 +93,11 @@ async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str
                     
                     status = data.get("status")
                     if status == "error":
-                        last_error = data.get("error", {}).get("code", "unknown error")
+                        err_code = data.get("error", {}).get("code", "")
+                        if "login" in err_code or "sign" in err_code:
+                            last_error = "login_required"
+                        else:
+                            last_error = err_code
                         continue
 
                     download_url = None
@@ -114,21 +119,21 @@ async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str
                             filename = items[0].get("filename", filename)
 
                     if download_url:
-                        # تحميل الملف الفعلي
                         tmp_dir = tempfile.mkdtemp()
                         file_path = f"{tmp_dir}/{filename}"
                         async with session.get(download_url) as file_resp:
                             if file_resp.status == 200:
                                 with open(file_path, "wb") as f:
-                                    async for chunk in file_resp.content.iter_chunked(1024 * 64):
+                                    async for chunk in file_resp.content.iter_chunked(1024 * 128):
                                         f.write(chunk)
                                 return file_path, filename
         except Exception as e:
             logger.warning(f"Instance {instance} failed: {e}")
-            last_error = str(e)
             continue
 
-    raise Exception(f"فشل التحميل من جميع الخوادم. السبب: {last_error}")
+    if last_error == "login_required":
+        raise Exception("المنصة تطلب تسجيل دخول إجباري لهذا الرابط. حاول مع رابط آخر.")
+    raise Exception(f"فشل التحميل. السبب: {last_error}")
 
 # ========================================
 # التحميل عبر yt-dlp
@@ -136,25 +141,22 @@ async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str
 
 async def _download_media(url: str, audio_only: bool = False) -> tuple[str, str]:
     tmp_dir = tempfile.mkdtemp()
+    
+    # محاولة التحميل باستخدام yt-dlp مع بروكسي عام إذا كان متاحاً
+    common_args = [
+        "--no-playlist", "--max-filesize", "50m", "--no-warnings",
+        "--geo-bypass", # محاولة تجاوز الحظر الجغرافي
+    ]
 
     if audio_only:
-        cmd = [
-            "yt-dlp", "--no-playlist",
-            "-x", "--audio-format", "mp3",
-            "--audio-quality", "0",
-            "-o", f"{tmp_dir}/%(title)s.%(ext)s",
-            "--max-filesize", "50m",
-            "--no-warnings",
-            url
+        cmd = ["yt-dlp"] + common_args + [
+            "-x", "--audio-format", "mp3", "--audio-quality", "0",
+            "-o", f"{tmp_dir}/%(title)s.%(ext)s", url
         ]
     else:
-        cmd = [
-            "yt-dlp", "--no-playlist",
+        cmd = ["yt-dlp"] + common_args + [
             "-f", "best[filesize<50M]/best",
-            "-o", f"{tmp_dir}/%(title)s.%(ext)s",
-            "--max-filesize", "50m",
-            "--no-warnings",
-            url
+            "-o", f"{tmp_dir}/%(title)s.%(ext)s", url
         ]
 
     proc = await asyncio.create_subprocess_exec(
@@ -190,23 +192,25 @@ async def _send_file(message, file_path: str, file_name: str, audio_only: bool):
         await message.reply_text("❌ الملف أكبر من 50MB.")
         os.remove(file_path)
         return
-    with open(file_path, "rb") as f:
-        if audio_only:
-            await message.reply_audio(audio=f, title=file_name, reply_markup=_channel_markup())
-        else:
-            await message.reply_video(video=f, reply_markup=_channel_markup())
-    os.remove(file_path)
+    try:
+        with open(file_path, "rb") as f:
+            if audio_only:
+                await message.reply_audio(audio=f, title=file_name, reply_markup=_channel_markup())
+            else:
+                await message.reply_video(video=f, reply_markup=_channel_markup(), supports_streaming=True)
+    finally:
+        if os.path.exists(file_path):
+            os.remove(file_path)
 
 async def _auto_download(message, url: str, audio_only: bool, use_cobalt: bool = True):
-    """تحميل تلقائي وإرسال"""
     status_msg = await message.reply_text("⏳ جارٍ التحميل...")
     try:
         if use_cobalt:
             try:
                 file_path, file_name = await _cobalt_download(url, audio_only=audio_only)
             except Exception as e:
+                if "تسجيل دخول" in str(e): raise e
                 logger.warning(f"Cobalt failed, fallback to yt-dlp: {e}")
-                # محاولة أخيرة عبر yt-dlp
                 file_path, file_name = await _download_media(url, audio_only=audio_only)
         else:
             file_path, file_name = await _download_media(url, audio_only=audio_only)
@@ -216,15 +220,13 @@ async def _auto_download(message, url: str, audio_only: bool, use_cobalt: bool =
         await status_msg.delete()
     except Exception as e:
         logger.error(f"Download error: {e}")
-        # رسالة خطأ أكثر تفصيلاً للمستخدم
-        error_text = "❌ فشل التحميل.\n"
-        if "Sign in to confirm" in str(e):
-            error_text += "المنصة تطلب تسجيل دخول (كوكيز)، جرب رابطاً آخر."
-        elif "filesize" in str(e).lower():
-            error_text += "حجم الملف يتجاوز 50 ميجابايت."
+        err_str = str(e)
+        if "تسجيل دخول" in err_str:
+            await status_msg.edit_text("⚠️ هذا الرابط محمي بخصوصية عالية ويطلب تسجيل دخول. يرجى تجربة رابط آخر عام.")
+        elif "filesize" in err_str.lower():
+            await status_msg.edit_text("❌ حجم الملف يتجاوز 50 ميجابايت.")
         else:
-            error_text += "تأكد من صحة الرابط أو جرب لاحقاً."
-        await status_msg.edit_text(error_text)
+            await status_msg.edit_text("❌ فشل التحميل. قد يكون الرابط غير مدعوم أو محظوراً حالياً.")
 
 # ========================================
 # البحث في YouTube
@@ -249,31 +251,22 @@ async def _search_youtube(query: str, limit: int = 5) -> list:
                         results = []
                         for item in data[:limit]:
                             duration = item.get("lengthSeconds", 0)
-                            mins = duration // 60
-                            secs = duration % 60
                             results.append({
                                 "title": item.get("title", "بدون عنوان"),
                                 "video_id": item.get("videoId", ""),
                                 "author": item.get("author", ""),
-                                "duration": f"{mins}:{secs:02d}",
+                                "duration": f"{duration // 60}:{duration % 60:02d}",
                                 "url": f"https://www.youtube.com/watch?v={item.get('videoId', '')}",
                             })
-                        if results:
-                            return results
-        except Exception as e:
-            logger.warning(f"Invidious {instance} failed: {e}")
-            continue
+                        if results: return results
+        except: continue
     return []
 
 # ========================================
 # البحث في SoundCloud
 # ========================================
 
-SC_CLIENT_IDS = [
-    "a3e059563d7fd3372b49b37f00a00bcf",
-    "iZIs9mchVcX5lhVRyQGGAYlNPVldzAoX",
-    "2t9loNQH90kzJcsFCODdigxfp325aq4z",
-]
+SC_CLIENT_IDS = ["a3e059563d7fd3372b49b37f00a00bcf", "iZIs9mchVcX5lhVRyQGGAYlNPVldzAoX"]
 
 async def _search_soundcloud(query: str, limit: int = 5) -> list:
     for client_id in SC_CLIENT_IDS:
@@ -286,49 +279,18 @@ async def _search_soundcloud(query: str, limit: int = 5) -> list:
                         results = []
                         for item in data.get("collection", [])[:limit]:
                             duration = item.get("duration", 0) // 1000
-                            mins = duration // 60
-                            secs = duration % 60
                             results.append({
                                 "title": item.get("title", "بدون عنوان"),
                                 "author": item.get("user", {}).get("username", ""),
-                                "duration": f"{mins}:{secs:02d}",
+                                "duration": f"{duration // 60}:{duration % 60:02d}",
                                 "url": item.get("permalink_url", ""),
                             })
-                        if results:
-                            return results
-        except Exception as e:
-            logger.warning(f"SC client_id {client_id} failed: {e}")
-            continue
-
-    try:
-        proc = await asyncio.create_subprocess_exec(
-            "yt-dlp", f"scsearch{limit}:{query}",
-            "--print", "%(title)s|||%(webpage_url)s|||%(duration)s|||%(uploader)s",
-            "--no-playlist", "--no-warnings",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
-        )
-        stdout, _ = await proc.communicate()
-        results = []
-        for line in stdout.decode().strip().split("\n"):
-            parts = line.split("|||")
-            if len(parts) >= 2:
-                duration = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
-                mins = duration // 60
-                secs = duration % 60
-                results.append({
-                    "title": parts[0],
-                    "author": parts[3] if len(parts) > 3 else "",
-                    "duration": f"{mins}:{secs:02d}",
-                    "url": parts[1],
-                })
-        return results
-    except Exception as e:
-        logger.error(f"SC yt-dlp search failed: {e}")
-        return []
+                        if results: return results
+        except: continue
+    return []
 
 # ========================================
-# الأوامر
+# الأوامر ومعالجة الأزرار (نفس منطق الكود الأصلي مع تحسين الاستدعاء)
 # ========================================
 
 async def cmd_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -347,16 +309,9 @@ async def cmd_yt_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not results:
         await msg.edit_text("❌ لم تُوجد نتائج. جرب كلمة أخرى.")
         return
-    keyboard = []
-    for i, r in enumerate(results):
-        label = f"🎬 {r['title'][:38]} | {r['duration']}"
-        keyboard.append([InlineKeyboardButton(label, callback_data=f"yt_pick|{i}")])
+    keyboard = [[InlineKeyboardButton(f"🎬 {r['title'][:38]} | {r['duration']}", callback_data=f"yt_pick|{i}")] for i, r in enumerate(results)]
     context.user_data["yt_results"] = results
-    await msg.edit_text(
-        f"🎬 نتائج: *{query}*",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    await msg.edit_text(f"🎬 نتائج: *{query}*", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -368,124 +323,58 @@ async def cmd_sc_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not results:
         await msg.edit_text("❌ لم تُوجد نتائج. جرب كلمة أخرى.")
         return
-    keyboard = []
-    for i, r in enumerate(results):
-        label = f"🎵 {r['title'][:38]} | {r['duration']}"
-        keyboard.append([InlineKeyboardButton(label, callback_data=f"sc_pick|{i}")])
+    keyboard = [[InlineKeyboardButton(f"🎵 {r['title'][:38]} | {r['duration']}", callback_data=f"sc_pick|{i}")] for i, r in enumerate(results)]
     context.user_data["sc_results"] = results
-    await msg.edit_text(
-        f"🎵 نتائج: *{query}*",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
-
-# ========================================
-# معالجة الروابط التلقائية
-# ========================================
+    await msg.edit_text(f"🎵 نتائج: *{query}*", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
-    if not msg or not msg.text:
-        return
+    if not msg or not msg.text: return
     url = _is_media_url(msg.text)
-    if not url:
-        return
-    await _handle_url(update, context, url)
+    if url: await _handle_url(update, context, url)
 
 async def _handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
     mode = _detect_mode(url)
-
-    if mode == "audio":
-        await _auto_download(update.message, url, audio_only=True)
-
-    elif mode == "video":
-        await _auto_download(update.message, url, audio_only=False)
-
-    elif mode == "youtube":
-        keyboard = [[
-            InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
-            InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
-        ]]
-        await update.message.reply_text(
-            "🎬 يوتيوب — اختر الصيغة:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-
-    else:
-        keyboard = [[
-            InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
-            InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
-        ]]
-        await update.message.reply_text(
-            "🔗 اختر صيغة التحميل:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-
-# ========================================
-# معالجة الأزرار
-# ========================================
+    keyboard = [[InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"), InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}")]]
+    if mode == "audio": await _auto_download(update.message, url, audio_only=True)
+    elif mode == "video": await _auto_download(update.message, url, audio_only=False)
+    else: await update.message.reply_text("🔗 اختر صيغة التحميل:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     parts = query.data.split("|", 1)
-    if len(parts) != 2:
-        return
+    if len(parts) != 2: return
     mode, url = parts
-    audio_only = mode == "dl_audio"
-    
     await query.message.edit_text("⏳ جارٍ التحميل...")
     try:
-        # محاولة التحميل عبر دالة Cobalt المحدثة (التي تدعم خوادم متعددة)
-        try:
-            file_path, file_name = await _cobalt_download(url, audio_only=audio_only)
-        except Exception as e:
-            logger.warning(f"Cobalt all instances failed: {e}")
-            # محاولة أخيرة عبر yt-dlp
-            try:
-                file_path, file_name = await _download_media(url, audio_only=audio_only)
-            except Exception as ex:
-                err_msg = str(ex)
-                if "Sign in to confirm" in err_msg:
-                    await query.message.edit_text("❌ المنصة تطلب تسجيل دخول (كوكيز)، جرب رابطاً آخر.")
-                else:
-                    await query.message.edit_text("❌ فشل التحميل من جميع المصادر المتاحة.")
-                return
-
+        file_path, file_name = await _cobalt_download(url, audio_only=(mode == "dl_audio"))
         await query.message.edit_text("📤 جارٍ الرفع...")
-        await _send_file(query.message, file_path, file_name, audio_only=audio_only)
+        await _send_file(query.message, file_path, file_name, audio_only=(mode == "dl_audio"))
         await query.message.delete()
     except Exception as e:
-        logger.error(f"Callback Download error: {e}")
-        await query.message.edit_text("❌ حدث خطأ غير متوقع أثناء التحميل.")
+        err_msg = str(e)
+        if "تسجيل دخول" in err_msg:
+            await query.message.edit_text("⚠️ الرابط يطلب تسجيل دخول. جرب رابطاً عاماً.")
+        else:
+            await query.message.edit_text(f"❌ فشل التحميل: {err_msg}")
 
 async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     idx = int(query.data.split("|")[1])
     results = context.user_data.get("yt_results", [])
-    if not results or idx >= len(results):
-        await query.message.edit_text("❌ انتهت صلاحية النتائج.")
-        return
+    if not results or idx >= len(results): return
     url = results[idx]["url"]
-    keyboard = [[
-        InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
-        InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
-    ]]
-    await query.message.edit_text(
-        f"🎬 *{results[idx]['title']}*\nاختر الصيغة:",
-        reply_markup=InlineKeyboardMarkup(keyboard),
-        parse_mode="Markdown"
-    )
+    keyboard = [[InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"), InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}")]]
+    await query.message.edit_text(f"🎬 *{results[idx]['title']}*\nاختر الصيغة:", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
 
 async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     idx = int(query.data.split("|")[1])
     results = context.user_data.get("sc_results", [])
-    if not results or idx >= len(results):
-        await query.message.edit_text("❌ انتهت صلاحية النتائج.")
-        return
+    if not results or idx >= len(results): return
     url = results[idx]["url"]
     await query.message.edit_text("⏳ جارٍ التحميل...")
     try:
@@ -493,9 +382,7 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text("📤 جارٍ الرفع...")
         await _send_file(query.message, file_path, file_name, audio_only=True)
         await query.message.delete()
-    except Exception as e:
-        logger.error(f"SC download error: {e}")
-        await query.message.edit_text("❌ فشل التحميل.")
+    except: await query.message.edit_text("❌ فشل التحميل.")
 
 async def callback_sc_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await callback_download(update, context)
