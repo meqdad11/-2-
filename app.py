@@ -168,11 +168,9 @@ async def handle_channel_post(update: Update, context):
         return
     logger.info(f"📢 رسالة في القناة: {msg.text[:100]}")
 
-    # نعيد توجيه channel_post كـ message مؤقت لـ handle_media_url
     from music import _is_media_url, _handle_url
     url = _is_media_url(msg.text)
     if url:
-        # نرسل أزرار التحميل في القناة
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         keyboard = [[
             InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
@@ -241,7 +239,7 @@ def register_handlers(app):
 
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
-    # ---------- إضافة معالج الألعاب النصية قبل handle_text لتجنب التعارض ----------
+    # ---------- معالج الألعاب النصية (يُضاف قبل handle_text) ----------
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text_games))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text_games))
 
