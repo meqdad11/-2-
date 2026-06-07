@@ -67,6 +67,9 @@ from handlers.crisis import (
     cmd_set_crisis_reply, cmd_enable_crisis, cmd_disable_crisis, cmd_crisis_status,
 )
 from handlers.userbot import cmd_send_invite
+from music import (
+    cmd_download, cmd_sc_search, cmd_yt_search,
+)
 
 ARABIC_COMMANDS = {
     "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
@@ -161,4 +164,8 @@ ARABIC_COMMANDS = {
 
     "ارسل_رابط": cmd_send_invite,
     "نموذج": cmd_choose_model,
+
+    "حمل": cmd_download,
+    "يوت": cmd_yt_search,
+    "بحث": cmd_sc_search,
 }
