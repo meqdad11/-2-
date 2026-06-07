@@ -12,21 +12,42 @@ from telegram.ext import ContextTypes
 logger = logging.getLogger(__name__)
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+CHANNEL_URL = "https://t.me/shafaqmeqdad"
+
+# ========================================
+# تصنيف الدومينات
+# ========================================
+
+AUDIO_ONLY_DOMAINS = ["soundcloud.com"]
+
+VIDEO_ONLY_DOMAINS = [
+    "tiktok.com", "vt.tiktok.com",
+    "instagram.com",
+    "twitter.com", "x.com",
+    "facebook.com", "fb.watch",
+    "vimeo.com", "dailymotion.com",
+    "twitch.tv", "reddit.com",
+    "streamable.com", "bilibili.com",
+]
+
+BOTH_DOMAINS = []  # يوتيوب وما شابه
+
+SUPPORTED_DOMAINS = AUDIO_ONLY_DOMAINS + VIDEO_ONLY_DOMAINS + BOTH_DOMAINS
+
+def _detect_mode(url: str) -> str:
+    """أرجع: 'audio' أو 'video' أو 'both'"""
+    url_lower = url.lower()
+    if any(d in url_lower for d in AUDIO_ONLY_DOMAINS):
+        return "audio"
+    if any(d in url_lower for d in VIDEO_ONLY_DOMAINS):
+        return "video"
+    return "both"
 
 # ========================================
 # استخراج الروابط من النص
 # ========================================
 
-SUPPORTED_DOMAINS = [
-    "soundcloud.com", "tiktok.com", "vt.tiktok.com",
-    "instagram.com", "twitter.com", "x.com",
-    "facebook.com", "fb.watch", "vimeo.com",
-    "dailymotion.com", "twitch.tv", "reddit.com",
-    "streamable.com", "bilibili.com",
-]
-
 def _extract_url(text: str) -> str | None:
-    """استخرج أول رابط مدعوم من النص"""
     urls = re.findall(r'https?://\S+', text)
     for url in urls:
         url = url.rstrip(')')
@@ -35,12 +56,9 @@ def _extract_url(text: str) -> str | None:
     return None
 
 def _is_media_url(text: str) -> str | None:
-    """تحقق وأرجع الرابط إذا وُجد في النص"""
     text = text.strip()
-    # رابط مباشر
     if text.startswith("http") and any(d in text for d in SUPPORTED_DOMAINS):
         return text.split()[0]
-    # رابط مدمج في نص
     return _extract_url(text)
 
 # ========================================
@@ -162,7 +180,7 @@ async def _search_soundcloud(query: str, limit: int = 5) -> list:
             logger.warning(f"SC client_id {client_id} failed: {e}")
             continue
 
-    # fallback: بحث عبر yt-dlp مباشرة
+    # fallback عبر yt-dlp
     try:
         proc = await asyncio.create_subprocess_exec(
             "yt-dlp", f"scsearch{limit}:{query}",
@@ -257,14 +275,37 @@ async def handle_media_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _handle_url(update, context, url)
 
 async def _handle_url(update: Update, context: ContextTypes.DEFAULT_TYPE, url: str):
-    keyboard = [[
-        InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
-        InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
-    ]]
+    mode = _detect_mode(url)
+
+    if mode == "audio":
+        # تحميل مباشر بدون خيار
+        keyboard = [[
+            InlineKeyboardButton("🎵 تحميل صوت", callback_data=f"dl_audio|{url}"),
+        ]]
+    elif mode == "video":
+        keyboard = [[
+            InlineKeyboardButton("🎬 تحميل فيديو", callback_data=f"dl_video|{url}"),
+            InlineKeyboardButton("🎵 صوت فقط", callback_data=f"dl_audio|{url}"),
+        ]]
+    else:
+        keyboard = [[
+            InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
+            InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
+        ]]
+
     await update.message.reply_text(
         "🔗 اختر صيغة التحميل:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
+
+# ========================================
+# زر القناة
+# ========================================
+
+def _channel_markup():
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("📢 قناة تحديثات شفق", url=CHANNEL_URL)
+    ]])
 
 # ========================================
 # معالجة الأزرار
@@ -293,9 +334,16 @@ async def callback_download(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text("📤 جارٍ الرفع...")
         with open(file_path, "rb") as f:
             if audio_only:
-                await query.message.reply_audio(audio=f, title=file_name)
+                await query.message.reply_audio(
+                    audio=f,
+                    title=file_name,
+                    reply_markup=_channel_markup()
+                )
             else:
-                await query.message.reply_video(video=f)
+                await query.message.reply_video(
+                    video=f,
+                    reply_markup=_channel_markup()
+                )
         await query.message.delete()
         os.remove(file_path)
 
@@ -312,6 +360,7 @@ async def callback_yt_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text("❌ انتهت صلاحية النتائج.")
         return
     url = results[idx]["url"]
+    # يوتيوب يدعم الاثنين
     keyboard = [[
         InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
         InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
@@ -331,12 +380,12 @@ async def callback_sc_pick(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.edit_text("❌ انتهت صلاحية النتائج.")
         return
     url = results[idx]["url"]
+    # ساوند كلاود صوت فقط
     keyboard = [[
-        InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
-        InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
+        InlineKeyboardButton("🎵 تحميل صوت", callback_data=f"dl_audio|{url}"),
     ]]
     await query.message.edit_text(
-        f"🎵 *{results[idx]['title']}*\nاختر الصيغة:",
+        f"🎵 *{results[idx]['title']}*",
         reply_markup=InlineKeyboardMarkup(keyboard),
         parse_mode="Markdown"
     )
