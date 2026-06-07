@@ -55,10 +55,10 @@ from music import (
     callback_sc_download, callback_yt_pick, callback_sc_pick,
 )
 from handlers.locks import filter_locked_content
-
 from handlers.menu import cmd_menu
 from handlers.buttons import callback_menu
 from handlers.interactive import handle_interactive_messages
+from handlers.support import handle_encouragement_input
 
 from handlers.admin import (
     cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
@@ -76,10 +76,7 @@ from handlers.moderation import (
     cmd_add_command, cmd_remove_command, cmd_list_commands,
 )
 from handlers.dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
-
-from handlers.crisis import (
-    check_crisis_words,
-)
+from handlers.crisis import check_crisis_words
 from handlers.inline import handle_inline_query, handle_chosen_inline_result
 
 logging.basicConfig(
@@ -114,6 +111,10 @@ async def handle_text(update: Update, context):
         except Exception as e:
             logger.error(f"فشل إرسال إشعار الرسالة المجهولة: {e}")
         await update.message.reply_text("✅ تم إرسال رسالتك المجهولة.")
+        return
+
+    # معالجة نص التشجيع
+    if await handle_encouragement_input(update, context):
         return
 
     if msg.reply_to_message and text == "حذف":
@@ -159,13 +160,10 @@ async def handle_text(update: Update, context):
     await track_message(update, context)
     await check_crisis_words(update, context)
 
-# ========== معالجة منشورات القناة ==========
 async def handle_channel_post(update: Update, context):
     msg = update.channel_post
     if not msg or not msg.text:
         return
-    logger.info(f"📢 رسالة في القناة: {msg.text[:100]}")
-
     from music import _is_media_url
     from telegram import InlineKeyboardButton, InlineKeyboardMarkup
     url = _is_media_url(msg.text)
@@ -174,10 +172,7 @@ async def handle_channel_post(update: Update, context):
             InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
             InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
         ]]
-        await msg.reply_text(
-            "🔗 اختر صيغة التحميل:",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await msg.reply_text("🔗 اختر صيغة التحميل:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def post_init(app):
     await db.init_db()
@@ -241,9 +236,7 @@ def register_handlers(app):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
-
     app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
-
     app.add_handler(InlineQueryHandler(handle_inline_query))
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_whisper_message))
