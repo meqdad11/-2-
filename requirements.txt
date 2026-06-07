@@ -7,3 +7,6 @@ supabase
 pytz
 youtube-search-python
 soundcloud-v2
+fastapi
+uvicorn
+jinja2
