@@ -30,159 +30,8 @@ def reset_points(context: ContextTypes.DEFAULT_TYPE, user_id: int):
     pts = context.bot_data.setdefault("game_points", {})
     pts[user_id] = 0
 
-
-# دوال بدء الألعاب عبر الرسائل النصية
-async def start_guess_game(message, context):
-    number = random.randint(1, 10)
-    context.bot_data.setdefault("guess_numbers", {})[message.from_user.id] = number
-    buttons = [
-        [InlineKeyboardButton(str(i), callback_data=f"guess_{i}") for i in range(1, 6)],
-        [InlineKeyboardButton(str(i), callback_data=f"guess_{i}") for i in range(6, 11)],
-    ]
-    await message.reply_text("🎲 خمن الرقم (1-10):", reply_markup=InlineKeyboardMarkup(buttons))
-
-async def start_rps_game(message, context):
-    keyboard = [
-        [InlineKeyboardButton("🗻 حجر", callback_data="rps_rock"),
-         InlineKeyboardButton("📄 ورقة", callback_data="rps_paper")],
-        [InlineKeyboardButton("✂️ مقص", callback_data="rps_scissors")],
-    ]
-    await message.reply_text("✂️ حجر ورقة مقص - اختر:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_bank_game(message, context):
-    # نفس كود bank_menu لكن بدون query
-    user = message.from_user
-    last_claim = context.bot_data.setdefault("bank_last", {}).get(user.id)
-    now = datetime.now()
-    if last_claim and now - last_claim < timedelta(hours=12):
-        remain = timedelta(hours=12) - (now - last_claim)
-        hours, remainder = divmod(remain.seconds, 3600)
-        minutes = remainder // 60
-        await message.reply_text(f"⏳ يمكنك استلام الراتب كل 12 ساعة. متبقي {hours}h {minutes}m")
-        return
-    salary = random.randint(20, 100)
-    add_points(context, user.id, salary)
-    context.bot_data["bank_last"][user.id] = now
-    keyboard = [[InlineKeyboardButton("💰 بخشيش", callback_data="bank_tip")]]
-    await message.reply_text(f"🏦 **البنك**\nراتبك اليوم: {salary} نقطة.\nهل تريد بخشيش؟", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_slot_game(message, context):
-    symbols = ["🍒", "🍋", "🍊", "🔔", "7️⃣"]
-    result = [random.choice(symbols) for _ in range(3)]
-    display = " | ".join(result)
-    pts = 20 if len(set(result)) == 1 else 5 if len(set(result)) == 2 else 0
-    if pts: add_points(context, message.from_user.id, pts)
-    keyboard = [[InlineKeyboardButton("🔄 لف مرة أخرى", callback_data="slot_spin")]]
-    await message.reply_text(f"{display}\n{'🎉 جاكبوت! +20' if pts==20 else '💰 جيد! +5' if pts==5 else '😕 لا شيء'}", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_dart_game(message, context):
-    score = random.choices([50, 25, 10, 5, 1, 0], weights=[5, 10, 30, 30, 20, 5])[0]
-    pts = score // 5 if score >= 25 else 0
-    if pts: add_points(context, message.from_user.id, pts)
-    keyboard = [[InlineKeyboardButton("🎯 ارمي مرة أخرى", callback_data="dart_throw")]]
-    await message.reply_text(f"🎯 **{score} نقطة** {'(+'+str(pts)+' نقاط)' if pts else ''}", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_fastest_game(message, context):
-    context.bot_data["fastest_game"] = {
-        "chat_id": message.chat.id,
-        "msg_id": None,
-        "active": True,
-        "start_time": time.time()
-    }
-    keyboard = [[InlineKeyboardButton("🏃 اضغط هنا بأسرع وقت!", callback_data="fastest_press")],
-                [InlineKeyboardButton("❌ إلغاء", callback_data="fastest_cancel")]]
-    await message.reply_text("🏃 **الأسرع!** أول من يضغط الزر يفوز.", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_cups_game(message, context):
-    cups = ["🥛", "🍵", "🧃"]
-    winning_cup = random.randint(0, 2)
-    context.bot_data[f"cups_{message.chat.id}"] = winning_cup
-    keyboard = [[InlineKeyboardButton(cups[i], callback_data=f"cups_choose_{i}") for i in range(3)]]
-    await message.reply_text("🏺 **محيبس** — اختر الكوب الذي يخفي الخاتم:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_roulette_game(message, context):
-    names = ["الأسد", "النمر", "الفيل", "الغزال", "الثعلب", "الضبع", "الأرنب"]
-    choice = random.choice(names)
-    add_points(context, message.from_user.id, 2)
-    keyboard = [[InlineKeyboardButton("🔄 لف مرة أخرى", callback_data="roulette_spin")]]
-    await message.reply_text(f"🎡 **الروليت:**  ⟳  **{choice}**  (+2 نقطة)", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_judge_game(message, context):
-    judgments = ["أنت شخص رائع 👍", "تحتاج شوية نوم 😴", "ستربح مليون نقطة 🔮", "لا تتأخر على العشاء 🍽", "اليوم يوم حظك 🍀", "ابتسم! 😄"]
-    text = f"⚖️ **الحكم:** {random.choice(judgments)}"
-    keyboard = [[InlineKeyboardButton("⚖️ حكم آخر", callback_data="judge_get")]]
-    await message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_bowling_game(message, context):
-    pins = random.choices([0,1,2,3,4,5,6,7,8,9,10], weights=[5,5,5,5,5,10,10,15,20,15,5])[0]
-    add_points(context, message.from_user.id, pins)
-    text = f"🎳 سقط {pins} قارورة! (+{pins} نقطة)"
-    if pins == 10: text = "🎳 ضربة كاملة! 10 قوارير! (+10 نقاط)"
-    keyboard = [[InlineKeyboardButton("🎳 ارمي مرة أخرى", callback_data="bowling_roll")]]
-    await message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_dice_game(message, context):
-    dice = random.randint(1, 6)
-    add_points(context, message.from_user.id, dice)
-    keyboard = [[InlineKeyboardButton("🎲 الف مرة أخرى", callback_data="dice_roll")]]
-    await message.reply_text(f"🎲 **{dice}** (+{dice} نقطة)", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_football_game(message, context):
-    keyboard = [
-        [InlineKeyboardButton("↖️ يسار عالي", callback_data="foot_choice_up_left"),
-         InlineKeyboardButton("⬆️ وسط عالي", callback_data="foot_choice_up_center"),
-         InlineKeyboardButton("↗️ يمين عالي", callback_data="foot_choice_up_right")],
-        [InlineKeyboardButton("⬅️ يسار أرضي", callback_data="foot_choice_low_left"),
-         InlineKeyboardButton("⬇️ وسط أرضي", callback_data="foot_choice_low_center"),
-         InlineKeyboardButton("➡️ يمين أرضي", callback_data="foot_choice_low_right")],
-    ]
-    await message.reply_text("⚽ اختر اتجاه التسديدة:", reply_markup=InlineKeyboardMarkup(keyboard))
-
-async def start_basketball_game(message, context):
-    score = random.choices([3, 2, 0], weights=[30, 40, 30])[0]
-    if score == 3:
-        add_points(context, message.from_user.id, 5)
-        text = "🏀 رمية ثلاثية! +5 نقاط"
-    elif score == 2:
-        add_points(context, message.from_user.id, 3)
-        text = "🏀 نقطتين! +3 نقاط"
-    else:
-        text = "🏀 أخطأت السلة."
-    keyboard = [[InlineKeyboardButton("🏀 ارمي مرة أخرى", callback_data="basketball_shot")]]
-    await message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
-
-# قاموس الكلمات -> دوال البدء
-GAME_STARTERS = {
-    "تخمين": start_guess_game,
-    "حجر": start_rps_game,
-    "ورقة": start_rps_game,
-    "مقص": start_rps_game,
-    "بنك": start_bank_game,
-    "البنك": start_bank_game,
-    "سلوت": start_slot_game,
-    "أرقام": start_slot_game,
-    "سهم": start_dart_game,
-    "الأسرع": start_fastest_game,
-    "محيبس": start_cups_game,
-    "روليت": start_roulette_game,
-    "أحكام": start_judge_game,
-    "بولينق": start_bowling_game,
-    "بولينج": start_bowling_game,
-    "نرد": start_dice_game,
-    "زهر": start_dice_game,
-    "ركلة": start_football_game,
-    "كورة": start_football_game,
-    "سلة": start_basketball_game,
-}
-
-async def handle_text_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text in GAME_STARTERS:
-        await GAME_STARTERS[text](update.message, context)
-
-# ==================== معالج جميع ضغطات أزرار الألعاب (تم تصحيح التوقيع) ====================
+# ==================== معالج جميع ضغطات أزرار الألعاب ====================
 async def handle_games_callback(query, user, msg, context: ContextTypes.DEFAULT_TYPE):
-    """يستقبل query, user, msg, context تماماً كما يُستدعى من بوتنز"""
     await query.answer()
     data = query.data
     chat_id = msg.chat.id
@@ -512,5 +361,152 @@ async def handle_games_callback(query, user, msg, context: ContextTypes.DEFAULT_
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # لو لم يتعرف على اللعبة
     await query.answer("اللعبة غير متوفرة.", show_alert=True)
+
+# ==================== دوال بدء الألعاب عبر الرسائل النصية ====================
+async def start_guess_game(message, context):
+    number = random.randint(1, 10)
+    context.bot_data.setdefault("guess_numbers", {})[message.from_user.id] = number
+    buttons = [
+        [InlineKeyboardButton(str(i), callback_data=f"guess_{i}") for i in range(1, 6)],
+        [InlineKeyboardButton(str(i), callback_data=f"guess_{i}") for i in range(6, 11)],
+    ]
+    await message.reply_text("🎲 خمن الرقم (1-10):", reply_markup=InlineKeyboardMarkup(buttons))
+
+async def start_rps_game(message, context):
+    keyboard = [
+        [InlineKeyboardButton("🗻 حجر", callback_data="rps_rock"),
+         InlineKeyboardButton("📄 ورقة", callback_data="rps_paper")],
+        [InlineKeyboardButton("✂️ مقص", callback_data="rps_scissors")],
+    ]
+    await message.reply_text("✂️ حجر ورقة مقص - اختر:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_bank_game(message, context):
+    user = message.from_user
+    last_claim = context.bot_data.setdefault("bank_last", {}).get(user.id)
+    now = datetime.now()
+    if last_claim and now - last_claim < timedelta(hours=12):
+        remain = timedelta(hours=12) - (now - last_claim)
+        hours, remainder = divmod(remain.seconds, 3600)
+        minutes = remainder // 60
+        await message.reply_text(f"⏳ يمكنك استلام الراتب كل 12 ساعة. متبقي {hours}h {minutes}m")
+        return
+    salary = random.randint(20, 100)
+    add_points(context, user.id, salary)
+    context.bot_data["bank_last"][user.id] = now
+    keyboard = [[InlineKeyboardButton("💰 بخشيش", callback_data="bank_tip")]]
+    await message.reply_text(f"🏦 **البنك**\nراتبك اليوم: {salary} نقطة.\nهل تريد بخشيش؟", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_slot_game(message, context):
+    symbols = ["🍒", "🍋", "🍊", "🔔", "7️⃣"]
+    result = [random.choice(symbols) for _ in range(3)]
+    display = " | ".join(result)
+    pts = 20 if len(set(result)) == 1 else 5 if len(set(result)) == 2 else 0
+    if pts: add_points(context, message.from_user.id, pts)
+    keyboard = [[InlineKeyboardButton("🔄 لف مرة أخرى", callback_data="slot_spin")]]
+    await message.reply_text(f"{display}\n{'🎉 جاكبوت! +20' if pts==20 else '💰 جيد! +5' if pts==5 else '😕 لا شيء'}", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_dart_game(message, context):
+    score = random.choices([50, 25, 10, 5, 1, 0], weights=[5, 10, 30, 30, 20, 5])[0]
+    pts = score // 5 if score >= 25 else 0
+    if pts: add_points(context, message.from_user.id, pts)
+    keyboard = [[InlineKeyboardButton("🎯 ارمي مرة أخرى", callback_data="dart_throw")]]
+    await message.reply_text(f"🎯 **{score} نقطة** {'(+'+str(pts)+' نقاط)' if pts else ''}", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_fastest_game(message, context):
+    context.bot_data["fastest_game"] = {
+        "chat_id": message.chat.id,
+        "msg_id": None,
+        "active": True,
+        "start_time": time.time()
+    }
+    keyboard = [[InlineKeyboardButton("🏃 اضغط هنا بأسرع وقت!", callback_data="fastest_press")],
+                [InlineKeyboardButton("❌ إلغاء", callback_data="fastest_cancel")]]
+    await message.reply_text("🏃 **الأسرع!** أول من يضغط الزر يفوز.", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_cups_game(message, context):
+    cups = ["🥛", "🍵", "🧃"]
+    winning_cup = random.randint(0, 2)
+    context.bot_data[f"cups_{message.chat.id}"] = winning_cup
+    keyboard = [[InlineKeyboardButton(cups[i], callback_data=f"cups_choose_{i}") for i in range(3)]]
+    await message.reply_text("🏺 **محيبس** — اختر الكوب الذي يخفي الخاتم:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_roulette_game(message, context):
+    names = ["الأسد", "النمر", "الفيل", "الغزال", "الثعلب", "الضبع", "الأرنب"]
+    choice = random.choice(names)
+    add_points(context, message.from_user.id, 2)
+    keyboard = [[InlineKeyboardButton("🔄 لف مرة أخرى", callback_data="roulette_spin")]]
+    await message.reply_text(f"🎡 **الروليت:**  ⟳  **{choice}**  (+2 نقطة)", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_judge_game(message, context):
+    judgments = ["أنت شخص رائع 👍", "تحتاج شوية نوم 😴", "ستربح مليون نقطة 🔮", "لا تتأخر على العشاء 🍽", "اليوم يوم حظك 🍀", "ابتسم! 😄"]
+    text = f"⚖️ **الحكم:** {random.choice(judgments)}"
+    keyboard = [[InlineKeyboardButton("⚖️ حكم آخر", callback_data="judge_get")]]
+    await message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_bowling_game(message, context):
+    pins = random.choices([0,1,2,3,4,5,6,7,8,9,10], weights=[5,5,5,5,5,10,10,15,20,15,5])[0]
+    add_points(context, message.from_user.id, pins)
+    text = f"🎳 سقط {pins} قارورة! (+{pins} نقطة)"
+    if pins == 10: text = "🎳 ضربة كاملة! 10 قوارير! (+10 نقاط)"
+    keyboard = [[InlineKeyboardButton("🎳 ارمي مرة أخرى", callback_data="bowling_roll")]]
+    await message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_dice_game(message, context):
+    dice = random.randint(1, 6)
+    add_points(context, message.from_user.id, dice)
+    keyboard = [[InlineKeyboardButton("🎲 الف مرة أخرى", callback_data="dice_roll")]]
+    await message.reply_text(f"🎲 **{dice}** (+{dice} نقطة)", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_football_game(message, context):
+    keyboard = [
+        [InlineKeyboardButton("↖️ يسار عالي", callback_data="foot_choice_up_left"),
+         InlineKeyboardButton("⬆️ وسط عالي", callback_data="foot_choice_up_center"),
+         InlineKeyboardButton("↗️ يمين عالي", callback_data="foot_choice_up_right")],
+        [InlineKeyboardButton("⬅️ يسار أرضي", callback_data="foot_choice_low_left"),
+         InlineKeyboardButton("⬇️ وسط أرضي", callback_data="foot_choice_low_center"),
+         InlineKeyboardButton("➡️ يمين أرضي", callback_data="foot_choice_low_right")],
+    ]
+    await message.reply_text("⚽ اختر اتجاه التسديدة:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_basketball_game(message, context):
+    score = random.choices([3, 2, 0], weights=[30, 40, 30])[0]
+    if score == 3:
+        add_points(context, message.from_user.id, 5)
+        text = "🏀 رمية ثلاثية! +5 نقاط"
+    elif score == 2:
+        add_points(context, message.from_user.id, 3)
+        text = "🏀 نقطتين! +3 نقاط"
+    else:
+        text = "🏀 أخطأت السلة."
+    keyboard = [[InlineKeyboardButton("🏀 ارمي مرة أخرى", callback_data="basketball_shot")]]
+    await message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+
+# قاموس الكلمات -> دوال البدء
+GAME_STARTERS = {
+    "تخمين": start_guess_game,
+    "حجر": start_rps_game,
+    "ورقة": start_rps_game,
+    "مقص": start_rps_game,
+    "بنك": start_bank_game,
+    "البنك": start_bank_game,
+    "سلوت": start_slot_game,
+    "أرقام": start_slot_game,
+    "سهم": start_dart_game,
+    "الأسرع": start_fastest_game,
+    "محيبس": start_cups_game,
+    "روليت": start_roulette_game,
+    "أحكام": start_judge_game,
+    "بولينق": start_bowling_game,
+    "بولينج": start_bowling_game,
+    "نرد": start_dice_game,
+    "زهر": start_dice_game,
+    "ركلة": start_football_game,
+    "كورة": start_football_game,
+    "سلة": start_basketball_game,
+}
+
+async def handle_text_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    if text in GAME_STARTERS:
+        await GAME_STARTERS[text](update.message, context)
