@@ -64,15 +64,18 @@ async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str
     payload = {
         "url": url,
         "downloadMode": "audio" if audio_only else "auto",
-        "audioFormat": "mp3" if audio_only else "best",
-        "videoQuality": "1080",
+        "audioFormat": "mp3",
+        "videoQuality": "720",
+        "youtubeVideoCodec": "h264",
+        "youtubeVideoContainer": "mp4",
+        "alwaysProxy": True,
     }
     headers = {
         "Accept": "application/json",
         "Content-Type": "application/json",
     }
 
-    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
         async with session.post(f"{COBALT_API}/", json=payload, headers=headers) as resp:
             if resp.status != 200:
                 text = await resp.text()
@@ -84,30 +87,35 @@ async def _cobalt_download(url: str, audio_only: bool = False) -> tuple[str, str
         raise Exception(f"Cobalt: {data.get('error', {}).get('code', 'unknown error')}")
 
     download_url = None
-    filename = "media"
+    filename = "media.mp4"
 
-    if status == "redirect" or status == "tunnel":
+    if status in ("redirect", "tunnel"):
         download_url = data.get("url")
-        filename = data.get("filename", "media")
+        filename = data.get("filename", filename)
+    elif status == "local-processing":
+        # نأخذ أول tunnel
+        tunnels = data.get("tunnel", [])
+        if tunnels:
+            download_url = tunnels[0]
+            output = data.get("output", {})
+            filename = output.get("filename", filename)
     elif status == "picker":
-        # يأخذ أول عنصر
         items = data.get("picker", [])
         if items:
             download_url = items[0].get("url")
-            filename = items[0].get("filename", "media")
+            filename = items[0].get("filename", filename)
 
     if not download_url:
-        raise Exception("لم يُعثر على رابط تحميل من Cobalt")
+        raise Exception(f"Cobalt status غير مدعوم: {status}")
 
     # تحميل الملف
     tmp_dir = tempfile.mkdtemp()
-    ext = "mp3" if audio_only else filename.split(".")[-1] if "." in filename else "mp4"
     file_path = f"{tmp_dir}/{filename}"
 
-    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=120)) as session:
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=300)) as session:
         async with session.get(download_url) as resp:
             if resp.status != 200:
-                raise Exception("فشل تحميل الملف من Cobalt")
+                raise Exception(f"فشل تحميل الملف من Cobalt: {resp.status}")
             with open(file_path, "wb") as f:
                 async for chunk in resp.content.iter_chunked(1024 * 64):
                     f.write(chunk)
