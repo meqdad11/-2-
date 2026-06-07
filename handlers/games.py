@@ -12,6 +12,7 @@ async def show_games_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("🧩 تحديات وتفكير", callback_data="menu_games_thinking")],
         [InlineKeyboardButton("⚡ سرعة وحظ", callback_data="menu_games_speed")],
         [InlineKeyboardButton("🎯 ترفيهية سريعة", callback_data="menu_games_fun")],
+        [InlineKeyboardButton("👥 ألعاب جماعية", callback_data="menu_games_group")],
         [InlineKeyboardButton("🏆 النقاط", callback_data="menu_games_points")],
         [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main"),
          InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
@@ -32,6 +33,11 @@ def reset_points(context: ContextTypes.DEFAULT_TYPE, user_id: int):
 
 # ==================== معالج جميع ضغطات أزرار الألعاب ====================
 async def handle_games_callback(query, user, msg, context: ContextTypes.DEFAULT_TYPE):
+    # إذا كانت معالجة المبارزة ضد البوت، نوجهها لدالة خاصة
+    if query.data.startswith("duel_vsbot_"):
+        await duel_vsbot_callback(query, user, msg, context)
+        return
+
     await query.answer()
     data = query.data
     chat_id = msg.chat.id
@@ -80,6 +86,19 @@ async def handle_games_callback(query, user, msg, context: ContextTypes.DEFAULT_
         keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games"),
                      InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    # --- القسم الجماعي ---
+    if data == "menu_games_group":
+        keyboard = [
+            [InlineKeyboardButton("⌨️ تحدي كتابة", callback_data="group_writing_start")],
+            [InlineKeyboardButton("❌⭕ إكس-أو", callback_data="group_xo_start")],
+            [InlineKeyboardButton("⚡ تحدي سرعة الأزرار", callback_data="group_speed_start")],
+            [InlineKeyboardButton("⚔️ مبارزة حجر-ورقة-مقص", callback_data="group_duel_start")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="menu_games"),
+             InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
+        ]
+        await msg.edit_text("👥 **ألعاب جماعية**", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
     # ==================== الألعاب القديمة ====================
@@ -361,7 +380,204 @@ async def handle_games_callback(query, user, msg, context: ContextTypes.DEFAULT_
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
+    # ==================== ألعاب جماعية جديدة ====================
+    # --- تحدي كتابة ---
+    if data == "group_writing_start":
+        words = ["سماء", "كتاب", "وردة", "شمس", "قمر", "نجم", "بحر", "جبل", "نهر", "طائر"]
+        word = random.choice(words)
+        context.bot_data[f"writing_word_{chat_id}"] = word
+        context.bot_data[f"writing_active_{chat_id}"] = True
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group"),
+                     InlineKeyboardButton("❌ إلغاء", callback_data="writing_cancel")]]
+        await msg.edit_text(f"⌨️ **تحدي كتابة**\nأول من يكتب الكلمة التالية بشكل صحيح يفوز:\n\n**{word}**",
+                            reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    if data == "writing_cancel":
+        context.bot_data.pop(f"writing_active_{chat_id}", None)
+        await msg.edit_text("تم إلغاء تحدي الكتابة.", reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")]]))
+        return
+
+    # --- إكس-أو ---
+    if data == "group_xo_start":
+        board = [" " for _ in range(9)]
+        context.bot_data[f"xo_board_{chat_id}"] = board
+        context.bot_data[f"xo_turn_{chat_id}"] = "X"
+        context.bot_data[f"xo_players_{chat_id}"] = {"X": user.id, "O": 0}
+        keyboard = _build_xo_keyboard(board)
+        keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")])
+        await msg.edit_text(f"❌⭕ **إكس-أو**\nأنت (X) ضد البوت (O)\nدورك الآن: X", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    if data.startswith("xo_cell_"):
+        board = context.bot_data.get(f"xo_board_{chat_id}")
+        turn = context.bot_data.get(f"xo_turn_{chat_id}")
+        players = context.bot_data.get(f"xo_players_{chat_id}")
+        if not board or not turn or not players:
+            await query.answer("انتهت اللعبة أو غير موجودة", show_alert=True)
+            return
+        index = int(data.split("_")[2])
+        if board[index] != " ":
+            await query.answer("هذه الخلية مشغولة", show_alert=True)
+            return
+        if turn == "X" and user.id != players["X"]:
+            await query.answer("ليس دورك", show_alert=True)
+            return
+        if turn == "O" and players["O"] != 0 and user.id != players["O"]:
+            await query.answer("ليس دورك", show_alert=True)
+            return
+
+        board[index] = turn
+        winner = check_winner(board)
+        if winner:
+            context.bot_data.pop(f"xo_board_{chat_id}", None)
+            context.bot_data.pop(f"xo_turn_{chat_id}", None)
+            context.bot_data.pop(f"xo_players_{chat_id}", None)
+            if winner == "X":
+                add_points(context, players["X"], 10)
+                text = "🎉 فزت! +10 نقاط"
+            elif winner == "O" and players["O"] != 0:
+                add_points(context, players["O"], 10)
+                text = "🎉 فاز O! +10 نقاط"
+            elif winner == "O":
+                text = "🤖 فاز البوت!"
+            else:
+                text = "🤝 تعادل!"
+            keyboard = _build_xo_keyboard(board)
+            keyboard.append([InlineKeyboardButton("🔄 العب مجدداً", callback_data="group_xo_start"),
+                             InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")])
+            await msg.edit_text(f"❌⭕ **إكس-أو**\n{text}", reply_markup=InlineKeyboardMarkup(keyboard))
+            return
+
+        next_turn = "O" if turn == "X" else "X"
+        context.bot_data[f"xo_turn_{chat_id}"] = next_turn
+        keyboard = _build_xo_keyboard(board)
+
+        if next_turn == "O" and players["O"] == 0:
+            # دور البوت
+            empty = [i for i, v in enumerate(board) if v == " "]
+            if empty:
+                bot_index = random.choice(empty)
+                board[bot_index] = "O"
+                winner = check_winner(board)
+                if winner:
+                    context.bot_data.pop(f"xo_board_{chat_id}", None)
+                    context.bot_data.pop(f"xo_turn_{chat_id}", None)
+                    context.bot_data.pop(f"xo_players_{chat_id}", None)
+                    text = "🤖 فاز البوت!" if winner == "O" else "🤝 تعادل!"
+                    keyboard = _build_xo_keyboard(board)
+                    keyboard.append([InlineKeyboardButton("🔄 العب مجدداً", callback_data="group_xo_start"),
+                                     InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")])
+                    await msg.edit_text(f"❌⭕ **إكس-أو**\n{text}", reply_markup=InlineKeyboardMarkup(keyboard))
+                    return
+                else:
+                    context.bot_data[f"xo_turn_{chat_id}"] = "X"
+                    keyboard = _build_xo_keyboard(board)
+                    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")])
+                    await msg.edit_text(f"❌⭕ **إكس-أو**\nلعب البوت (O)\nدورك الآن: X", reply_markup=InlineKeyboardMarkup(keyboard))
+            else:
+                context.bot_data.pop(f"xo_board_{chat_id}", None)
+                context.bot_data.pop(f"xo_turn_{chat_id}", None)
+                context.bot_data.pop(f"xo_players_{chat_id}", None)
+                keyboard = _build_xo_keyboard(board)
+                keyboard.append([InlineKeyboardButton("🔄 العب مجدداً", callback_data="group_xo_start"),
+                                 InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")])
+                await msg.edit_text("❌⭕ **إكس-أو**\nتعادل! 🤝", reply_markup=InlineKeyboardMarkup(keyboard))
+        else:
+            keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")])
+            await msg.edit_text(f"❌⭕ **إكس-أو**\nدور اللاعب: {next_turn}", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
+
+    # --- تحدي سرعة الأزرار ---
+    if data == "group_speed_start":
+        context.bot_data[f"speed_game_{chat_id}"] = {"rounds": 5, "current": 0, "scores": {}, "target_button": None}
+        await _speed_new_round(context, msg, chat_id)
+        return
+
+    if data.startswith("speed_btn_"):
+        game = context.bot_data.get(f"speed_game_{chat_id}")
+        if not game or game["current"] >= game["rounds"]:
+            await query.answer("اللعبة انتهت", show_alert=True)
+            return
+        target = game.get("target_button")
+        pressed = int(data.split("_")[2])
+        if target == pressed:
+            game.setdefault("scores", {})
+            game["scores"][user.id] = game["scores"].get(user.id, 0) + 1
+            game["current"] += 1
+            add_points(context, user.id, 2)
+            await query.answer(f"أحسنت! +2 نقاط. فزت بهذه الجولة", show_alert=True)
+            if game["current"] < game["rounds"]:
+                await _speed_new_round(context, msg, chat_id)
+            else:
+                await _speed_game_over(context, msg, chat_id)
+        else:
+            await query.answer("خطأ! انتظر الزر الصحيح", show_alert=True)
+        return
+
+    # --- مبارزة (داخل الأزرار) ---
+    if data == "group_duel_start":
+        await msg.edit_text("⚔️ **لبدء مبارزة:** استخدم الأمر `مبارزة @username` أو اكتب `مبارزة` للعب ضد البوت.",
+                            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")]]))
+        return
+
+    # أزرار اختيار المبارزة (تستخدم من قبل اللاعبين) - إن وجدت مبارزة جماعية مستقبلية
+    if data.startswith("duel_choice_"):
+        # معالجة اختيار اللاعب في المبارزة الجماعية (لم تنفذ بعد بالكامل)
+        await query.answer("المبارزة قيد التطوير", show_alert=True)
+        return
+
     await query.answer("اللعبة غير متوفرة.", show_alert=True)
+
+# ==================== دوال مساعدة للإكس-أو والسرعة ====================
+def _build_xo_keyboard(board):
+    buttons = []
+    for i in range(0, 9, 3):
+        row = [InlineKeyboardButton(board[i+j] if board[i+j] != " " else "⬜", callback_data=f"xo_cell_{i+j}") for j in range(3)]
+        buttons.append(row)
+    return buttons
+
+def check_winner(board):
+    lines = [(0,1,2),(3,4,5),(6,7,8),(0,3,6),(1,4,7),(2,5,8),(0,4,8),(2,4,6)]
+    for a,b,c in lines:
+        if board[a] != " " and board[a] == board[b] == board[c]:
+            return board[a]
+    if " " not in board:
+        return "draw"
+    return None
+
+async def _speed_new_round(context, msg, chat_id):
+    game = context.bot_data.get(f"speed_game_{chat_id}")
+    if not game: return
+    target = random.randint(0, 3)
+    game["target_button"] = target
+    buttons = []
+    for i in range(4):
+        if i == target:
+            buttons.append(InlineKeyboardButton("✅ اضغط", callback_data=f"speed_btn_{i}"))
+        else:
+            buttons.append(InlineKeyboardButton("❌", callback_data=f"speed_btn_{i}"))
+    keyboard = [buttons,
+                [InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")]]
+    await msg.edit_text(f"⚡ **تحدي سرعة** - الجولة {game['current']+1} من {game['rounds']}\nاضغط على ✅ بسرعة!",
+                        reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def _speed_game_over(context, msg, chat_id):
+    game = context.bot_data.pop(f"speed_game_{chat_id}", None)
+    if not game: return
+    scores = game.get("scores", {})
+    if not scores:
+        text = "لم يفز أحد 😕"
+    else:
+        winner = max(scores, key=scores.get)
+        try:
+            winner_name = (await context.bot.get_chat(winner)).first_name
+        except:
+            winner_name = "شخص"
+        text = f"🏆 **انتهى تحدي السرعة!**\nالفائز: {winner_name} برصيد {scores[winner]} جولات"
+    keyboard = [[InlineKeyboardButton("🔄 العب مجدداً", callback_data="group_speed_start"),
+                 InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")]]
+    await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
 # ==================== دوال بدء الألعاب عبر الرسائل النصية ====================
 async def start_guess_game(message, context):
@@ -482,7 +698,74 @@ async def start_basketball_game(message, context):
     keyboard = [[InlineKeyboardButton("🏀 ارمي مرة أخرى", callback_data="basketball_shot")]]
     await message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
-# قاموس الكلمات -> دوال البدء
+async def start_writing_game(message, context):
+    words = ["سماء", "كتاب", "وردة", "شمس", "قمر", "نجم", "بحر", "جبل", "نهر", "طائر"]
+    word = random.choice(words)
+    chat_id = message.chat.id
+    context.bot_data[f"writing_word_{chat_id}"] = word
+    context.bot_data[f"writing_active_{chat_id}"] = True
+    keyboard = [[InlineKeyboardButton("❌ إلغاء", callback_data="writing_cancel")]]
+    await message.reply_text(f"⌨️ **تحدي كتابة**\nأول من يكتب: **{word}** يفوز!",
+                             reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_xo_vs_bot(message, context):
+    board = [" " for _ in range(9)]
+    chat_id = message.chat.id
+    context.bot_data[f"xo_board_{chat_id}"] = board
+    context.bot_data[f"xo_turn_{chat_id}"] = "X"
+    context.bot_data[f"xo_players_{chat_id}"] = {"X": message.from_user.id, "O": 0}
+    keyboard = _build_xo_keyboard(board)
+    keyboard.append([InlineKeyboardButton("🔙 إلغاء", callback_data="menu_games_group")])
+    await message.reply_text(f"❌⭕ **إكس-أو**\nأنت (X) ضد البوت (O)\nدورك: X",
+                             reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_speed_game(message, context):
+    chat_id = message.chat.id
+    context.bot_data[f"speed_game_{chat_id}"] = {"rounds": 5, "current": 0, "scores": {}, "target_button": None}
+    # لإرسال الرسالة الأولى، نستخدم دالة مماثلة لـ _speed_new_round
+    game = context.bot_data[f"speed_game_{chat_id}"]
+    target = random.randint(0, 3)
+    game["target_button"] = target
+    buttons = []
+    for i in range(4):
+        if i == target:
+            buttons.append(InlineKeyboardButton("✅ اضغط", callback_data=f"speed_btn_{i}"))
+        else:
+            buttons.append(InlineKeyboardButton("❌", callback_data=f"speed_btn_{i}"))
+    keyboard = [buttons,
+                [InlineKeyboardButton("🔙 رجوع", callback_data="menu_games_group")]]
+    await message.reply_text(f"⚡ **تحدي سرعة** - الجولة 1 من 5\nاضغط على ✅ بسرعة!",
+                             reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def start_duel_vs_bot(message, context):
+    keyboard = [
+        [InlineKeyboardButton("🗻 حجر", callback_data="duel_vsbot_rock"),
+         InlineKeyboardButton("📄 ورقة", callback_data="duel_vsbot_paper"),
+         InlineKeyboardButton("✂️ مقص", callback_data="duel_vsbot_scissors")]
+    ]
+    await message.reply_text("⚔️ اختر حركتك ضد البوت:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+# دالة معالجة اختيار اللاعب ضد البوت (تستدعى من handle_games_callback)
+async def duel_vsbot_callback(query, user, msg, context):
+    data = query.data
+    if not data.startswith("duel_vsbot_"):
+        return
+    choice = data[len("duel_vsbot_"):]
+    bot_choice = random.choice(["rock", "paper", "scissors"])
+    emoji = {"rock": "🗻", "paper": "📄", "scissors": "✂️"}
+    if choice == bot_choice:
+        result = "🤝 تعادل"
+    elif (choice == "rock" and bot_choice == "scissors") or \
+         (choice == "scissors" and bot_choice == "paper") or \
+         (choice == "paper" and bot_choice == "rock"):
+        result = "🎉 فزت! +5 نقاط"
+        add_points(context, user.id, 5)
+    else:
+        result = "💔 خسرت!"
+    await query.answer()
+    await msg.edit_text(f"اخترت: {emoji[choice]}\nالبوت: {emoji[bot_choice]}\n{result}")
+
+# ==================== قاموس الكلمات -> دوال البدء ====================
 GAME_STARTERS = {
     "تخمين": start_guess_game,
     "حجر": start_rps_game,
@@ -504,6 +787,10 @@ GAME_STARTERS = {
     "ركلة": start_football_game,
     "كورة": start_football_game,
     "سلة": start_basketball_game,
+    "كتابة": start_writing_game,
+    "اكس او": start_xo_vs_bot,
+    "تحدي سرعة": start_speed_game,
+    "مبارزة": start_duel_vs_bot,
 }
 
 async def handle_text_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
