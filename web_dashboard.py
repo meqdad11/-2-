@@ -15,29 +15,25 @@ templates = Jinja2Templates(directory="templates")
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     try:
-        # جلب الإحصائيات من Supabase مباشرة
         chats_list = await db.get_all_active_chats()
         chats = len(chats_list)
 
-        # عدد المستخدمين الكلي
         users = 0
-        for chat_id in chats_list:
-            users += await db.get_total_members(chat_id)
+        for cid in chats_list:
+            users += await db.get_total_members(int(cid))
 
-        # آخر 20 حدث
         events = []
-        for chat_id in chats_list[:5]:  # أول 5 مجموعات فقط لتجنب البطء
-            chat_events = await db.get_event_log(chat_id, limit=5)
+        for cid in chats_list[:5]:
+            chat_events = await db.get_event_log(int(cid), limit=5)
             events.extend(chat_events)
         events = sorted(events, key=lambda x: x.get("created_at", ""), reverse=True)[:20]
 
-        # الأقفال
         active_locks = 0
-        total_locks = 0
-        for chat_id in chats_list[:5]:
-            for lock_type in ["links", "tags", "media", "files", "video", "voice", "gifs"]:
-                total_locks += 1
-                if await db.is_locked(chat_id, lock_type):
+        lock_types = ["links", "tags", "media", "files", "video", "voice", "gifs"]
+        total_locks = len(chats_list[:5]) * len(lock_types)
+        for cid in chats_list[:5]:
+            for lock_type in lock_types:
+                if await db.is_locked(int(cid), lock_type):
                     active_locks += 1
 
     except Exception as e:
@@ -60,4 +56,3 @@ def run_web():
 def start_dashboard():
     threading.Thread(target=run_web, daemon=True).start()
     logger.info("✅ لوحة التحكم تعمل على البورت 8000")
-
