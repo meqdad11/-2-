@@ -82,7 +82,7 @@ from handlers.crisis import (
 from handlers.inline import handle_inline_query, handle_chosen_inline_result
 
 # ---------- استيراد الألعاب النصية ----------
-from handlers.games import handle_text_games
+from handlers.games import handle_text_games, duel_vsbot_callback
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -236,6 +236,9 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(callback_sc_pick, pattern=r"^sc_pick\|"))
     app.add_handler(CallbackQueryHandler(callback_choose_model, pattern=r"^model_"))
     app.add_handler(CallbackQueryHandler(callback_menu))
+
+    # ---------- معالج أزرار المبارزة (duel_vsbot_) ----------
+    app.add_handler(CallbackQueryHandler(duel_vsbot_callback, pattern=r"^duel_vsbot_"))
 
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
