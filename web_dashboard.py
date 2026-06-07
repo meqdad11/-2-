@@ -60,3 +60,4 @@ def run_web():
 def start_dashboard():
     threading.Thread(target=run_web, daemon=True).start()
     logger.info("✅ لوحة التحكم تعمل على البورت 8000")
+
