@@ -81,6 +81,9 @@ from handlers.crisis import (
 )
 from handlers.inline import handle_inline_query, handle_chosen_inline_result
 
+# ---------- استيراد الألعاب النصية ----------
+from handlers.games import handle_text_games
+
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     level=logging.INFO,
@@ -237,6 +240,10 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(callback_menu))
 
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
+
+    # ---------- إضافة معالج الألعاب النصية قبل handle_text لتجنب التعارض ----------
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text_games))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text_games))
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text))
