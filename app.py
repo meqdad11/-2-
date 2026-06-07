@@ -81,9 +81,6 @@ from handlers.crisis import (
 )
 from handlers.inline import handle_inline_query, handle_chosen_inline_result
 
-# ---------- استيراد الألعاب النصية ----------
-from handlers.games import handle_text_games, duel_vsbot_callback
-
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     level=logging.INFO,
@@ -168,9 +165,11 @@ async def handle_channel_post(update: Update, context):
         return
     logger.info(f"📢 رسالة في القناة: {msg.text[:100]}")
 
+    # نعيد توجيه channel_post كـ message مؤقت لـ handle_media_url
     from music import _is_media_url, _handle_url
     url = _is_media_url(msg.text)
     if url:
+        # نرسل أزرار التحميل في القناة
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         keyboard = [[
             InlineKeyboardButton("🎵 صوت", callback_data=f"dl_audio|{url}"),
@@ -237,14 +236,7 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(callback_choose_model, pattern=r"^model_"))
     app.add_handler(CallbackQueryHandler(callback_menu))
 
-    # ---------- معالج أزرار المبارزة (duel_vsbot_) ----------
-    app.add_handler(CallbackQueryHandler(duel_vsbot_callback, pattern=r"^duel_vsbot_"))
-
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
-
-    # ---------- معالج الألعاب النصية (يُضاف قبل handle_text) ----------
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text_games))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text_games))
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text))
