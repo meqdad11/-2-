@@ -81,6 +81,10 @@ from handlers.moderation import (
 from handlers.dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 from handlers.crisis import check_crisis_words
 from handlers.inline import handle_inline_query, handle_chosen_inline_result
+# 🆕 استيراد أوامر شبكة الأمان
+from handlers.emergency import (
+    cmd_my_safety_net, cmd_get_emergency_data, callback_delete_emergency_data,
+)
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -246,6 +250,11 @@ def register_handlers(app):
     app.add_handler(CommandHandler("download", cmd_download))
     app.add_handler(CommandHandler("model", cmd_choose_model))
     app.add_handler(CommandHandler("myreminders", cmd_my_reminders))
+
+    # 🆕 أوامر شبكة الأمان
+    app.add_handler(CommandHandler("my_safety_net", cmd_my_safety_net))
+    app.add_handler(CommandHandler("get_emergency_data", cmd_get_emergency_data))
+    app.add_handler(CallbackQueryHandler(callback_delete_emergency_data, pattern="^delete_emergency_data$"))
 
     app.add_handler(CallbackQueryHandler(callback_download, pattern=r"^dl_(audio|video)\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_download, pattern=r"^sc_dl\|"))
