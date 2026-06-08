@@ -74,6 +74,10 @@ from handlers.support import (
 from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
 )
+# 🆕 استيراد أوامر شبكة الأمان
+from handlers.emergency import (
+    cmd_my_safety_net, cmd_get_emergency_data, callback_delete_emergency_data,
+)
 
 ARABIC_COMMANDS = {
     "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
@@ -181,4 +185,9 @@ ARABIC_COMMANDS = {
     "أرسل تشجيع": cmd_send_encouragement,
     "ارسل تشجيع": cmd_send_encouragement,
     "تشجيع": cmd_get_encouragement,
+
+    # 🆕 شبكة الأمان الطارئة
+    "شبكة اماني": cmd_my_safety_net,
+    "حذف شبكة اماني": cmd_my_safety_net,
+    "بيانات طارئة": cmd_get_emergency_data,
 }
