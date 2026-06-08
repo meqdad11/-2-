@@ -10,6 +10,7 @@ from config import ADMIN_CHAT_ID
 # حالات المحادثة
 ASK_NAME, ASK_PHONE, ASK_CITY = range(3)
 
+
 # ========== أمر العضو: بدء تسجيل بيانات الطوارئ ==========
 async def cmd_my_safety_net(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """يبدأ محادثة خاصة لتسجيل بيانات الطوارئ"""
@@ -39,15 +40,18 @@ async def cmd_my_safety_net(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     return ASK_NAME
 
+
 async def ask_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['emergency_name'] = update.message.text.strip()
     await update.message.reply_text("📞 ما هو **رقم هاتفك**؟", parse_mode=ParseMode.MARKDOWN)
     return ASK_PHONE
 
+
 async def ask_phone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['emergency_phone'] = update.message.text.strip()
     await update.message.reply_text("📍 ما هي **مدينتك**؟", parse_mode=ParseMode.MARKDOWN)
     return ASK_CITY
+
 
 async def ask_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -73,6 +77,7 @@ async def ask_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop('emergency_phone', None)
 
     return ConversationHandler.END
+
 
 async def cancel_emergency(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("❌ تم إلغاء تسجيل بيانات الطوارئ.")
