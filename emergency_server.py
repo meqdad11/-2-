@@ -4,9 +4,17 @@ from supabase import create_client, Client
 
 app = Flask(__name__)
 
-SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://xlaruzxqtbsqjqdbwbyb.supabase.co")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+supabase = None
+if SUPABASE_URL and SUPABASE_SERVICE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        print("✅ خادم الطوارئ متصل بـ Supabase")
+    except Exception as e:
+        print(f"❌ فشل اتصال خادم الطوارئ: {e}")
+else:
+    print("⚠️ متغيرات البيئة SUPABASE_URL أو SUPABASE_SERVICE_KEY مفقودة")
 
 HTML_PAGE = """
 <!DOCTYPE html>
@@ -60,6 +68,8 @@ def emergency_form():
 
 @app.route('/save', methods=['POST'])
 def save_emergency():
+    if not supabase:
+        return jsonify({"error": "الخادم غير متصل بقاعدة البيانات"}), 500
     data = request.json
     try:
         supabase.table("emergency_contacts").upsert({
