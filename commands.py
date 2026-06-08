@@ -69,7 +69,7 @@ from handlers.crisis import (
 from handlers.userbot import cmd_send_invite
 from handlers.support import (
     cmd_setup_admin_support, cmd_setup_members_support,
-    cmd_need_someone, cmd_send_encouragement,
+    cmd_need_someone, cmd_send_encouragement, cmd_get_encouragement,
 )
 from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
@@ -180,4 +180,5 @@ ARABIC_COMMANDS = {
     "احتاج احد": cmd_need_someone,
     "أرسل تشجيع": cmd_send_encouragement,
     "ارسل تشجيع": cmd_send_encouragement,
+    "تشجيع": cmd_get_encouragement,
 }
