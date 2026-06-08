@@ -934,6 +934,8 @@ async def delete_conversation(user_id: int, chat_id: int):
                 .eq("chat_id", chat_id)
                 .execute()
         )
+    except Exception as e:
+        print(f"خطأ في مسح المحادثة: {e}")
 
 # ==================== دوال شبكة الأمان الطارئة ====================
 async def save_emergency_contact(user_id: int, first_name: str, phone_number: str, city: str) -> bool:
@@ -1007,5 +1009,3 @@ async def is_admin_user(user_id: int) -> bool:
     except Exception as e:
         print(f"خطأ في التحقق من مشرف الطوارئ: {e}")
         return False
-    except Exception as e:
-        print(f"خطأ في مسح المحادثة: {e}")
