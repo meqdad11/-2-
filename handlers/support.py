@@ -3,6 +3,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from utils import database as db
 from utils.helpers import is_admin
+import asyncio
+from utils.database import supabase
 
 logger = logging.getLogger(__name__)
 
@@ -10,19 +12,7 @@ logger = logging.getLogger(__name__)
 # دوال قاعدة البيانات
 # ========================================
 
-async def get_support_settings(chat_id: int) -> dict:
-    try:
-        result = await db.supabase_fetch(
-            "support_settings", filters={"chat_id": chat_id}
-        )
-        return result[0] if result else {}
-    except Exception as e:
-        logger.error(f"get_support_settings error: {e}")
-        return {}
-
 async def save_support_setting(chat_id: int, field: str, value):
-    import asyncio
-    from utils.database import supabase
     try:
         existing = await asyncio.get_event_loop().run_in_executor(
             None,
@@ -44,8 +34,6 @@ async def save_support_setting(chat_id: int, field: str, value):
         return False
 
 async def get_admin_group(members_chat_id: int) -> int | None:
-    import asyncio
-    from utils.database import supabase
     try:
         result = await asyncio.get_event_loop().run_in_executor(
             None,
@@ -55,20 +43,6 @@ async def get_admin_group(members_chat_id: int) -> int | None:
             return result.data[0].get("admin_group_id")
     except Exception as e:
         logger.error(f"get_admin_group error: {e}")
-    return None
-
-async def get_members_group(admin_group_id: int) -> int | None:
-    import asyncio
-    from utils.database import supabase
-    try:
-        result = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: supabase.table("support_settings").select("chat_id").eq("admin_group_id", admin_group_id).execute()
-        )
-        if result.data:
-            return result.data[0].get("chat_id")
-    except Exception as e:
-        logger.error(f"get_members_group error: {e}")
     return None
 
 # ========================================
@@ -84,8 +58,10 @@ async def cmd_setup_admin_support(update: Update, context: ContextTypes.DEFAULT_
     success = await save_support_setting(chat_id, "admin_group_id", chat_id)
     if success:
         await update.message.reply_text(
-            "✅ تم ضبط هذه المجموعة كـ **غرفة المشرفين** لنظام الدعم.\n\n"
-            "الآن اذهب لمجموعة الأعضاء واكتب: `ضبط دعم الأعضاء`",
+            f"✅ تم ضبط هذه المجموعة كـ **غرفة المشرفين**.\n\n"
+            f"🆔 معرف هذه المجموعة:\n`{chat_id}`\n\n"
+            f"الآن اذهب لمجموعة الأعضاء واكتب:\n"
+            f"`ضبط دعم الأعضاء {chat_id}`",
             parse_mode="Markdown"
         )
     else:
@@ -99,8 +75,8 @@ async def cmd_setup_members_support(update: Update, context: ContextTypes.DEFAUL
 
     if not context.args:
         await update.message.reply_text(
-            "⚠️ اكتب معرف مجموعة المشرفين بعد الأمر.\n"
-            "مثال: `ضبط دعم الأعضاء -100123456789`\n\n"
+            "⚠️ اكتب معرف مجموعة المشرفين بعد الأمر.\n\n"
+            "مثال:\n`ضبط دعم الأعضاء -100123456789`\n\n"
             "تجد المعرف بكتابة `ضبط دعم المشرفين` في غرفة المشرفين أولاً.",
             parse_mode="Markdown"
         )
@@ -116,8 +92,8 @@ async def cmd_setup_members_support(update: Update, context: ContextTypes.DEFAUL
     success = await save_support_setting(chat_id, "admin_group_id", admin_group_id)
     if success:
         await update.message.reply_text(
-            f"✅ تم ربط هذه المجموعة بغرفة المشرفين.\n"
-            f"الآن الأعضاء يمكنهم استخدام:\n"
+            f"✅ تم الربط بنجاح!\n\n"
+            f"الأعضاء الآن يمكنهم استخدام:\n"
             f"• `أحتاج أحد` — طلب مساعدة فورية\n"
             f"• `أرسل تشجيع` — إرسال كلمة دعم مجهولة",
             parse_mode="Markdown"
@@ -141,8 +117,8 @@ async def cmd_need_someone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # رد فوري على العضو
     await msg.reply_text(
         "💙 لست وحدك.\n\n"
-        "تم إبلاغ المشرفين الآن وسيتواصلون معك قريباً.\n"
-        "إذا كنت في خطر فوري، اتصل بالطوارئ 911 أو خط الدعم النفسي 920033360.",
+        "تم إبلاغ المشرفين الآن وسيتواصلون معك قريباً.\n\n"
+        "إذا كنت في خطر فوري، اتصل بالطوارئ **911** أو خط الدعم النفسي **920033360**.",
         parse_mode="Markdown"
     )
 
@@ -180,7 +156,7 @@ async def cmd_need_someone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========================================
 
 async def cmd_send_encouragement(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عضو يرسل تشجيعاً مجهولاً لعضو آخر"""
+    """عضو يرسل تشجيعاً مجهولاً"""
     msg = update.message
     chat_id = update.effective_chat.id
 
@@ -188,7 +164,7 @@ async def cmd_send_encouragement(update: Update, context: ContextTypes.DEFAULT_T
         context.user_data["waiting_encouragement"] = chat_id
         await msg.reply_text(
             "💌 اكتب كلمة التشجيع التي تريد إرسالها:\n"
-            "(ستصل بدون اسمك لعضو عشوائي في المجموعة)"
+            "(ستُنشر في المجموعة بدون اسمك)"
         )
         return
 
@@ -200,28 +176,20 @@ async def handle_encouragement_input(update: Update, context: ContextTypes.DEFAU
     msg = update.message
     if context.user_data.get("waiting_encouragement") != update.effective_chat.id:
         return False
-
     context.user_data.pop("waiting_encouragement")
     await _send_encouragement_message(update, context, msg.text)
     return True
 
 async def _send_encouragement_message(update: Update, context: ContextTypes.DEFAULT_TYPE, text: str):
     chat_id = update.effective_chat.id
-
-    # نرسل التشجيع للمجموعة بشكل مجهول
     encouragement_text = (
         f"💛 **رسالة تشجيع مجهولة**\n\n"
         f"_{text}_\n\n"
         f"— من أحد أعضاء المجموعة 🤍"
     )
-
     try:
-        await context.bot.send_message(
-            chat_id,
-            encouragement_text,
-            parse_mode="Markdown"
-        )
-        await update.message.reply_text("✅ تم إرسال تشجيعك بنجاح 💙")
+        await context.bot.send_message(chat_id, encouragement_text, parse_mode="Markdown")
+        await update.message.reply_text("✅ تم إرسال تشجيعك 💙")
     except Exception as e:
         logger.error(f"Failed to send encouragement: {e}")
         await update.message.reply_text("❌ فشل الإرسال.")
