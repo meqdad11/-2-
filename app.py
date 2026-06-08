@@ -175,7 +175,17 @@ async def handle_private(update: Update, context):
     if not msg or not msg.text:
         return
 
-    # معالجة نص التشجيع فقط (start يعالجه handle_start_cmd)
+    text = msg.text.strip()
+
+    # معالجة الأوامر العربية في الخاص
+    for arabic_cmd, handler in ARABIC_COMMANDS.items():
+        if text == arabic_cmd or text.startswith(arabic_cmd + " "):
+            args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
+            context.args = args
+            await handler(update, context)
+            return
+
+    # معالجة نص التشجيع (start يعالجه handle_start_cmd)
     if await handle_private_encouragement(update, context):
         return
 
