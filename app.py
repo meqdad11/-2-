@@ -20,6 +20,8 @@ from config import TELEGRAM_BOT_TOKEN
 from commands import ARABIC_COMMANDS
 from utils.helpers import is_admin
 from web_dashboard import start_dashboard
+from emergency_server import app as emergency_flask_app
+import threading
 
 from handlers.admin import (
     cmd_ban, cmd_unban, cmd_warn, cmd_clearwarn, cmd_warnings,
@@ -81,7 +83,6 @@ from handlers.moderation import (
 from handlers.dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 from handlers.crisis import check_crisis_words
 from handlers.inline import handle_inline_query, handle_chosen_inline_result
-# 🆕 استيراد أوامر شبكة الأمان
 from handlers.emergency import (
     cmd_my_safety_net, cmd_get_emergency_data, callback_delete_emergency_data,
 )
@@ -202,6 +203,11 @@ async def handle_channel_post(update: Update, context):
 async def post_init(app):
     await db.init_db()
     start_dashboard()
+    # تشغيل خادم الطوارئ على منفذ 5000 (منفذ مختلف عن الداشبورد 8000)
+    threading.Thread(target=emergency_flask_app.run, kwargs={
+        'host': '0.0.0.0', 'port': 5000, 'debug': False, 'use_reloader': False
+    }, daemon=True).start()
+
     reminders = await db.load_all_reminders()
     if reminders:
         count = 0
