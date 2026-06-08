@@ -58,7 +58,10 @@ from handlers.locks import filter_locked_content
 from handlers.menu import cmd_menu
 from handlers.buttons import callback_menu
 from handlers.interactive import handle_interactive_messages
-from handlers.support import handle_encouragement_input
+from handlers.support import (
+    handle_start_encouragement,
+    handle_private_encouragement,
+)
 
 from handlers.admin import (
     cmd_promote_admin, cmd_demote_admin, cmd_list_admins,
@@ -113,10 +116,6 @@ async def handle_text(update: Update, context):
         await update.message.reply_text("✅ تم إرسال رسالتك المجهولة.")
         return
 
-    # معالجة نص التشجيع
-    if await handle_encouragement_input(update, context):
-        return
-
     if msg.reply_to_message and text == "حذف":
         if not await is_admin(update, context):
             try: await context.bot.send_message(user.id, "⛔ هذا الأمر للمشرفين فقط.")
@@ -159,6 +158,21 @@ async def handle_text(update: Update, context):
     await auto_reply(update, context)
     await track_message(update, context)
     await check_crisis_words(update, context)
+
+async def handle_private(update: Update, context):
+    """معالجة الرسائل الخاصة"""
+    msg = update.message
+    if not msg or not msg.text:
+        return
+
+    # معالجة start للتشجيع
+    if msg.text.startswith("/start"):
+        if await handle_start_encouragement(update, context):
+            return
+
+    # معالجة نص التشجيع
+    if await handle_private_encouragement(update, context):
+        return
 
 async def handle_channel_post(update: Update, context):
     msg = update.channel_post
@@ -234,7 +248,7 @@ def register_handlers(app):
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_text))
+    app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, handle_private))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
     app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
     app.add_handler(InlineQueryHandler(handle_inline_query))
