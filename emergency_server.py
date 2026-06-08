@@ -1,5 +1,4 @@
 import os
-import secrets
 from flask import Flask, request, render_template_string, jsonify
 from supabase import create_client, Client
 
@@ -7,7 +6,6 @@ app = Flask(__name__)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
-
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
 HTML_PAGE = """
@@ -63,12 +61,9 @@ def emergency_form():
 @app.route('/save', methods=['POST'])
 def save_emergency():
     data = request.json
-    user_id = data.get('user_id')
-    token = data.get('token')
-    # يمكنك هنا التحقق من صحة التوكن إذا ربطته بقاعدة بيانات الجلسات
     try:
         supabase.table("emergency_contacts").upsert({
-            "user_id": str(user_id),
+            "user_id": str(data['user_id']),
             "first_name": data['first_name'],
             "phone_number": data['phone_number'],
             "city": data['city'],
