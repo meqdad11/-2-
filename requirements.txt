@@ -12,4 +12,3 @@ uvicorn
 jinja2
 flask
 gunicorn
-supabase
