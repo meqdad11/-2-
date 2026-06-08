@@ -10,3 +10,6 @@ soundcloud-v2
 fastapi
 uvicorn
 jinja2
+flask
+gunicorn
+supabase
