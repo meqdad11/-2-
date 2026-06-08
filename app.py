@@ -89,6 +89,15 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 SAUDI_TZ = pytz.timezone('Asia/Riyadh')
 
+
+# ✅ البوابة الجديدة لـ /start
+async def handle_start_cmd(update: Update, context):
+    if context.args and context.args[0].startswith("enc_"):
+        await handle_start_encouragement(update, context)
+        return
+    await cmd_start(update, context)
+
+
 async def handle_text(update: Update, context):
     msg = update.message
     if not msg or not msg.text:
@@ -159,20 +168,17 @@ async def handle_text(update: Update, context):
     await track_message(update, context)
     await check_crisis_words(update, context)
 
+
 async def handle_private(update: Update, context):
     """معالجة الرسائل الخاصة"""
     msg = update.message
     if not msg or not msg.text:
         return
 
-    # معالجة start للتشجيع
-    if msg.text.startswith("/start"):
-        if await handle_start_encouragement(update, context):
-            return
-
-    # معالجة نص التشجيع
+    # معالجة نص التشجيع فقط (start يعالجه handle_start_cmd)
     if await handle_private_encouragement(update, context):
         return
+
 
 async def handle_channel_post(update: Update, context):
     msg = update.channel_post
@@ -187,6 +193,7 @@ async def handle_channel_post(update: Update, context):
             InlineKeyboardButton("🎬 فيديو", callback_data=f"dl_video|{url}"),
         ]]
         await msg.reply_text("🔗 اختر صيغة التحميل:", reply_markup=InlineKeyboardMarkup(keyboard))
+
 
 async def post_init(app):
     await db.init_db()
@@ -210,8 +217,10 @@ async def post_init(app):
         if count:
             logger.info(f"✅ تم إعادة جدولة {count} تذكير يومي")
 
+
 def register_handlers(app):
-    app.add_handler(CommandHandler("start", cmd_start))
+    # ✅ start يمر من البوابة الجديدة
+    app.add_handler(CommandHandler("start", handle_start_cmd))
     app.add_handler(CommandHandler("id", cmd_id))
     app.add_handler(CommandHandler("ban", cmd_ban))
     app.add_handler(CommandHandler("unban", cmd_unban))
@@ -255,6 +264,7 @@ def register_handlers(app):
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_whisper_message))
 
+
 def register_jobs(app):
     jq = app.job_queue
     jq.run_repeating(job_expire_bans, interval=300, first=10)
@@ -262,6 +272,7 @@ def register_jobs(app):
         job_daily_quote,
         time=datetime.time(hour=9, minute=0, second=0, tzinfo=SAUDI_TZ)
     )
+
 
 def main():
     if not TELEGRAM_BOT_TOKEN:
