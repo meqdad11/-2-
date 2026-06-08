@@ -45,6 +45,42 @@ async def get_admin_group(members_chat_id: int) -> int | None:
         logger.error(f"get_admin_group error: {e}")
     return None
 
+async def save_pending_enc(user_id: int, chat_id: int):
+    """حفظ chat_id مؤقتاً في Supabase"""
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("pending_encouragements").upsert({
+                "user_id": user_id,
+                "chat_id": chat_id,
+            }).execute()
+        )
+    except Exception as e:
+        logger.error(f"save_pending_enc error: {e}")
+
+async def get_pending_enc(user_id: int) -> int | None:
+    """جلب chat_id المؤقت"""
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("pending_encouragements").select("chat_id").eq("user_id", user_id).execute()
+        )
+        if result.data:
+            return result.data[0].get("chat_id")
+    except Exception as e:
+        logger.error(f"get_pending_enc error: {e}")
+    return None
+
+async def delete_pending_enc(user_id: int):
+    """حذف chat_id المؤقت بعد الاستخدام"""
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("pending_encouragements").delete().eq("user_id", user_id).execute()
+        )
+    except Exception as e:
+        logger.error(f"delete_pending_enc error: {e}")
+
 async def save_encouragement(chat_id: int, text: str) -> bool:
     try:
         await asyncio.get_event_loop().run_in_executor(
@@ -73,7 +109,6 @@ async def get_random_encouragement(chat_id: int) -> dict | None:
         if not result.data:
             return None
         item = random.choice(result.data)
-        # نحدد الرسالة كمستخدمة
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: supabase.table("encouragements")
@@ -190,22 +225,20 @@ async def cmd_need_someone(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========================================
 
 async def cmd_send_encouragement(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """ينشر زر يفتح محادثة خاصة مع البوت لكتابة التشجيع"""
     chat_id = update.effective_chat.id
     bot_username = context.bot.username
 
-    # نحفظ chat_id في start payload عشان البوت يعرف أي مجموعة
     keyboard = [[InlineKeyboardButton(
         "💌 اكتب تشجيعك سراً",
         url=f"https://t.me/{bot_username}?start=enc_{chat_id}"
     )]]
 
     await update.message.reply_text(
-        "💛 اضغط الزر أدناه لإرسال كلمة تشجيع سرية — لن يعرف أحد أنك أرسلتها.",
+        "💛 اضغط الزر أدناه لإرسال كلمة تشجيع سرية.\nلن يعرف أحد أنك أرسلتها.",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
-async def handle_start_encouragement(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_start_encouragement(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """يعالج /start enc_CHATID في المحادثة الخاصة"""
     msg = update.message
     if not context.args:
@@ -220,7 +253,10 @@ async def handle_start_encouragement(update: Update, context: ContextTypes.DEFAU
     except ValueError:
         return False
 
-    context.user_data["enc_chat_id"] = chat_id
+    user_id = update.effective_user.id
+    # نحفظ في Supabase بدل user_data
+    await save_pending_enc(user_id, chat_id)
+
     await msg.reply_text(
         "💌 اكتب كلمة تشجيعك الآن:\n"
         "(ستُحفظ وتُرسل لشخص يحتاجها لاحقاً بدون اسمك)"
@@ -230,7 +266,9 @@ async def handle_start_encouragement(update: Update, context: ContextTypes.DEFAU
 async def handle_private_encouragement(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """يستقبل نص التشجيع في المحادثة الخاصة"""
     msg = update.message
-    chat_id = context.user_data.get("enc_chat_id")
+    user_id = update.effective_user.id
+
+    chat_id = await get_pending_enc(user_id)
     if not chat_id:
         return False
 
@@ -238,7 +276,7 @@ async def handle_private_encouragement(update: Update, context: ContextTypes.DEF
     if not text:
         return False
 
-    context.user_data.pop("enc_chat_id")
+    await delete_pending_enc(user_id)
     success = await save_encouragement(chat_id, text)
 
     if success:
@@ -252,7 +290,6 @@ async def handle_private_encouragement(update: Update, context: ContextTypes.DEF
 # ========================================
 
 async def cmd_get_encouragement(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """يسحب رسالة عشوائية من المخزون وينشرها"""
     chat_id = update.effective_chat.id
     item = await get_random_encouragement(chat_id)
 
