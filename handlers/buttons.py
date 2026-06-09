@@ -32,6 +32,56 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.delete()
         return
 
+    # ==================== طوارئ — أحتاج أحد ====================
+    if data == "menu_emergency":
+        from handlers.support import cmd_need_someone, get_admin_group
+        admin_group_id = await get_admin_group(chat_id)
+
+        clean_chat_id = str(chat_id).replace("-100", "")
+        message_link = f"https://t.me/c/{clean_chat_id}/{msg.message_id}"
+
+        user_mention = f"[{user.full_name}](tg://user?id={user.id})"
+        alert_text = (
+            f"🆘 **طلب مساعدة فورية**\n\n"
+            f"👤 العضو: {user_mention}\n"
+            f"🆔 المعرف: `{user.id}`\n"
+            f"💬 المجموعة: {msg.chat.title or 'مجموعة'}\n\n"
+            f"يرجى التواصل معه في أقرب وقت."
+        )
+        keyboard_admin = [
+            [InlineKeyboardButton(
+                f"💬 راسل {user.first_name}",
+                url=f"tg://user?id={user.id}"
+            )],
+            [InlineKeyboardButton(
+                "📩 الرسالة الأصلية",
+                url=message_link
+            )]
+        ]
+
+        if admin_group_id:
+            try:
+                await context.bot.send_message(
+                    admin_group_id,
+                    alert_text,
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup(keyboard_admin)
+                )
+            except Exception as e:
+                logger.error(f"menu_emergency notify error: {e}")
+
+        keyboard = [[InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
+        await msg.edit_text(
+            "💙 لست وحدك.\n\n"
+            "تم إبلاغ المشرفين وسيتواصلون معك قريباً.\n\n"
+            "إذا كنت في خطر فوري:\n"
+            "📞 الطوارئ: **911**\n"
+            "📞 الدعم النفسي: **920033360**",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
     # ==================== إحصائيات سريعة ====================
     if data == "exec_stats":
         try:
@@ -334,13 +384,14 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
              InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
             [InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google"),
              InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
+            [InlineKeyboardButton("🆘 طوارئ — أحتاج أحد", callback_data="menu_emergency")],
             [InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")],
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text("🌅 بوت شفق — القائمة الرئيسية\nاختر القسم:", reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # ==================== قائمة المشرفين (بدون مساعدين) ====================
+    # ==================== قائمة المشرفين ====================
     if data == "menu_admin":
         if not await is_admin(update, context):
             await query.answer("⛔ هذه القائمة للمشرفين فقط", show_alert=True)
@@ -617,7 +668,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.delete()
         return
 
-    # ==================== تنفيذ أوامر التذكير الجديدة (مباشرة) ====================
+    # ==================== تنفيذ أوامر التذكير ====================
     if data == "exec_my_reminders":
         reminders = await db.get_user_reminders(user.id)
         if not reminders:
@@ -646,27 +697,19 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
         return
 
-    # ==================== معالج الهمسة الجديد (نافذة منبثقة) ====================
+    # ==================== معالج الهمسة ====================
     if data.startswith("show_whisper_"):
         whisper_id = data.split("_")[2]
         user_id = update.effective_user.id
-        
         whisper = context.bot_data.get(f'whisper_{whisper_id}')
-        
         if not whisper:
             await query.answer("❌ هذه الهمسة غير متاحة (انتهت صلاحيتها).", show_alert=True)
             await msg.delete()
             return
-        
         if user_id not in [whisper['sender_id'], whisper['target_id']]:
             await query.answer("❌ هذه الهمسة ليست لك!", show_alert=True)
             return
-        
-        await query.answer(
-            f"💬 {whisper['text']}",
-            show_alert=True
-        )
-        
+        await query.answer(f"💬 {whisper['text']}", show_alert=True)
         del context.bot_data[f'whisper_{whisper_id}']
         await msg.delete()
         return
