@@ -731,12 +731,18 @@ async def load_all_reminders():
         print(f"خطأ في تحميل التذكيرات: {e}")
         return []
 
-async def get_user_reminders(user_id: int):
+# ==================== التعديل الرئيسي: get_user_reminders ====================
+# قبل: كانت تجيب تذكيرات المستخدم من كل المجموعات بدون تصفية
+# بعد: تجيب تذكيرات المستخدم في المجموعة الحالية فقط (إذا مُرر chat_id)
+async def get_user_reminders(user_id: int, chat_id: int = None):
     if not supabase:
         return []
     try:
+        query = supabase.table("reminders").select("*").eq("user_id", user_id)
+        if chat_id:
+            query = query.eq("chat_id", chat_id)
         result = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: supabase.table("reminders").select("*").eq("user_id", user_id).execute()
+            None, lambda: query.execute()
         )
         return result.data if result.data else []
     except Exception as e:
@@ -902,7 +908,6 @@ async def save_conversation(user_id: int, chat_id: int, messages: list):
     if not supabase:
         return
     try:
-        # نحتفظ بآخر 20 رسالة مع الحفاظ على system prompt
         system_msgs = [m for m in messages if m.get("role") == "system"]
         other_msgs = [m for m in messages if m.get("role") != "system"]
         if len(other_msgs) > 20:
