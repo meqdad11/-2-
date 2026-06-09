@@ -96,13 +96,6 @@ MODELS = {
         "key_env": "OPENAI_API_KEY",
         "model_name": "gpt-3.5-turbo",
     },
-    # ===== إضافة FinImpulse كـ نموذج جديد =====
-    "finimpulse": {
-        "name": "FinImpulse (API تداول)",
-        "url": "https://api.finimpulse.com/v1/chat/completions",  # الرابط الأساسي – تحقق من توثيق FinImpulse
-        "key_env": "FINIMPULSE_API_KEY",
-        "model_name": "finimpulse-model-v1",  # اسم المودل – غير حسب التوثيق
-    },
 }
 
 # ========== دالة مساعدة: النماذج المتاحة فقط ==========
