@@ -34,7 +34,20 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # ==================== طوارئ — أحتاج أحد ====================
     if data == "menu_emergency":
-        from handlers.support import cmd_need_someone, get_admin_group
+        keyboard = [
+            [InlineKeyboardButton("✅ نعم، أحتاج مساعدة", callback_data="emergency_confirm")],
+            [InlineKeyboardButton("❌ لا، ضغطتها بالغلط", callback_data="menu_close")],
+        ]
+        await msg.edit_text(
+            "🆘 **هل تحتاج مساعدة فعلاً؟**\n\n"
+            "سيتم إبلاغ المشرفين فوراً عند التأكيد.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+        return
+
+    if data == "emergency_confirm":
+        from handlers.support import get_admin_group
         admin_group_id = await get_admin_group(chat_id)
 
         clean_chat_id = str(chat_id).replace("-100", "")
@@ -68,7 +81,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     reply_markup=InlineKeyboardMarkup(keyboard_admin)
                 )
             except Exception as e:
-                logger.error(f"menu_emergency notify error: {e}")
+                logger.error(f"emergency_confirm notify error: {e}")
 
         keyboard = [[InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
         await msg.edit_text(
