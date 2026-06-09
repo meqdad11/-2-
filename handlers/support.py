@@ -197,6 +197,11 @@ async def cmd_need_someone(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not admin_group_id:
         return
 
+    # بناء لينك الرسالة — يشتغل للقروبات الخاصة إذا البوت مشرف
+    # chat_id للقروبات الخاصة يبدأ بـ -100، نحذف الـ -100 للينك
+    clean_chat_id = str(chat_id).replace("-100", "")
+    message_link = f"https://t.me/c/{clean_chat_id}/{msg.message_id}"
+
     user_mention = f"[{user.full_name}](tg://user?id={user.id})"
     alert_text = (
         f"🆘 **طلب مساعدة فورية**\n\n"
@@ -205,10 +210,16 @@ async def cmd_need_someone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"💬 المجموعة: {chat_title}\n\n"
         f"يرجى التواصل معه في أقرب وقت."
     )
-    keyboard = [[InlineKeyboardButton(
-        f"💬 راسل {user.first_name}",
-        url=f"tg://user?id={user.id}"
-    )]]
+    keyboard = [
+        [InlineKeyboardButton(
+            f"💬 راسل {user.first_name}",
+            url=f"tg://user?id={user.id}"
+        )],
+        [InlineKeyboardButton(
+            "📩 الرسالة الأصلية",
+            url=message_link
+        )]
+    ]
 
     try:
         await context.bot.send_message(
@@ -254,7 +265,6 @@ async def handle_start_encouragement(update: Update, context: ContextTypes.DEFAU
         return False
 
     user_id = update.effective_user.id
-    # نحفظ في Supabase بدل user_data
     await save_pending_enc(user_id, chat_id)
 
     await msg.reply_text(
