@@ -12,7 +12,8 @@ from utils.helpers import is_admin
 logger = logging.getLogger(__name__)
 
 # ========== السيستم بروبت الموحد ==========
-SYSTEM_PROMPT = "أنت 'شفق'، مساعد ذكي وداعم نفسي بالعربية الفصحى المختصرة. في الأسئلة العامة: قدم إجابات دقيقة ومفيدة، والتزم بالحقائق، وإذا لم تعلم شيئاً فقل 'لا أعلم' بوضوح دون تخمين. في سياق الدعم النفسي: استمع بتعاطف، لا تصدر أحكاماً، لا تشخص أمراضاً أو تصف أدوية، لخص مشاعر المستخدم واسأل أسئلة مفتوحة. إذا ذكر المستخدم إيذاء نفس أو انهيار حاد، انصح فوراً وبهدوء بالتواصل مع مختص أو خط ساخن. كن مباشراً، واضحاً، ومطمئناً."
+SYSTEM_PROMPT = "أنت 'شفق'، مساعد ذكي مفيد ومهذب. مهمتك هي تقديم إجابات دقيقة ومفيدة باللغة العربية الفصحى المختصرة. يجب أن تلتزم بالحقائق. إذا سُئلت عن شيء لا تعرفه أو كان خارج نطاق معرفتك، يجب أن تعتذر بلطف وتقول 'لا أعلم' بدلاً من تخمين إجابة. لا تؤلف معلومات. كن مباشرًا وواضحًا."
+
 # ========== سيستم بروبت كشف النية ==========
 INTENT_SYSTEM_PROMPT = """أنت محلل نوايا لبوت تيليجرام. مهمتك تحليل رسالة المستخدم وإرجاع JSON فقط بدون أي نص إضافي.
 
@@ -189,10 +190,55 @@ async def _call_ai(model_key: str, messages: list) -> str:
         logger.error(f"AI call error: {e}")
         return "❌ تعذر الاتصال بالذكاء الاصطناعي."
 
+# ========== Rate Limiting ==========
+# تخزين مؤقت: {user_id: [timestamps]}
+_rate_limit_store: dict = {}
+
+def _check_rate_limit(user_id: int, max_commands: int = 10, window_seconds: int = 60) -> bool:
+    """يرجع True إذا تجاوز المستخدم الحد، False إذا لم يتجاوز"""
+    import time
+    now = time.time()
+    timestamps = _rate_limit_store.get(user_id, [])
+    # نحذف الطوابع القديمة
+    timestamps = [t for t in timestamps if now - t < window_seconds]
+    if len(timestamps) >= max_commands:
+        _rate_limit_store[user_id] = timestamps
+        return True
+    timestamps.append(now)
+    _rate_limit_store[user_id] = timestamps
+    return False
+
+# ========== كشف الوقت بالعربي ==========
+def _parse_arabic_time(text: str) -> int | None:
+    """يحول تعابير الوقت العربية لدقائق — يرجع None إذا ما عرف"""
+    text = text.strip()
+    # ربع ساعة = 15، نص ساعة = 30، ساعة = 60
+    patterns = [
+        (r"ربع ساعة", 15),
+        (r"نص ساعة|نصف ساعة", 30),
+        (r"ثلاثة أرباع ساعة|٣ أرباع ساعة", 45),
+        (r"ساعة ونص|ساعة ونصف", 90),
+        (r"ساعتين", 120),
+        (r"(\d+)\s*ساعة", None),   # X ساعة
+        (r"(\d+)\s*دقيقة", None),  # X دقيقة
+        (r"(\d+)\s*دقائق", None),  # X دقائق
+        (r"بعد شوي|بعد قليل", 5),
+    ]
+    for pattern, value in patterns:
+        match = re.search(pattern, text)
+        if match:
+            if value is not None:
+                return value
+            # استخراج الرقم
+            num = int(match.group(1))
+            if "ساعة" in pattern:
+                return num * 60
+            return num
+    return None
+
 # ========== كشف النية ==========
 async def _detect_intent(user_input: str, model_key: str) -> dict:
     """يرسل الرسالة لنموذج خفيف ويرجع JSON بالنية"""
-    # نستخدم groq دائماً للـ intent لأنه أسرع، وإلا نستخدم النموذج الحالي
     intent_model = "llama" if os.environ.get("GROQ_API_KEY") else model_key
 
     messages = [
@@ -202,9 +248,16 @@ async def _detect_intent(user_input: str, model_key: str) -> dict:
 
     try:
         raw = await _call_ai(intent_model, messages)
-        # تنظيف الرد من أي markdown
         raw = re.sub(r"```json|```", "", raw).strip()
-        return json.loads(raw)
+        result = json.loads(raw)
+
+        # دعم الوقت بالعربي — لو minutes فارغ نحاول نستخرجه
+        if result.get("intent") == "reminder" and not result.get("minutes"):
+            arabic_minutes = _parse_arabic_time(user_input)
+            if arabic_minutes:
+                result["minutes"] = arabic_minutes
+
+        return result
     except Exception as e:
         logger.error(f"Intent detection error: {e}")
         return {"intent": "none"}
@@ -350,7 +403,7 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
             await db.add_ban(target_id, chat.id, reason, user.id, until)
             await db.log_event(chat.id, "ban", user_id=user.id, target_id=target_id, detail=reason)
             duration_str = f" لمدة {duration}" if duration else " دائماً"
-            await msg.reply_text(f"🚫 تم حظر {target_name}{duration_str}\n📝 السبب: {reason}")
+            await msg.reply_text(f"🚫 تم حظر {target_name}{duration_str}\n📝 السبب: {reason}\n👤 بأمر: {user.first_name}")
         except Exception as e:
             logger.error(f"Intent ban error: {e}")
             await msg.reply_text("❌ فشل الحظر.")
@@ -382,7 +435,7 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
         try:
             await context.bot.unban_chat_member(chat.id, target_id)
             await db.remove_ban(target_id, chat.id, user.id)
-            await msg.reply_text(f"✅ تم رفع الحظر عن {target_name}")
+            await msg.reply_text(f"✅ تم رفع الحظر عن {target_name}\n👤 بأمر: {user.first_name}")
         except Exception as e:
             logger.error(f"Intent unban error: {e}")
             await msg.reply_text("❌ فشل رفع الحظر.")
@@ -413,7 +466,7 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
             from telegram import ChatPermissions
             await context.bot.restrict_chat_member(chat.id, target_id, ChatPermissions(can_send_messages=False))
             await db.log_event(chat.id, "mute", user_id=user.id, target_id=target_id)
-            await msg.reply_text(f"🔇 تم كتم {target_name}")
+            await msg.reply_text(f"🔇 تم كتم {target_name}\n👤 بأمر: {user.first_name}")
         except Exception as e:
             logger.error(f"Intent mute error: {e}")
             await msg.reply_text("❌ فشل الكتم.")
@@ -447,7 +500,7 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
                 can_send_other_messages=True, can_add_web_page_previews=True
             ))
             await db.log_event(chat.id, "unmute", user_id=user.id, target_id=target_id)
-            await msg.reply_text(f"🔊 تم رفع الكتم عن {target_name}")
+            await msg.reply_text(f"🔊 تم رفع الكتم عن {target_name}\n👤 بأمر: {user.first_name}")
         except Exception as e:
             logger.error(f"Intent unmute error: {e}")
             await msg.reply_text("❌ فشل رفع الكتم.")
@@ -476,7 +529,7 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
 
         from config import MAX_WARNINGS
         count = await db.add_warning(target_id, chat.id)
-        await msg.reply_text(f"⚠️ تم تحذير {target_name} ({count}/{MAX_WARNINGS})")
+        await msg.reply_text(f"⚠️ تم تحذير {target_name} ({count}/{MAX_WARNINGS})\n👤 بأمر: {user.first_name}")
         if count >= MAX_WARNINGS:
             try:
                 await context.bot.ban_chat_member(chat.id, target_id)
@@ -627,17 +680,110 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("⚠️ اكتب شيئًا بعد 'شفق'.")
         return
 
+    # ===== Rate Limiting =====
+    if _check_rate_limit(user.id):
+        await msg.reply_text("⏱️ أرسلت أوامر كثيرة، انتظر دقيقة ثم حاول.")
+        return
+
     model_key = context.user_data.get("ai_model", "llama")
 
     # ===== كشف النية أولاً =====
     if not is_continuation:
-        await msg.reply_chat_action("typing")
+        thinking_msg = await msg.reply_text("⏳ جاري التفكير...")
         intent_data = await _detect_intent(user_input, model_key)
         logger.info(f"Intent detected: {intent_data}")
 
+        try:
+            await thinking_msg.delete()
+        except:
+            pass
+
+        intent = intent_data.get("intent", "none")
+
+        # ===== تسجيل محاولات غير المشرفين =====
+        admin_intents = ["ban", "unban", "mute", "unmute", "warn", "pin", "unpin"]
+        if intent in admin_intents and not await is_admin(update, context):
+            await db.log_event(
+                chat.id, "shafaq_unauthorized_attempt",
+                user_id=user.id,
+                detail=f"tried: {intent} | msg: {user_input[:80]}"
+            )
+            await msg.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+            return
+
+        # ===== تسجيل الأوامر التنفيذية في ban_log =====
+        if intent in admin_intents:
+            await db.log_event(
+                chat.id, f"shafaq_{intent}",
+                user_id=user.id,
+                detail=f"via shafaq: {user_input[:100]}"
+            )
+
+        # ===== السؤال لما المعلومة ناقصة =====
+        if intent == "reminder" and not intent_data.get("minutes"):
+            context.user_data["pending_intent"] = intent_data
+            await msg.reply_text("⏰ كم دقيقة؟")
+            return
+
+        if intent == "reminder" and not intent_data.get("text"):
+            context.user_data["pending_intent"] = intent_data
+            await msg.reply_text("📝 وش أذكّرك فيه؟")
+            return
+
+        if intent == "daily_reminder" and not intent_data.get("time"):
+            context.user_data["pending_intent"] = intent_data
+            await msg.reply_text("⏰ أي ساعة؟ (مثال: 09:00)")
+            return
+
+        if intent == "daily_reminder" and not intent_data.get("text"):
+            context.user_data["pending_intent"] = intent_data
+            await msg.reply_text("📝 وش أذكّرك فيه؟")
+            return
+
         executed = await _execute_intent(intent_data, update, context)
         if executed:
+            # حفظ آخر نية منفّذة للسياق
+            context.user_data["last_intent"] = intent_data
             return
+
+        # النموذج كشف نية لكن ما نفّذها
+        if intent != "none":
+            await msg.reply_text(
+                "⚠️ لم أفهم الأمر جيداً.\n"
+                "جرب تكتبه بشكل مختلف، أو استخدم الأمر المباشر.\n"
+                "مثال: `شفق احظر @فلان` أو `شفق ذكرني بعد 5 دقائق بكذا`",
+                parse_mode="Markdown"
+            )
+            return
+
+    # ===== إكمال السياق — لو كان فيه pending_intent =====
+    pending = context.user_data.pop("pending_intent", None)
+    if pending and not is_continuation:
+        intent = pending.get("intent")
+        # المستخدم أرسل المعلومة الناقصة
+        if intent == "reminder":
+            if not pending.get("minutes"):
+                arabic_minutes = _parse_arabic_time(user_input)
+                pending["minutes"] = arabic_minutes or (int(user_input) if user_input.isdigit() else None)
+            elif not pending.get("text"):
+                pending["text"] = user_input
+            if pending.get("minutes") and pending.get("text"):
+                await _execute_intent(pending, update, context)
+                context.user_data["last_intent"] = pending
+                return
+
+        if intent == "daily_reminder":
+            if not pending.get("time"):
+                pending["time"] = user_input
+            elif not pending.get("text"):
+                pending["text"] = user_input
+            if pending.get("time") and pending.get("text"):
+                await _execute_intent(pending, update, context)
+                context.user_data["last_intent"] = pending
+                return
+
+        # لو ما اكتملت المعلومات، أعد الـ pending
+        context.user_data["pending_intent"] = pending
 
     # ===== محادثة عادية =====
     if not is_continuation:
