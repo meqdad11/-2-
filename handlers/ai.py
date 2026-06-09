@@ -292,7 +292,7 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
 
     # ===== عرض التذكيرات =====
     if intent == "my_reminders":
-        reminders = await db.get_user_reminders(user.id)
+        reminders = await db.get_user_reminders(user.id, chat.id)
         if not reminders:
             await msg.reply_text("📭 ليس لديك أي تذكيرات يومية.")
         else:
