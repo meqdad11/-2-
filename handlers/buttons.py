@@ -36,7 +36,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "menu_emergency":
         keyboard = [
             [InlineKeyboardButton("✅ نعم، أحتاج مساعدة", callback_data="emergency_confirm")],
-            [InlineKeyboardButton("❌ لا، ضغطتها بالغلط", callback_data="menu_close")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main")],
         ]
         await msg.edit_text(
             "🆘 **هل تحتاج مساعدة فعلاً؟**\n\n"
