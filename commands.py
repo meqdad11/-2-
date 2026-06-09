@@ -178,6 +178,8 @@ ARABIC_COMMANDS = {
     "ضبط دعم الأعضاء": cmd_setup_members_support,
     "أحتاج أحد": cmd_need_someone,
     "احتاج احد": cmd_need_someone,
+    "مساعدة": cmd_need_someone,
+    "طوارئ": cmd_need_someone,
     "أرسل تشجيع": cmd_send_encouragement,
     "ارسل تشجيع": cmd_send_encouragement,
     "تشجيع": cmd_get_encouragement,
