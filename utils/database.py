@@ -941,3 +941,79 @@ async def delete_conversation(user_id: int, chat_id: int):
         )
     except Exception as e:
         print(f"خطأ في مسح المحادثة: {e}")
+
+# ==================== دوال رسائل المجموعة (للميزات الذكية) ====================
+async def save_group_message(chat_id: int, user_id: int, user_name: str, message_text: str):
+    """يحفظ رسالة في جدول group_messages مع الحفاظ على حد 500 رسالة لكل مجموعة"""
+    if not supabase:
+        return
+    try:
+        # حفظ الرسالة
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("group_messages").insert({
+                "chat_id": chat_id,
+                "user_id": user_id,
+                "user_name": user_name,
+                "message_text": message_text[:500],  # حد الطول
+                "created_at": now_iso()
+            }).execute()
+        )
+        # حذف الأقدم إذا تجاوز 500
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("group_messages")
+                .select("id")
+                .eq("chat_id", chat_id)
+                .order("created_at", desc=False)
+                .execute()
+        )
+        if result.data and len(result.data) > 500:
+            excess = len(result.data) - 500
+            old_ids = [row["id"] for row in result.data[:excess]]
+            for oid in old_ids:
+                await asyncio.get_event_loop().run_in_executor(
+                    None,
+                    lambda oid=oid: supabase.table("group_messages").delete().eq("id", oid).execute()
+                )
+    except Exception as e:
+        print(f"خطأ في حفظ رسالة المجموعة: {e}")
+
+async def get_group_messages(chat_id: int, limit: int = 50) -> list:
+    """جلب آخر X رسالة من المجموعة"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("group_messages")
+                .select("user_name, message_text, created_at")
+                .eq("chat_id", chat_id)
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+        )
+        return list(reversed(result.data)) if result.data else []
+    except Exception as e:
+        print(f"خطأ في جلب رسائل المجموعة: {e}")
+        return []
+
+async def search_group_messages(chat_id: int, keyword: str, limit: int = 20) -> list:
+    """البحث في رسائل المجموعة"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("group_messages")
+                .select("user_name, message_text, created_at")
+                .eq("chat_id", chat_id)
+                .ilike("message_text", f"%{keyword}%")
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+        )
+        return result.data if result.data else []
+    except Exception as e:
+        print(f"خطأ في البحث في رسائل المجموعة: {e}")
+        return []
