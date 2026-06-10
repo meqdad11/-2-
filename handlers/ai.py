@@ -72,16 +72,16 @@ MODELS = {
         "model_name": "llama-3.3-70b-versatile",
     },
     "cerebras": {
-        "name": "Cerebras (Llama 3.1)",
+        "name": "Cerebras",
         "url": "https://api.cerebras.ai/v1/chat/completions",
         "key_env": "CEREBRAS_API_KEY",
-        "model_name": "llama3.1-8b",  # الموديل المجاني الصحيح
+        "model_name": "llama-3.3-70b",
     },
     "openrouter": {
         "name": "OpenRouter",
         "url": "https://openrouter.ai/api/v1/chat/completions",
         "key_env": "OPENROUTER_API_KEY",
-        "model_name": "mistralai/mistral-7b-instruct:free",
+        "model_name": "google/gemini-2.0-flash-001",
     },
     "deepseek": {
         "name": "DeepSeek",
@@ -91,11 +91,11 @@ MODELS = {
     },
     "gemini": {
         "name": "Gemini",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",  # flash مجاني
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
         "key_env": "GEMINI_API_KEY",
     },
     "sambanova": {
-        "name": "SambaNova (Llama 3.1)",
+        "name": "SambaNova",
         "url": "https://api.sambanova.ai/v1/chat/completions",
         "key_env": "SAMBANOVA_API_KEY",
         "model_name": "Meta-Llama-3.1-8B-Instruct",
