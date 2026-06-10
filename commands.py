@@ -85,7 +85,7 @@ ARABIC_COMMANDS = {
     "متقدم تقرير": cmd_deep_report,
     "أضف كلمة": cmd_add_word, "احذف كلمة": cmd_remove_word, "الكلمات المحظورة": cmd_list_words,
     "أضف مورد": cmd_add_resource, "الموارد": cmd_list_resources, "احذف مورد": cmd_delete_resource,
-    "ايدي": cmd_id, "القواعد": cmd_rules, "شفق": cmd_shafaq,
+    "ايدي": cmd_id, "القواعد": cmd_rules, "شفق": cmd_shafaq, "شوشو": cmd_shafaq,
     "ابدا": cmd_menu, "ابدأ": cmd_menu, "أبدا": cmd_menu,
 
     "قفل الروابط": cmd_lock_links, "فتح الروابط": cmd_unlock_links,
