@@ -63,7 +63,7 @@ INTENT_SYSTEM_PROMPT = """أنت محلل نوايا لبوت تيليجرام. 
 - الأوامر التي تحتاج reply (pin, report, ban بدون يوزر) أرجعها كـ none إذا لم يكن هناك target واضح
 - crisis_toggle: إذا كانت الرسالة تفعيل/شغّل/افتح أرجع enabled: true، إذا تعطيل/أوقف/أغلق أرجع enabled: false"""
 
-# ========== إعدادات النماذج ==========
+# ========== إعدادات النماذج (تم تصحيح أسماء النماذج المجانية) ==========
 MODELS = {
     "llama": {
         "name": "LLaMA 3 (Groq)",
@@ -72,10 +72,10 @@ MODELS = {
         "model_name": "llama-3.3-70b-versatile",
     },
     "cerebras": {
-        "name": "Cerebras (Llama 3.3)",
+        "name": "Cerebras (Llama 3.1)",
         "url": "https://api.cerebras.ai/v1/chat/completions",
         "key_env": "CEREBRAS_API_KEY",
-        "model_name": "llama-3.3-70b",
+        "model_name": "llama3.1-8b",  # الموديل المجاني الصحيح
     },
     "openrouter": {
         "name": "OpenRouter",
@@ -91,7 +91,7 @@ MODELS = {
     },
     "gemini": {
         "name": "Gemini",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",  # flash مجاني
         "key_env": "GEMINI_API_KEY",
     },
     "sambanova": {
@@ -115,6 +115,21 @@ def _get_available_models():
         if os.environ.get(model["key_env"]):
             available[key] = model
     return available
+
+# ========== أمر مؤقت: فحص المفاتيح البيئية ==========
+async def check_env_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """أمر مؤقت لفحص مفاتيح API الموجودة."""
+    keys = [
+        "GROQ_API_KEY", "CEREBRAS_API_KEY", "OPENROUTER_API_KEY",
+        "DEEPSEEK_API_KEY", "GEMINI_API_KEY", "SAMBANOVA_API_KEY",
+        "OPENAI_API_KEY"
+    ]
+    status = {}
+    for k in keys:
+        val = os.environ.get(k)
+        status[k] = f"✅ موجود (يبدأ بـ {val[:6]}...)" if val else "❌ مفقود"
+    msg = "**حالة المفاتيح البيئية:**\n" + "\n".join([f"{k}: {v}" for k, v in status.items()])
+    await update.message.reply_text(msg, parse_mode="Markdown")
 
 # ========== اختيار النموذج ==========
 async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -165,10 +180,12 @@ async def _call_ai(model_key: str, messages: list) -> str:
     headers = {"Content-Type": "application/json"}
 
     if model_key == "gemini":
-        prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
-        payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-        }
+        # بناء محادثة متعددة الأدوار لـ Gemini
+        contents = []
+        for m in messages:
+            role = "user" if m["role"] in ("user", "system") else "model"
+            contents.append({"role": role, "parts": [{"text": m["content"]}]})
+        payload = {"contents": contents}
         url = f"{model['url']}?key={api_key}"
     else:
         payload = {
@@ -184,8 +201,9 @@ async def _call_ai(model_key: str, messages: list) -> str:
         url = model["url"]
 
     try:
+        timeout = aiohttp.ClientTimeout(total=30)
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, json=payload, headers=headers) as resp:
+            async with session.post(url, json=payload, headers=headers, timeout=timeout) as resp:
                 if resp.status != 200:
                     text = await resp.text()
                     logger.error(f"AI API error: {resp.status} {text}")
@@ -241,7 +259,15 @@ def _parse_arabic_time(text: str) -> int | None:
 
 # ========== كشف النية ==========
 async def _detect_intent(user_input: str, model_key: str) -> dict:
-    intent_model = "llama" if os.environ.get("GROQ_API_KEY") else model_key
+    available = _get_available_models()
+    if not available:
+        return {"intent": "none"}
+
+    # اختيار أفضل نموذج متاح، وليس Groq حصراً
+    if "llama" in available:
+        intent_model = "llama"
+    else:
+        intent_model = next(iter(available))
 
     messages = [
         {"role": "system", "content": INTENT_SYSTEM_PROMPT},
@@ -269,6 +295,7 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
     msg = update.message
     user = update.effective_user
     chat = update.effective_chat
+    model_key = context.user_data.get("ai_model", "llama")  # تعريف model_key هنا
 
     # ===== تذكير لمرة واحدة =====
     if intent == "reminder":
