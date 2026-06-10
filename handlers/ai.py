@@ -749,7 +749,7 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_input = msg.text
         is_continuation = True
     elif msg.text.startswith("شفق "):
-        user_input = msg.text[5:].strip()
+        user_input = msg.text.split("شفق ", 1)[1].strip()
         is_continuation = False
     else:
         return
