@@ -302,7 +302,7 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
 
     # ← حفظ محتوى الرسالة للميزات الذكية
-    if update.message.text and not update.message.text.startswith("شفق") and not update.message.text.startswith("ش "):
+    if update.message.text and not update.message.text.startswith("شفق") and not update.message.text.startswith("شوشو "):
         await db.save_group_message(
             chat_id=chat.id,
             user_id=user.id,
