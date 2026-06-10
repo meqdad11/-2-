@@ -41,6 +41,9 @@ INTENT_SYSTEM_PROMPT = """أنت محلل نوايا لبوت تيليجرام. 
 - user_warnings: تحذيرات عضو (مثال: كم تحذير عند فلان، تحذيرات @فلان)
 - banned_words: الكلمات المحظورة (مثال: وش الكلمات المحظورة، اعرض المحظور)
 - crisis_toggle: تفعيل أو تعطيل نظام الأزمات (مثال: فعّل الأزمات، عطّل الأزمات)
+- group_mood: مزاج المجموعة (مثال: وش مزاج المجموعة، كيف الجو)
+- group_summary: ملخص اللي فاتني (مثال: لخص اللي صار، وش فاتني)
+- group_search: بحث في رسائل المجموعة (مثال: وش قالوا عن كذا، دور على كذا)
 - none: محادثة عادية أو سؤال
 
 صيغة الرد JSON:
@@ -720,6 +723,72 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
             )
         return True
 
+    # ===== مزاج المجموعة =====
+    if intent == "group_mood":
+        messages = await db.get_group_messages(chat.id, 50)
+        if not messages or len(messages) < 5:
+            await msg.reply_text("💬 ما في رسائل كافية بعد لتحليل المزاج.")
+            return True
+        convo = "\n".join([f"{m['user_name']}: {m['message_text']}" for m in messages])
+        prompt = (
+            f"حلّل مزاج هذه المحادثة في مجموعة تيليجرام بناءً على آخر {len(messages)} رسالة. "
+            f"أعطِ تقييماً مختصراً في جملتين: المزاج العام، والموضوع السائد. "
+            f"استخدم إيموجي مناسب.\n\nالرسائل:\n{convo[:3000]}"
+        )
+        thinking = await msg.reply_text("⏳ أحلل مزاج المجموعة...")
+        result = await _call_ai(model_key, [
+            {"role": "system", "content": "أنت محلل نفسي للمحادثات. ردك مختصر وبالعربي."},
+            {"role": "user", "content": prompt}
+        ])
+        try:
+            await thinking.delete()
+        except:
+            pass
+        await msg.reply_text(f"🌡️ **مزاج المجموعة:**\n\n{result}", parse_mode="Markdown")
+        return True
+
+    # ===== ملخص اللي فاتني =====
+    if intent == "group_summary":
+        messages = await db.get_group_messages(chat.id, 100)
+        if not messages or len(messages) < 5:
+            await msg.reply_text("💬 ما في رسائل كافية بعد للتلخيص.")
+            return True
+        convo = "\n".join([f"{m['user_name']}: {m['message_text']}" for m in messages])
+        prompt = (
+            f"لخّص أهم ما دار في هذه المحادثة بشكل مختصر ومفيد. "
+            f"اذكر المواضيع الرئيسية والقرارات المهمة إن وجدت. لا تذكر كل رسالة.\n\n"
+            f"المحادثة:\n{convo[:4000]}"
+        )
+        thinking = await msg.reply_text("⏳ ألخص اللي فاتك...")
+        result = await _call_ai(model_key, [
+            {"role": "system", "content": "أنت ملخص محادثات ذكي. ردك مختصر ومفيد وبالعربي."},
+            {"role": "user", "content": prompt}
+        ])
+        try:
+            await thinking.delete()
+        except:
+            pass
+        await msg.reply_text(f"📋 **ملخص المحادثة:**\n\n{result}", parse_mode="Markdown")
+        return True
+
+    # ===== بحث في رسائل المجموعة =====
+    if intent == "group_search":
+        keyword = intent_data.get("text")
+        if not keyword:
+            await msg.reply_text("⚠️ وش تبي أدور عليه؟ مثال: شفق دور على كلمة 'اجتماع'")
+            return True
+        results = await db.search_group_messages(chat.id, keyword, 10)
+        if not results:
+            await msg.reply_text(f"🔍 ما لقيت رسائل تحتوي على: **{keyword}**", parse_mode="Markdown")
+            return True
+        lines = [f"• **{r['user_name']}:** {r['message_text'][:100]} _({r['created_at'][11:16]})_"
+                 for r in results]
+        await msg.reply_text(
+            f"🔍 **نتائج البحث عن '{keyword}'** ({len(results)} رسالة):\n\n" + "\n".join(lines),
+            parse_mode="Markdown"
+        )
+        return True
+
     # ===== تفعيل/تعطيل نظام الأزمات =====
     if intent == "crisis_toggle":
         if not await is_admin(update, context):
@@ -749,7 +818,7 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user_input = msg.text
         is_continuation = True
     elif msg.text.startswith("شفق "):
-        user_input = msg.text.split("شفق ", 1)[1].strip()
+        user_input = msg.text[5:].strip()
         is_continuation = False
     else:
         return
