@@ -820,6 +820,9 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif msg.text.startswith("شفق "):
         user_input = msg.text.split("شفق ", 1)[1].strip()
         is_continuation = False
+    elif msg.text.startswith("ش "):
+        user_input = msg.text.split("ش ", 1)[1].strip()
+        is_continuation = False
     else:
         return
 
