@@ -247,9 +247,9 @@ async def cmd_cancel_daily_reminder(update: Update, context: ContextTypes.DEFAUL
 
 async def cmd_my_reminders(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id  # ← التعديل: تمرير chat_id
+    chat_id = update.effective_chat.id
 
-    reminders = await db.get_user_reminders(user_id, chat_id)  # ← التعديل
+    reminders = await db.get_user_reminders(user_id, chat_id)
 
     if not reminders:
         await update.message.reply_text("📭 ليس لديك أي تذكيرات يومية.")
@@ -300,6 +300,15 @@ async def track_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await db.update_user_activity(user.id, chat.id)
     await db.increment_message_count(user.id, chat.id, full_name)
     await db.save_chat_name(chat.id, chat.title or str(chat.id))
+
+    # ← حفظ محتوى الرسالة للميزات الذكية
+    if update.message.text and not update.message.text.startswith("شفق"):
+        await db.save_group_message(
+            chat_id=chat.id,
+            user_id=user.id,
+            user_name=full_name,
+            message_text=update.message.text
+        )
 
 # ==================== WHISPER ====================
 async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -631,7 +640,6 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     original_text = msg.reply_to_message.text
-
     target_lang = "ar"
     lang_name = "العربية"
     if context.args:
@@ -645,13 +653,7 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         url = "https://translate.googleapis.com/translate_a/single"
-        params = {
-            "client": "gtx",
-            "sl": "auto",
-            "tl": target_lang,
-            "dt": "t",
-            "q": original_text
-        }
+        params = {"client": "gtx", "sl": "auto", "tl": target_lang, "dt": "t", "q": original_text}
         async with aiohttp.ClientSession() as session:
             async with session.get(url, params=params) as resp:
                 if resp.status != 200:
@@ -659,11 +661,7 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 data = await resp.json()
                 translated_parts = [part[0] for part in data[0] if part[0]]
                 translated = ''.join(translated_parts)
-
-        await msg.reply_text(
-            f"🌐 **الترجمة إلى {lang_name}:**\n\n{translated}",
-            parse_mode="Markdown"
-        )
+        await msg.reply_text(f"🌐 **الترجمة إلى {lang_name}:**\n\n{translated}", parse_mode="Markdown")
     except Exception as e:
         logger.error(f"خطأ في الترجمة: {e}")
         await msg.reply_text("❌ خدمة الترجمة غير متاحة حالياً.")
