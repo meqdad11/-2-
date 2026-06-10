@@ -37,6 +37,10 @@ INTENT_SYSTEM_PROMPT = """أنت محلل نوايا لبوت تيليجرام. 
 - id: معرفي أو معرف شخص
 - stats: إحصائيات المجموعة
 - need_someone: طلب مساعدة / طوارئ نفسية
+- event_log: آخر أحداث المجموعة (مثال: وش صار، آخر أحداث، سجل الأحداث)
+- user_warnings: تحذيرات عضو (مثال: كم تحذير عند فلان، تحذيرات @فلان)
+- banned_words: الكلمات المحظورة (مثال: وش الكلمات المحظورة، اعرض المحظور)
+- crisis_toggle: تفعيل أو تعطيل نظام الأزمات (مثال: فعّل الأزمات، عطّل الأزمات)
 - none: محادثة عادية أو سؤال
 
 صيغة الرد JSON:
@@ -46,13 +50,15 @@ INTENT_SYSTEM_PROMPT = """أنت محلل نوايا لبوت تيليجرام. 
   "time": "HH:MM" أو null,
   "text": "نص التذكير أو السبب" أو null,
   "target": "يوزر أو معرف الشخص المستهدف" أو null,
-  "duration": "مدة الحظر مثل 1d أو 2h" أو null
+  "duration": "مدة الحظر مثل 1d أو 2h" أو null,
+  "enabled": true أو false أو null
 }
 
 قواعد مهمة:
 - أرجع JSON فقط، بدون أي كلام قبله أو بعده
 - إذا لم تكن متأكداً من النية أرجع intent: none
-- الأوامر التي تحتاج reply (pin, report, ban بدون يوزر) أرجعها كـ none إذا لم يكن هناك target واضح"""
+- الأوامر التي تحتاج reply (pin, report, ban بدون يوزر) أرجعها كـ none إذا لم يكن هناك target واضح
+- crisis_toggle: إذا كانت الرسالة تفعيل/شغّل/افتح أرجع enabled: true، إذا تعطيل/أوقف/أغلق أرجع enabled: false"""
 
 # ========== إعدادات النماذج ==========
 MODELS = {
@@ -191,15 +197,12 @@ async def _call_ai(model_key: str, messages: list) -> str:
         return "❌ تعذر الاتصال بالذكاء الاصطناعي."
 
 # ========== Rate Limiting ==========
-# تخزين مؤقت: {user_id: [timestamps]}
 _rate_limit_store: dict = {}
 
 def _check_rate_limit(user_id: int, max_commands: int = 10, window_seconds: int = 60) -> bool:
-    """يرجع True إذا تجاوز المستخدم الحد، False إذا لم يتجاوز"""
     import time
     now = time.time()
     timestamps = _rate_limit_store.get(user_id, [])
-    # نحذف الطوابع القديمة
     timestamps = [t for t in timestamps if now - t < window_seconds]
     if len(timestamps) >= max_commands:
         _rate_limit_store[user_id] = timestamps
@@ -210,18 +213,16 @@ def _check_rate_limit(user_id: int, max_commands: int = 10, window_seconds: int 
 
 # ========== كشف الوقت بالعربي ==========
 def _parse_arabic_time(text: str) -> int | None:
-    """يحول تعابير الوقت العربية لدقائق — يرجع None إذا ما عرف"""
     text = text.strip()
-    # ربع ساعة = 15، نص ساعة = 30، ساعة = 60
     patterns = [
         (r"ربع ساعة", 15),
         (r"نص ساعة|نصف ساعة", 30),
         (r"ثلاثة أرباع ساعة|٣ أرباع ساعة", 45),
         (r"ساعة ونص|ساعة ونصف", 90),
         (r"ساعتين", 120),
-        (r"(\d+)\s*ساعة", None),   # X ساعة
-        (r"(\d+)\s*دقيقة", None),  # X دقيقة
-        (r"(\d+)\s*دقائق", None),  # X دقائق
+        (r"(\d+)\s*ساعة", None),
+        (r"(\d+)\s*دقيقة", None),
+        (r"(\d+)\s*دقائق", None),
         (r"بعد شوي|بعد قليل", 5),
     ]
     for pattern, value in patterns:
@@ -229,7 +230,6 @@ def _parse_arabic_time(text: str) -> int | None:
         if match:
             if value is not None:
                 return value
-            # استخراج الرقم
             num = int(match.group(1))
             if "ساعة" in pattern:
                 return num * 60
@@ -238,7 +238,6 @@ def _parse_arabic_time(text: str) -> int | None:
 
 # ========== كشف النية ==========
 async def _detect_intent(user_input: str, model_key: str) -> dict:
-    """يرسل الرسالة لنموذج خفيف ويرجع JSON بالنية"""
     intent_model = "llama" if os.environ.get("GROQ_API_KEY") else model_key
 
     messages = [
@@ -251,7 +250,6 @@ async def _detect_intent(user_input: str, model_key: str) -> dict:
         raw = re.sub(r"```json|```", "", raw).strip()
         result = json.loads(raw)
 
-        # دعم الوقت بالعربي — لو minutes فارغ نحاول نستخرجه
         if result.get("intent") == "reminder" and not result.get("minutes"):
             arabic_minutes = _parse_arabic_time(user_input)
             if arabic_minutes:
@@ -264,10 +262,6 @@ async def _detect_intent(user_input: str, model_key: str) -> dict:
 
 # ========== تنفيذ النية ==========
 async def _execute_intent(intent_data: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """
-    ينفذ الأمر بناءً على النية المكتشفة.
-    يرجع True إذا نفّذ أمراً، False إذا يجب المتابعة كمحادثة عادية.
-    """
     intent = intent_data.get("intent", "none")
     msg = update.message
     user = update.effective_user
@@ -285,7 +279,6 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
             if minutes <= 0 or minutes > 1440:
                 await msg.reply_text("❌ المدة يجب أن تكون بين 1 و 1440 دقيقة.")
                 return True
-
             from handlers.user import _send_reminder
             context.job_queue.run_once(
                 _send_reminder,
@@ -353,7 +346,8 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
         return True
 
     # ===== أوامر تحتاج صلاحيات مشرف =====
-    admin_intents = ["ban", "unban", "mute", "unmute", "warn", "pin", "unpin"]
+    admin_intents = ["ban", "unban", "mute", "unmute", "warn", "pin", "unpin",
+                     "event_log", "banned_words", "crisis_toggle"]
     if intent in admin_intents:
         if not await is_admin(update, context):
             await msg.reply_text("⛔ هذا الأمر للمشرفين فقط.")
@@ -389,7 +383,6 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
             from datetime import datetime, timedelta, timezone as tz
             from utils.helpers import parse_duration
             until = None
-            duration_obj = None
             if duration:
                 duration_obj = parse_duration(duration)
                 if duration_obj:
@@ -586,7 +579,7 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
         try:
             await msg.reply_to_message.pin()
             await msg.reply_text("📌 تم التثبيت.")
-        except Exception as e:
+        except:
             await msg.reply_text("❌ فشل التثبيت.")
         return True
 
@@ -595,7 +588,7 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
         try:
             await msg.chat.unpin_all_messages()
             await msg.reply_text("📌 تم إلغاء التثبيت.")
-        except Exception as e:
+        except:
             await msg.reply_text("❌ فشل إلغاء التثبيت.")
         return True
 
@@ -658,6 +651,91 @@ async def _execute_intent(intent_data: dict, update: Update, context: ContextTyp
         await cmd_need_someone(update, context)
         return True
 
+    # ===== آخر أحداث المجموعة =====
+    if intent == "event_log":
+        if not await is_admin(update, context):
+            await msg.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+            return True
+        events = await db.get_event_log(chat.id, 10)
+        if not events:
+            await msg.reply_text("📭 لا توجد أحداث مسجلة.")
+        else:
+            lines = []
+            for e in events:
+                action = e.get("action", "")
+                created = e.get("created_at", "")[:16]
+                uid = e.get("user_id", "")
+                tid = e.get("target_id", "")
+                line = f"• `{action}` — {created}"
+                if tid:
+                    line += f" | هدف: `{tid}`"
+                lines.append(line)
+            await msg.reply_text(
+                f"📋 **آخر أحداث المجموعة:**\n\n" + "\n".join(lines),
+                parse_mode="Markdown"
+            )
+        return True
+
+    # ===== تحذيرات عضو =====
+    if intent == "user_warnings":
+        target_id = None
+        target_name = "المستخدم"
+
+        if msg.reply_to_message:
+            target_id = msg.reply_to_message.from_user.id
+            target_name = msg.reply_to_message.from_user.first_name
+        elif intent_data.get("target"):
+            target = intent_data["target"].lstrip("@")
+            try:
+                member = await context.bot.get_chat_member(chat.id, target)
+                target_id = member.user.id
+                target_name = member.user.first_name
+            except:
+                await msg.reply_text(f"❌ لم أجد المستخدم: {target}")
+                return True
+        else:
+            await msg.reply_text("⚠️ حدد الشخص برد على رسالته أو اذكر يوزره.")
+            return True
+
+        from config import MAX_WARNINGS
+        count = await db.get_warnings(target_id, chat.id)
+        await msg.reply_text(
+            f"⚠️ **تحذيرات {target_name}:**\n{count}/{MAX_WARNINGS}",
+            parse_mode="Markdown"
+        )
+        return True
+
+    # ===== الكلمات المحظورة =====
+    if intent == "banned_words":
+        if not await is_admin(update, context):
+            await msg.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+            return True
+        words = await db.get_banned_words(chat.id)
+        if not words:
+            await msg.reply_text("✅ لا توجد كلمات محظورة في هذه المجموعة.")
+        else:
+            await msg.reply_text(
+                f"🚫 **الكلمات المحظورة ({len(words)}):**\n\n" + "\n".join(f"• `{w}`" for w in words),
+                parse_mode="Markdown"
+            )
+        return True
+
+    # ===== تفعيل/تعطيل نظام الأزمات =====
+    if intent == "crisis_toggle":
+        if not await is_admin(update, context):
+            await msg.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+            return True
+        enabled = intent_data.get("enabled")
+        if enabled is None:
+            current = await db.get_crisis_enabled(chat.id)
+            status = "مفعّل ✅" if current else "معطّل ❌"
+            await msg.reply_text(f"🚨 نظام الأزمات حالياً: {status}")
+            return True
+        await db.set_crisis_enabled(chat.id, enabled)
+        status = "✅ تم تفعيل" if enabled else "🔴 تم تعطيل"
+        await msg.reply_text(f"{status} نظام الأزمات\n👤 بأمر: {user.first_name}")
+        return True
+
     return False
 
 
@@ -701,7 +779,8 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         intent = intent_data.get("intent", "none")
 
         # ===== تسجيل محاولات غير المشرفين =====
-        admin_intents = ["ban", "unban", "mute", "unmute", "warn", "pin", "unpin"]
+        admin_intents = ["ban", "unban", "mute", "unmute", "warn", "pin", "unpin",
+                         "event_log", "banned_words", "crisis_toggle"]
         if intent in admin_intents and not await is_admin(update, context):
             await db.log_event(
                 chat.id, "shafaq_unauthorized_attempt",
@@ -711,8 +790,9 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await msg.reply_text("⛔ هذا الأمر للمشرفين فقط.")
             return
 
-        # ===== تسجيل الأوامر التنفيذية في ban_log =====
-        if intent in admin_intents:
+        # ===== تسجيل الأوامر التنفيذية =====
+        executive_intents = ["ban", "unban", "mute", "unmute", "warn", "pin", "unpin"]
+        if intent in executive_intents:
             await db.log_event(
                 chat.id, f"shafaq_{intent}",
                 user_id=user.id,
@@ -742,11 +822,9 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         executed = await _execute_intent(intent_data, update, context)
         if executed:
-            # حفظ آخر نية منفّذة للسياق
             context.user_data["last_intent"] = intent_data
             return
 
-        # النموذج كشف نية لكن ما نفّذها
         if intent != "none":
             await msg.reply_text(
                 "⚠️ لم أفهم الأمر جيداً.\n"
@@ -756,11 +834,10 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-    # ===== إكمال السياق — لو كان فيه pending_intent =====
+    # ===== إكمال السياق =====
     pending = context.user_data.pop("pending_intent", None)
     if pending and not is_continuation:
         intent = pending.get("intent")
-        # المستخدم أرسل المعلومة الناقصة
         if intent == "reminder":
             if not pending.get("minutes"):
                 arabic_minutes = _parse_arabic_time(user_input)
@@ -782,7 +859,6 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.user_data["last_intent"] = pending
                 return
 
-        # لو ما اكتملت المعلومات، أعد الـ pending
         context.user_data["pending_intent"] = pending
 
     # ===== محادثة عادية =====
