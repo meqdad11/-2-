@@ -265,6 +265,75 @@ async def cmd_deep_report(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
     await db.log_event(chat.id, "deep_report", user_id=user.id, target_id=target.id, detail=reason[:100])
 
+# ========== استدعاء التقرير الأسبوعي يدوياً ==========
+async def cmd_weekly_report_now(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """استدعاء التقرير الأسبوعي يدوياً — للمشرفين فقط"""
+    from utils.helpers import is_admin
+    if not await is_admin(update, context):
+        await update.message.reply_text("⛔ هذا الأمر للمشرفين فقط.")
+        return
+    await update.message.reply_text("⏳ جاري إعداد التقرير...")
+    # نستدعي نفس دالة التقرير لكن للمجموعة الحالية فقط
+    chat_id = update.effective_chat.id
+    from datetime import datetime as dt_now
+    week_start = (dt_now(TIMEZONE) - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    week_end = dt_now(TIMEZONE).strftime("%Y-%m-%d")
+    try:
+        chat_name = await db.get_chat_name(chat_id)
+        top_members = await db.get_top_members(chat_id, limit=10)
+        total_msgs = sum(m["message_count"] for m in top_members) if top_members else 0
+        active_count = len(top_members)
+        events = await db.get_event_log(chat_id, 50)
+        warns = sum(1 for e in events if e.get("action") == "warn")
+        bans = sum(1 for e in events if e.get("action") == "ban")
+        mutes = sum(1 for e in events if e.get("action") == "mute")
+        report = (
+            f"📊 **التقرير الأسبوعي**\n"
+            f"🏠 المجموعة: {chat_name}\n"
+            f"📅 {week_start} — {week_end}\n\n"
+            f"**👥 النشاط:**\n"
+            f"• إجمالي الرسائل: {total_msgs}\n"
+            f"• الأعضاء النشطين: {active_count}\n"
+        )
+        if top_members:
+            report += f"• أكثر عضو نشيط: {top_members[0]['full_name']} ({top_members[0]['message_count']} رسالة) 🏆\n"
+        report += (
+            f"\n**⚠️ الإدارة:**\n"
+            f"• تحذيرات: {warns}\n"
+            f"• حظر: {bans}\n"
+            f"• كتم: {mutes}\n\n"
+            f"_تقرير تلقائي من شفق 🌅_"
+        )
+        ranking = None
+        if top_members:
+            medals = ["🥇", "🥈", "🥉"]
+            lines = [
+                f"{medals[i] if i < 3 else f'{i+1}.'} {m['full_name']} — {m['message_count']} رسالة"
+                for i, m in enumerate(top_members)
+            ]
+            ranking = "🏅 **ترتيب الأعضاء هذا الأسبوع:**\n\n" + "\n".join(lines)
+
+        from handlers.support import get_admin_group
+        admin_group_id = await get_admin_group(chat_id)
+        if admin_group_id:
+            await context.bot.send_message(admin_group_id, report, parse_mode="Markdown")
+            if ranking:
+                await context.bot.send_message(admin_group_id, ranking, parse_mode="Markdown")
+        else:
+            admins = await context.bot.get_chat_administrators(chat_id)
+            for admin in admins:
+                if not admin.user.is_bot:
+                    try:
+                        await context.bot.send_message(admin.user.id, report, parse_mode="Markdown")
+                        if ranking:
+                            await context.bot.send_message(admin.user.id, ranking, parse_mode="Markdown")
+                    except:
+                        pass
+        await update.message.reply_text("✅ تم إرسال التقرير.")
+    except Exception as e:
+        logger.error(f"خطأ في التقرير اليدوي: {e}")
+        await update.message.reply_text("❌ حدث خطأ أثناء إعداد التقرير.")
+
 # ========== التقرير الأسبوعي التلقائي ==========
 async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
     """إرسال تقرير أسبوعي كل جمعة لغرفة المشرفين أو خاص المشرفين"""
