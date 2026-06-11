@@ -38,7 +38,7 @@ from handlers.moderation import (
 from handlers.jobs import (
     cmd_report, job_expire_bans,
     job_daily_quote, job_reschedule_reminders,
-    _send_daily_reminder, job_weekly_report,
+    _send_daily_reminder, job_weekly_report, cmd_weekly_report_now,
 )
 from handlers.ai import (
     cmd_shafaq, cmd_choose_model, callback_choose_model,
