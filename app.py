@@ -153,7 +153,7 @@ async def handle_text(update: Update, context):
         await confirm_demote_all(update, context)
         return
 
-    for arabic_cmd, handler in ARABIC_COMMANDS.items():
+    for arabic_cmd, handler in sorted(ARABIC_COMMANDS.items(), key=lambda x: len(x[0]), reverse=True):
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
             args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
             context.args = args
@@ -175,7 +175,7 @@ async def handle_private(update: Update, context):
 
     text = msg.text.strip()
 
-    for arabic_cmd, handler in ARABIC_COMMANDS.items():
+    for arabic_cmd, handler in sorted(ARABIC_COMMANDS.items(), key=lambda x: len(x[0]), reverse=True):
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
             args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
             context.args = args
