@@ -29,7 +29,7 @@ from handlers.ai import (
 from handlers.dev import (
     cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats, cmd_backup,
 )
-from handlers.jobs import cmd_report, cmd_deep_report
+from handlers.jobs import cmd_report, cmd_deep_report, cmd_weekly_report_now
 from handlers.menu import cmd_menu
 from handlers.locks import (
     cmd_lock_links, cmd_unlock_links,
@@ -173,7 +173,8 @@ ARABIC_COMMANDS = {
     "يوت": cmd_yt_search,
     "بحث": cmd_sc_search,
 
-    # نظام الدعم النفسي
+    "تقرير أسبوعي": cmd_weekly_report_now,
+    "تقرير اسبوعي": cmd_weekly_report_now,
     "ضبط دعم المشرفين": cmd_setup_admin_support,
     "ضبط دعم الأعضاء": cmd_setup_members_support,
     "أحتاج أحد": cmd_need_someone,
