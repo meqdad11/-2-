@@ -94,7 +94,7 @@ async def handle_start_cmd(update: Update, context):
     if context.args and context.args[0].startswith("enc_"):
         await handle_start_encouragement(update, context)
         return
-    await cmd_start(update, context)
+    await cmd_menu(update, context)
 
 
 async def handle_text(update: Update, context):
