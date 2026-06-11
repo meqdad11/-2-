@@ -38,7 +38,7 @@ from handlers.moderation import (
 from handlers.jobs import (
     cmd_report, job_expire_bans,
     job_daily_quote, job_reschedule_reminders,
-    _send_daily_reminder,
+    _send_daily_reminder, job_weekly_report,
 )
 from handlers.ai import (
     cmd_shafaq, cmd_choose_model, callback_choose_model,
@@ -90,7 +90,6 @@ logger = logging.getLogger(__name__)
 SAUDI_TZ = pytz.timezone('Asia/Riyadh')
 
 
-# ✅ البوابة الجديدة لـ /start
 async def handle_start_cmd(update: Update, context):
     if context.args and context.args[0].startswith("enc_"):
         await handle_start_encouragement(update, context)
@@ -170,14 +169,12 @@ async def handle_text(update: Update, context):
 
 
 async def handle_private(update: Update, context):
-    """معالجة الرسائل الخاصة"""
     msg = update.message
     if not msg or not msg.text:
         return
 
     text = msg.text.strip()
 
-    # معالجة الأوامر العربية في الخاص
     for arabic_cmd, handler in ARABIC_COMMANDS.items():
         if text == arabic_cmd or text.startswith(arabic_cmd + " "):
             args = text[len(arabic_cmd):].strip().split() if len(text) > len(arabic_cmd) else []
@@ -185,7 +182,6 @@ async def handle_private(update: Update, context):
             await handler(update, context)
             return
 
-    # معالجة نص التشجيع (start يعالجه handle_start_cmd)
     if await handle_private_encouragement(update, context):
         return
 
@@ -229,7 +225,6 @@ async def post_init(app):
 
 
 def register_handlers(app):
-    # ✅ start يمر من البوابة الجديدة
     app.add_handler(CommandHandler("start", handle_start_cmd))
     app.add_handler(CommandHandler("id", cmd_id))
     app.add_handler(CommandHandler("ban", cmd_ban))
@@ -281,6 +276,13 @@ def register_jobs(app):
     jq.run_daily(
         job_daily_quote,
         time=datetime.time(hour=9, minute=0, second=0, tzinfo=SAUDI_TZ)
+    )
+    # التقرير الأسبوعي — كل جمعة الساعة 8 مساءً
+    jq.run_daily(
+        job_weekly_report,
+        time=datetime.time(hour=20, minute=0, second=0, tzinfo=SAUDI_TZ),
+        days=(4,),  # 4 = الجمعة
+        name="weekly_report"
     )
 
 
