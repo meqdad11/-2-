@@ -275,9 +275,10 @@ async def cmd_weekly_report_now(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text("⏳ جاري إعداد التقرير...")
     # نستدعي نفس دالة التقرير لكن للمجموعة الحالية فقط
     chat_id = update.effective_chat.id
-    from datetime import datetime as dt_now
-    week_start = (dt_now(TIMEZONE) - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
-    week_end = dt_now(TIMEZONE).strftime("%Y-%m-%d")
+    from datetime import datetime as dt_now_cls
+    now = dt_now_cls.now(TIMEZONE)
+    week_start = (now - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    week_end = now.strftime("%Y-%m-%d")
     try:
         chat_name = await db.get_chat_name(chat_id)
         top_members = await db.get_top_members(chat_id, limit=10)
