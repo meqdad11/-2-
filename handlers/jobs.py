@@ -275,6 +275,7 @@ async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
     for chat_id in chats:
         try:
             # ===== جمع البيانات =====
+            chat_name = await db.get_chat_name(chat_id)
             top_members = await db.get_top_members(chat_id, limit=10)
             total_msgs = sum(m["message_count"] for m in top_members) if top_members else 0
             active_count = len(top_members)
@@ -287,6 +288,7 @@ async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
             # ===== بناء الرسائل =====
             report = (
                 f"📊 **التقرير الأسبوعي**\n"
+                f"🏠 المجموعة: {chat_name}\n"
                 f"📅 {week_start} — {week_end}\n\n"
                 f"**👥 النشاط:**\n"
                 f"• إجمالي الرسائل: {total_msgs}\n"
