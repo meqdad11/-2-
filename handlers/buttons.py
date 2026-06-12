@@ -48,7 +48,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "emergency_confirm":
         from handlers.support import get_admin_group
-        admin_group_id = await get_admin_group(chat_id)
 
         clean_chat_id = str(chat_id).replace("-100", "")
         message_link = f"https://t.me/c/{clean_chat_id}/{msg.message_id}"
@@ -72,35 +71,52 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )]
         ]
 
-        if admin_group_id:
+        # لو الرسالة من خاص — ترسل لي مباشرة
+        is_private = chat_id > 0
+        if is_private:
             try:
                 await context.bot.send_message(
-                    admin_group_id,
+                    729970974,
                     alert_text,
                     parse_mode="Markdown",
                     reply_markup=InlineKeyboardMarkup(keyboard_admin)
                 )
             except Exception as e:
-                logger.error(f"emergency_confirm notify error: {e}")
+                logger.error(f"emergency_confirm DM to dev error: {e}")
         else:
-            # إرسال خاص لكل مشرف
-            try:
-                admins = await context.bot.get_chat_administrators(chat_id)
-                for admin in admins:
-                    if not admin.user.is_bot:
-                        try:
-                            await context.bot.send_message(
-                                admin.user.id,
-                                alert_text,
-                                parse_mode="Markdown",
-                                reply_markup=InlineKeyboardMarkup(keyboard_admin)
-                            )
-                        except:
-                            pass
-            except Exception as e:
-                logger.error(f"emergency_confirm admin DM error: {e}")
+            admin_group_id = await get_admin_group(chat_id)
+            if admin_group_id:
+                try:
+                    await context.bot.send_message(
+                        admin_group_id,
+                        alert_text,
+                        parse_mode="Markdown",
+                        reply_markup=InlineKeyboardMarkup(keyboard_admin)
+                    )
+                except Exception as e:
+                    logger.error(f"emergency_confirm notify error: {e}")
+            else:
+                try:
+                    admins = await context.bot.get_chat_administrators(chat_id)
+                    for admin in admins:
+                        if not admin.user.is_bot:
+                            try:
+                                await context.bot.send_message(
+                                    admin.user.id,
+                                    alert_text,
+                                    parse_mode="Markdown",
+                                    reply_markup=InlineKeyboardMarkup(keyboard_admin)
+                                )
+                            except:
+                                pass
+                except Exception as e:
+                    logger.error(f"emergency_confirm admin DM error: {e}")
 
-        keyboard = [[InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
+        # رسالة الرد للمستخدم — مع زر يفتح محادثة معك في الخاص
+        keyboard = [
+            [InlineKeyboardButton("💬 راسل المطور مباشرة", url="https://t.me/Me8dad")],
+            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]
+        ]
         await msg.edit_text(
             "💙 لست وحدك.\n\n"
             "تم إبلاغ المشرفين وسيتواصلون معك قريباً.\n\n"
