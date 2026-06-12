@@ -194,11 +194,6 @@ async def cmd_need_someone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-    if not admin_group_id:
-        return
-
-    # بناء لينك الرسالة — يشتغل للقروبات الخاصة إذا البوت مشرف
-    # chat_id للقروبات الخاصة يبدأ بـ -100، نحذف الـ -100 للينك
     clean_chat_id = str(chat_id).replace("-100", "")
     message_link = f"https://t.me/c/{clean_chat_id}/{msg.message_id}"
 
@@ -221,15 +216,33 @@ async def cmd_need_someone(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )]
     ]
 
-    try:
-        await context.bot.send_message(
-            admin_group_id,
-            alert_text,
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-    except Exception as e:
-        logger.error(f"Failed to notify admin group: {e}")
+    if admin_group_id:
+        try:
+            await context.bot.send_message(
+                admin_group_id,
+                alert_text,
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(keyboard)
+            )
+        except Exception as e:
+            logger.error(f"Failed to notify admin group: {e}")
+    else:
+        # إرسال خاص لكل مشرف
+        try:
+            admins = await context.bot.get_chat_administrators(chat_id)
+            for admin in admins:
+                if not admin.user.is_bot:
+                    try:
+                        await context.bot.send_message(
+                            admin.user.id,
+                            alert_text,
+                            parse_mode="Markdown",
+                            reply_markup=InlineKeyboardMarkup(keyboard)
+                        )
+                    except:
+                        pass
+        except Exception as e:
+            logger.error(f"Failed to notify admins via DM: {e}")
 
 # ========================================
 # إرسال تشجيع — سري عبر DM
