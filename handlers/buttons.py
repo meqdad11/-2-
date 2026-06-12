@@ -49,6 +49,8 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "emergency_confirm":
         from handlers.support import get_admin_group
 
+        is_private = chat_id > 0
+        chat_context = "خاص مع البوت" if is_private else (msg.chat.title or "مجموعة")
         clean_chat_id = str(chat_id).replace("-100", "")
         message_link = f"https://t.me/c/{clean_chat_id}/{msg.message_id}"
 
@@ -71,7 +73,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )]
         ]
 
-        chat_context = "خاص مع البوت" if is_private else (msg.chat.title or "مجموعة")
         if is_private:
             try:
                 await context.bot.send_message(
