@@ -14,6 +14,7 @@ from handlers.admin import (
     cmd_demote_all, cmd_purge_bans, cmd_purge_muted,
     cmd_tag_all, cmd_my_rank, cmd_his_rank,
     cmd_pin, cmd_unpin, cmd_warn_user, cmd_userfile,
+    cmd_mutelist, cmd_warnlist,
 )
 from handlers.moderation import (
     cmd_add_word, cmd_remove_word, cmd_list_words,
@@ -79,6 +80,8 @@ ARABIC_COMMANDS = {
     "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
     "قائمة": cmd_banlist, "معلومات": cmd_baninfo, "تحقق": cmd_checkban,
     "تحذير": cmd_warn, "مسح التحذير": cmd_clearwarn, "التحذيرات": cmd_warnings,
+    "المكتومين": cmd_mutelist, "قائمة المكتومين": cmd_mutelist,
+    "المحذرين": cmd_warnlist, "قائمة المحذرين": cmd_warnlist,
     "كتم": cmd_mute, "رفع الكتم": cmd_unmute,
     "أغلق المجموعة": cmd_lock, "افتح المجموعة": cmd_unlock,
     "سجل": cmd_eventlog, "تقرير": cmd_report,
