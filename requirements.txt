@@ -12,3 +12,4 @@ uvicorn
 jinja2
 flask
 gunicorn
+python-multipart
