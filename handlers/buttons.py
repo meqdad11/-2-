@@ -57,7 +57,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"🆘 **طلب مساعدة فورية**\n\n"
             f"👤 العضو: {user_mention}\n"
             f"🆔 المعرف: `{user.id}`\n"
-            f"💬 المجموعة: {msg.chat.title or 'مجموعة'}\n\n"
+            f"💬 المصدر: {chat_context}\n\n"
             f"يرجى التواصل معه في أقرب وقت."
         )
         keyboard_admin = [
@@ -71,8 +71,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )]
         ]
 
-        # لو الرسالة من خاص — ترسل لي مباشرة
-        is_private = chat_id > 0
+        chat_context = "خاص مع البوت" if is_private else (msg.chat.title or "مجموعة")
         if is_private:
             try:
                 await context.bot.send_message(
