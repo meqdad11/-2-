@@ -82,6 +82,23 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception as e:
                 logger.error(f"emergency_confirm notify error: {e}")
+        else:
+            # إرسال خاص لكل مشرف
+            try:
+                admins = await context.bot.get_chat_administrators(chat_id)
+                for admin in admins:
+                    if not admin.user.is_bot:
+                        try:
+                            await context.bot.send_message(
+                                admin.user.id,
+                                alert_text,
+                                parse_mode="Markdown",
+                                reply_markup=InlineKeyboardMarkup(keyboard_admin)
+                            )
+                        except:
+                            pass
+            except Exception as e:
+                logger.error(f"emergency_confirm admin DM error: {e}")
 
         keyboard = [[InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
         await msg.edit_text(
