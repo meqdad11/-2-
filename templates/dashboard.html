@@ -8,13 +8,11 @@
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: Arial, sans-serif; background: #12121f; color: #e0e0e0; padding: 16px; }
-        h1 { font-size: 1.4em; margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px; }
+        h1 { font-size: 1.4em; margin-bottom: 16px; color: #fff; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
         h2 { font-size: 1em; color: #ffb347; margin-bottom: 12px; }
         h3 { font-size: 0.9em; color: #aaa; margin-bottom: 8px; }
 
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
-
         .card { background: #1e1e30; border-radius: 12px; padding: 16px; }
         .card.full { grid-column: 1 / -1; }
 
@@ -43,11 +41,32 @@
         .progress-bar { height: 6px; border-radius: 4px; background: #ffb347; }
 
         .empty { color: #555; font-size: 0.8em; text-align: center; padding: 12px; }
+
+        .btn { border: none; border-radius: 6px; padding: 4px 10px; font-size: 0.75em;
+               cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.8; }
+        .btn-red { background: #ff4444; color: #fff; }
+        .btn-green { background: #44bb44; color: #fff; }
+        .btn-yellow { background: #ffb347; color: #000; }
+        .btn-gray { background: #444; color: #ccc; }
+
+        .logout { font-size: 0.8em; color: #888; text-decoration: none; padding: 6px 12px;
+                  border: 1px solid #333; border-radius: 8px; }
+        .logout:hover { color: #ff6666; border-color: #ff6666; }
+
+        .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+                 background: #44bb44; color: #fff; padding: 10px 20px; border-radius: 8px;
+                 font-size: 0.85em; display: none; z-index: 999; }
     </style>
 </head>
 <body>
 
-<h1>🌅 بوت شفق — لوحة التحكم</h1>
+<div class="toast" id="toast"></div>
+
+<h1>
+    🌅 بوت شفق — لوحة التحكم
+    <a href="/logout" class="logout">خروج</a>
+</h1>
 
 <!-- إحصائيات رئيسية -->
 <div class="grid">
@@ -79,12 +98,12 @@
     </div>
 </div>
 
-<!-- نظام الأزمات -->
+<!-- نظام الأزمات مع أزرار تحكم -->
 <div class="section card">
     <h2>🚨 نظام الأزمات</h2>
     {% if crisis_data %}
     <table>
-        <tr><th>المجموعة</th><th>الحالة</th><th>الكلمات</th></tr>
+        <tr><th>المجموعة</th><th>الحالة</th><th>الكلمات</th><th>تحكم</th></tr>
         {% for c in crisis_data %}
         <tr>
             <td>{{ c.chat_name }}</td>
@@ -96,6 +115,13 @@
                 {% endif %}
             </td>
             <td>{{ c.word_count }} كلمة</td>
+            <td>
+                {% if c.enabled %}
+                <button class="btn btn-red" onclick="toggleCrisis('{{ c.chat_id }}', false)">تعطيل</button>
+                {% else %}
+                <button class="btn btn-green" onclick="toggleCrisis('{{ c.chat_id }}', true)">تفعيل</button>
+                {% endif %}
+            </td>
         </tr>
         {% endfor %}
     </table>
@@ -157,17 +183,20 @@
     {% endif %}
 </div>
 
-<!-- المحظورون الحاليون -->
+<!-- المحظورون مع زر رفع الحظر -->
 <div class="section card">
     <h2>🚫 المحظورون الحاليون</h2>
     {% if ban_list %}
     <table>
-        <tr><th>المعرف</th><th>السبب</th><th>التاريخ</th></tr>
+        <tr><th>المعرف</th><th>السبب</th><th>التاريخ</th><th>تحكم</th></tr>
         {% for b in ban_list %}
         <tr>
             <td>{{ b.user_id }}</td>
             <td>{{ b.reason or '—' }}</td>
             <td>{{ b.created_at[:10] if b.created_at else '—' }}</td>
+            <td>
+                <button class="btn btn-yellow" onclick="removeBan('{{ b.user_id }}', '{{ b.chat_id }}')">رفع الحظر</button>
+            </td>
         </tr>
         {% endfor %}
     </table>
@@ -198,6 +227,47 @@
     آخر تحديث: {{ last_update }} — يتجدد تلقائياً كل دقيقة
     <br>بواسطة @Me8dad
 </div>
+
+<script>
+function showToast(msg, color = '#44bb44') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.background = color;
+    t.style.display = 'block';
+    setTimeout(() => t.style.display = 'none', 2500);
+}
+
+async function toggleCrisis(chatId, enabled) {
+    const res = await fetch('/api/crisis/toggle', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({chat_id: chatId, enabled: enabled})
+    });
+    const data = await res.json();
+    if (data.success) {
+        showToast(enabled ? '✅ تم تفعيل الأزمات' : '🔴 تم تعطيل الأزمات');
+        setTimeout(() => location.reload(), 1500);
+    } else {
+        showToast('❌ فشل العملية', '#ff4444');
+    }
+}
+
+async function removeBan(userId, chatId) {
+    if (!confirm('هل تريد رفع الحظر عن هذا المستخدم؟')) return;
+    const res = await fetch('/api/ban/remove', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({user_id: userId, chat_id: chatId})
+    });
+    const data = await res.json();
+    if (data.success) {
+        showToast('✅ تم رفع الحظر');
+        setTimeout(() => location.reload(), 1500);
+    } else {
+        showToast('❌ فشل العملية', '#ff4444');
+    }
+}
+</script>
 
 </body>
 </html>
