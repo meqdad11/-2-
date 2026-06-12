@@ -632,3 +632,83 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
 
+# ==================== قائمة المكتومين ====================
+async def cmd_mutelist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        return
+    chat = update.effective_chat
+    try:
+        members = await context.bot.get_chat_administrators(chat.id)
+        # نجيب من سجل الأحداث
+        events = await db.get_event_log(chat.id, 100)
+        muted_ids = set()
+        unmuted_ids = set()
+        for e in events:
+            if e.get("action") == "mute":
+                muted_ids.add(e.get("target_id"))
+            elif e.get("action") == "unmute":
+                unmuted_ids.add(e.get("target_id"))
+        active_muted = muted_ids - unmuted_ids
+        if not active_muted:
+            await update.message.reply_text("✅ لا يوجد مكتومون حالياً.")
+            return
+        lines = []
+        for uid in list(active_muted)[:20]:
+            try:
+                member = await context.bot.get_chat_member(chat.id, uid)
+                if member.status == 'restricted' and not member.can_send_messages:
+                    name = member.user.full_name or member.user.first_name
+                    lines.append(f"• {name} (`{uid}`)")
+            except:
+                lines.append(f"• `{uid}`")
+        if not lines:
+            await update.message.reply_text("✅ لا يوجد مكتومون حالياً.")
+            return
+        await update.message.reply_text(
+            f"🔇 **المكتومون ({len(lines)}):**\n" + "\n".join(lines),
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"فشل جلب المكتومين: {e}")
+        await update.message.reply_text("❌ حدث خطأ.")
+
+# ==================== قائمة المحذّرين ====================
+async def cmd_warnlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await require_admin(update, context):
+        return
+    chat = update.effective_chat
+    try:
+        # نجيب من جدول warnings مباشرة
+        from utils.database import supabase
+        import asyncio
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("warnings")
+                .select("user_id, count")
+                .eq("chat_id", chat.id)
+                .gt("count", 0)
+                .order("count", desc=True)
+                .execute()
+        )
+        if not result.data:
+            await update.message.reply_text("✅ لا يوجد محذّرون حالياً.")
+            return
+        lines = []
+        for row in result.data[:20]:
+            uid = row["user_id"]
+            count = row["count"]
+            try:
+                member = await context.bot.get_chat_member(chat.id, uid)
+                name = member.user.full_name or member.user.first_name
+            except:
+                name = str(uid)
+            lines.append(f"• {name} — {count}/{MAX_WARNINGS} تحذير")
+        await update.message.reply_text(
+            f"⚠️ **المحذّرون ({len(lines)}):**\n" + "\n".join(lines),
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"فشل جلب المحذّرين: {e}")
+        await update.message.reply_text("❌ حدث خطأ.")
+
+
