@@ -1017,3 +1017,100 @@ async def search_group_messages(chat_id: int, keyword: str, limit: int = 20) -> 
     except Exception as e:
         print(f"خطأ في البحث في رسائل المجموعة: {e}")
         return []
+
+# ==================== دوال المكتومين ====================
+async def add_mute(user_id: int, chat_id: int, muted_by: int = 0):
+    if not supabase:
+        return
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("mutes").upsert({
+                "user_id": user_id,
+                "chat_id": chat_id,
+                "muted_by": muted_by,
+                "created_at": now_iso()
+            }).execute()
+        )
+    except Exception as e:
+        print(f"خطأ في حفظ الكتم: {e}")
+
+async def remove_mute(user_id: int, chat_id: int):
+    if not supabase:
+        return
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("mutes").delete()
+                .eq("user_id", user_id)
+                .eq("chat_id", chat_id)
+                .execute()
+        )
+    except Exception as e:
+        print(f"خطأ في حذف الكتم: {e}")
+
+async def get_mute_list(chat_id: int) -> list:
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("mutes").select("*")
+                .eq("chat_id", chat_id)
+                .execute()
+        )
+        return result.data if result.data else []
+    except Exception as e:
+        print(f"خطأ في جلب المكتومين: {e}")
+        return []
+
+# ==================== دوال التحذيرات المفصّلة ====================
+async def add_warn_log(user_id: int, chat_id: int, warned_by: int = 0, reason: str = None):
+    if not supabase:
+        return
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("warns_log").insert({
+                "user_id": user_id,
+                "chat_id": chat_id,
+                "warned_by": warned_by,
+                "reason": reason,
+                "created_at": now_iso()
+            }).execute()
+        )
+    except Exception as e:
+        print(f"خطأ في حفظ التحذير: {e}")
+
+async def remove_warn_log(user_id: int, chat_id: int):
+    """حذف جميع تحذيرات عضو عند مسح تحذيراته"""
+    if not supabase:
+        return
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("warns_log").delete()
+                .eq("user_id", user_id)
+                .eq("chat_id", chat_id)
+                .execute()
+        )
+    except Exception as e:
+        print(f"خطأ في حذف التحذيرات: {e}")
+
+async def get_warn_list(chat_id: int) -> list:
+    """جلب قائمة المحذّرين مع عدد التحذيرات"""
+    if not supabase:
+        return []
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("warnings").select("user_id, count")
+                .eq("chat_id", chat_id)
+                .gt("count", 0)
+                .order("count", desc=True)
+                .execute()
+        )
+        return result.data if result.data else []
+    except Exception as e:
+        print(f"خطأ في جلب المحذّرين: {e}")
+        return []
