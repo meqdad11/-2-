@@ -11,20 +11,25 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
     result = update.chat_member
     if not result:
         return
+
     new_member = result.new_chat_member
     old_member = result.old_chat_member
     chat_id = result.chat.id
     user = new_member.user
 
-    # عضو دخل فعلاً من خارج المجموعة
-    is_new_member = old_member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED)
+    # ===== تجاهل أي تغيير في الصلاحيات (كتم، رفع كتم، إلخ) =====
+    # نهتم فقط لما العضو يدخل المجموعة فعلاً
+    if new_member.status == ChatMemberStatus.RESTRICTED:
+        return
 
-    # تجاهل تغييرات الكتم أو القيود — نتحقق أن العضو كان خارج المجموعة فعلاً
+    # ===== تجاهل لو العضو لم يكن خارج المجموعة =====
+    is_new_member = old_member.status in (ChatMemberStatus.LEFT, ChatMemberStatus.BANNED)
     if not is_new_member:
         return
 
-    # العضو دخل وحالته الجديدة عضو أو مقيد (مثلاً قيود افتراضية)
-    if new_member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.RESTRICTED):
+    # ===== العضو دخل المجموعة =====
+    if new_member.status == ChatMemberStatus.MEMBER:
+        # تحقق من الحظر
         ban = await db.get_ban(user.id, chat_id)
         if ban:
             try:
@@ -45,42 +50,43 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
             except Exception:
                 pass
             await db.log_bot_action(chat_id, "auto_kick_banned", user_id=user.id, detail=reason)
-        else:
-            # التحقق من إعداد الترحيب
-            welcome_enabled = await db.get_setting(chat_id, "welcome_enabled")
-            if welcome_enabled == "no":
-                return
+            return
 
+        # تحقق من إعداد الترحيب
+        welcome_enabled = await db.get_setting(chat_id, "welcome_enabled")
+        if welcome_enabled == "no":
+            return
+
+        # إرسال رسالة الترحيب
+        try:
+            bio = "غير محدد"
             try:
-                bio = "غير محدد"
-                try:
-                    full_chat = await context.bot.get_chat(user.id)
-                    if full_chat.bio:
-                        bio = full_chat.bio
-                except:
-                    pass
+                full_chat = await context.bot.get_chat(user.id)
+                if full_chat.bio:
+                    bio = full_chat.bio
+            except:
+                pass
 
-                photos = await context.bot.get_user_profile_photos(user.id, limit=1)
-                username = f"@{user.username}" if user.username else "بدون يوزر"
-                welcome = (
-                    f"👋 أهلاً وسهلاً {user.first_name}!\n"
-                    f"🆔 المعرف: {user.id}\n"
-                    f"📎 اليوزر: {username}\n"
-                    f"📝 البايو: {bio}\n\n"
-                    f"نرحب بك في مجموعتنا. 😊\n"
-                    f"يرجى الالتزام بالقواعد واحترام الجميع."
-                )
-                if photos.total_count > 0:
-                    await context.bot.send_photo(
-                        chat_id,
-                        photo=photos.photos[0][-1].file_id,
-                        caption=welcome
-                    )
-                else:
-                    await context.bot.send_message(chat_id, welcome)
-            except Exception:
-                await context.bot.send_message(
+            photos = await context.bot.get_user_profile_photos(user.id, limit=1)
+            username = f"@{user.username}" if user.username else "بدون يوزر"
+            welcome = (
+                f"👋 أهلاً وسهلاً {user.first_name}!\n"
+                f"🆔 المعرف: {user.id}\n"
+                f"📎 اليوزر: {username}\n"
+                f"📝 البايو: {bio}\n\n"
+                f"نرحب بك في مجموعتنا. 😊\n"
+                f"يرجى الالتزام بالقواعد واحترام الجميع."
+            )
+            if photos.total_count > 0:
+                await context.bot.send_photo(
                     chat_id,
-                    f"👋 أهلاً {user.first_name}! نرحب بك في مجموعتنا. 😊"
+                    photo=photos.photos[0][-1].file_id,
+                    caption=welcome
                 )
- 
+            else:
+                await context.bot.send_message(chat_id, welcome)
+        except Exception:
+            await context.bot.send_message(
+                chat_id,
+                f"👋 أهلاً {user.first_name}! نرحب بك في مجموعتنا. 😊"
+            )
