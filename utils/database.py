@@ -1019,7 +1019,7 @@ async def search_group_messages(chat_id: int, keyword: str, limit: int = 20) -> 
         return []
 
 # ==================== دوال المكتومين ====================
-async def add_mute(user_id: int, chat_id: int, muted_by: int = 0):
+async def add_mute(user_id: int, chat_id: int, muted_by: int = 0, expires_at=None):
     if not supabase:
         return
     try:
@@ -1029,6 +1029,7 @@ async def add_mute(user_id: int, chat_id: int, muted_by: int = 0):
                 "user_id": user_id,
                 "chat_id": chat_id,
                 "muted_by": muted_by,
+                "expires_at": expires_at.isoformat() if expires_at else None,
                 "created_at": now_iso()
             }).execute()
         )
@@ -1064,6 +1065,23 @@ async def get_mute_list(chat_id: int) -> list:
         print(f"خطأ في جلب المكتومين: {e}")
         return []
 
+async def get_expired_mutes() -> list:
+    if not supabase:
+        return []
+    try:
+        now = now_iso()
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("mutes").select("*")
+                .lt("expires_at", now)
+                .not_.is_("expires_at", "null")
+                .execute()
+        )
+        return result.data if result.data else []
+    except Exception as e:
+        print(f"خطأ في جلب المكتومين المنتهين: {e}")
+        return []
+
 # ==================== دوال التحذيرات المفصّلة ====================
 async def add_warn_log(user_id: int, chat_id: int, warned_by: int = 0, reason: str = None):
     if not supabase:
@@ -1083,7 +1101,6 @@ async def add_warn_log(user_id: int, chat_id: int, warned_by: int = 0, reason: s
         print(f"خطأ في حفظ التحذير: {e}")
 
 async def remove_warn_log(user_id: int, chat_id: int):
-    """حذف جميع تحذيرات عضو عند مسح تحذيراته"""
     if not supabase:
         return
     try:
@@ -1098,7 +1115,6 @@ async def remove_warn_log(user_id: int, chat_id: int):
         print(f"خطأ في حذف التحذيرات: {e}")
 
 async def get_warn_list(chat_id: int) -> list:
-    """جلب قائمة المحذّرين مع عدد التحذيرات"""
     if not supabase:
         return []
     try:
