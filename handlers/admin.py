@@ -151,7 +151,7 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
             until = datetime.now(timezone.utc) + duration
         await context.bot.restrict_chat_member(update.effective_chat.id, target_id, perms, until_date=until)
         await db.log_event(update.effective_chat.id, "mute", user_id=update.effective_user.id, target_id=target_id)
-        await db.add_mute(target_id, update.effective_chat.id, update.effective_user.id)
+        await db.add_mute(target_id, update.effective_chat.id, update.effective_user.id, expires_at=until)
         duration_str = fmt_duration(duration)
         await update.message.reply_text(f"🔇 تم كتم {target_name} - {duration_str}")
     except Exception as e:
