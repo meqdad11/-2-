@@ -404,3 +404,24 @@ async def job_weekly_report(context: ContextTypes.DEFAULT_TYPE):
 
         except Exception as e:
             logger.error(f"فشل إرسال التقرير الأسبوعي للمجموعة {chat_id}: {e}")
+
+# ========== دالة رفع الكتم المنتهي ==========
+async def job_expire_mutes(context: ContextTypes.DEFAULT_TYPE):
+    """فحص الكتم المؤقت ورفعه تلقائياً عند انتهاء المدة"""
+    from telegram import ChatPermissions
+    expired = await db.get_expired_mutes()
+    for mute in expired:
+        user_id = mute["user_id"]
+        chat_id = mute["chat_id"]
+        try:
+            perms = ChatPermissions(
+                can_send_messages=True, can_send_polls=True,
+                can_send_other_messages=True, can_add_web_page_previews=True
+            )
+            await context.bot.restrict_chat_member(chat_id, user_id, perms)
+            await db.remove_mute(user_id, chat_id)
+            logger.info(f"تم رفع الكتم عن {user_id} في مجموعة {chat_id}")
+        except Exception as e:
+            logger.error(f"فشل رفع الكتم التلقائي: {e}")
+            # إذا فشل رفعه من تيليجرام، نحذفه من القاعدة على أي حال
+            await db.remove_mute(user_id, chat_id)
