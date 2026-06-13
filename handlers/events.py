@@ -83,3 +83,4 @@ async def on_chat_member_updated(update: Update, context: ContextTypes.DEFAULT_T
                     chat_id,
                     f"👋 أهلاً {user.first_name}! نرحب بك في مجموعتنا. 😊"
                 )
+ 
