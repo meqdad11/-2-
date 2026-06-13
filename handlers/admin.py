@@ -10,7 +10,7 @@ from config import MAX_WARNINGS
 from utils.helpers import (
     is_admin, require_admin, get_reply_user,
     can_restrict, parse_ban_args, fmt_user, fmt_duration,
-    extract_target  # ✅ إضافة الدالة الجديدة
+    extract_target
 )
 
 logger = logging.getLogger(__name__)
@@ -57,7 +57,6 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """رفع الحظر عن عضو وإرسال رابط المجموعة للمشرف"""
     if not await require_admin(update, context):
         return
     target_id, target_name, _ = await extract_target(update, context)
@@ -67,16 +66,14 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     chat = update.effective_chat
 
-    # ✅ التحقق من وجود العضو في حالة حظر
     try:
         member = await context.bot.get_chat_member(chat.id, target_id)
         if member.status in ('member', 'administrator', 'creator'):
             await update.message.reply_text("⚠️ هذا العضو ليس محظوراً، بل هو موجود في المجموعة.")
             return
     except Exception:
-        pass  # العضو غير موجود أصلاً (طبيعي للمحظورين)
+        pass
 
-    # ✅ رفع الحظر
     try:
         await context.bot.unban_chat_member(chat.id, target_id)
         await db.remove_ban(target_id, chat.id, update.effective_user.id)
@@ -85,26 +82,21 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يمكن رفع الحظر عن هذا المستخدم.")
         return
 
-    # ✅ تجهيز يوزر العضو
     try:
         member = await context.bot.get_chat_member(chat.id, target_id)
         target_username = f"@{member.user.username}" if member.user.username else "بدون يوزر"
     except:
         target_username = "بدون يوزر"
 
-    # ✅ إنشاء رابط دعوة (إن أمكن)
     invite_link = None
     try:
         link_obj = await context.bot.create_chat_invite_link(
-            chat.id,
-            member_limit=1,
-            creates_join_request=False
+            chat.id, member_limit=1, creates_join_request=False
         )
         invite_link = link_obj.invite_link
     except Exception:
         pass
 
-    # ✅ إرسال رابط المجموعة للعضو تلقائياً عبر اليوزربوت
     auto_sent = False
     try:
         from telegram import Bot
@@ -113,12 +105,11 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
         link_to_send = invite_link if invite_link else f"https://t.me/{chat.username}" if chat.username else ""
         if link_to_send:
             cmd = f"/send_invite {target_id} {link_to_send}"
-            await bot.send_message(chat_id=729970974, text=cmd)  # 729970974 = حسابك
+            await bot.send_message(chat_id=729970974, text=cmd)
             auto_sent = True
     except Exception as e:
         logger.error(f"فشل إرسال أمر الدعوة التلقائي: {e}")
 
-    # ✅ إرسال رسالة إلى الشخص الذي فك الحظر
     msg_parts = [
         f"✅ **تم رفع الحظر عن:** {target_name}",
         f"👤 **اليوزر:** {target_username}",
@@ -126,7 +117,7 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if invite_link:
         msg_parts.append(f"🔗 **رابط المجموعة:** {invite_link}")
     else:
-        msg_parts.append("\n⚠️ تعذر إنشاء رابط. يمكنك نسخ رابط المجموعة يدوياً وإرساله له.")
+        msg_parts.append("\n⚠️ تعذر إنشاء رابط.")
 
     if auto_sent:
         msg_parts.append("\n📩 تم إرسال رابط المجموعة للعضو تلقائياً عبر المساعد.")
@@ -160,6 +151,7 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
             until = datetime.now(timezone.utc) + duration
         await context.bot.restrict_chat_member(update.effective_chat.id, target_id, perms, until_date=until)
         await db.log_event(update.effective_chat.id, "mute", user_id=update.effective_user.id, target_id=target_id)
+        await db.add_mute(target_id, update.effective_chat.id, update.effective_user.id)
         duration_str = fmt_duration(duration)
         await update.message.reply_text(f"🔇 تم كتم {target_name} - {duration_str}")
     except Exception as e:
@@ -182,6 +174,7 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         await context.bot.restrict_chat_member(update.effective_chat.id, target_id, perms)
         await db.log_event(update.effective_chat.id, "unmute", user_id=update.effective_user.id, target_id=target_id)
+        await db.remove_mute(target_id, update.effective_chat.id)
         await update.message.reply_text(f"🔊 تم رفع الكتم عن {target_name}")
     except Exception as e:
         logger.error(f"فشل رفع الكتم: {e}")
@@ -201,7 +194,9 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يمكن تحذير مشرف أو مالك المجموعة.")
         return
 
+    reason = " ".join(context.args) if context.args else None
     count = await db.add_warning(target_id, update.effective_chat.id)
+    await db.add_warn_log(target_id, update.effective_chat.id, update.effective_user.id, reason)
     await update.message.reply_text(f"⚠️ {target_name} تلقى تحذيراً ({count}/{MAX_WARNINGS})")
 
     if count >= MAX_WARNINGS:
@@ -209,6 +204,7 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.ban_chat_member(update.effective_chat.id, target_id)
             await db.add_ban(target_id, update.effective_chat.id, f"حظر تلقائي بعد {MAX_WARNINGS} تحذيرات", 0)
             await db.clear_warnings(target_id, update.effective_chat.id)
+            await db.remove_warn_log(target_id, update.effective_chat.id)
             await update.message.reply_text(f"🚫 تم حظر {target_name} تلقائياً.")
         except Exception as e:
             logger.error(f"فشل الحظر التلقائي: {e}")
@@ -221,6 +217,7 @@ async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ حدد مستخدم: بالرد، المعرف، أو اليوزر.")
         return
     await db.clear_warnings(target_id, update.effective_chat.id)
+    await db.remove_warn_log(target_id, update.effective_chat.id)
     await update.message.reply_text(f"✅ تم مسح تحذيرات {target_name}")
 
 
@@ -252,7 +249,6 @@ async def cmd_baninfo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not target_id:
         await update.message.reply_text("❌ حدد مستخدم: بالرد، المعرف، أو اليوزر.")
         return
-
     ban = await db.get_ban(target_id, update.effective_chat.id)
     if not ban:
         await update.message.reply_text("✅ هذا المستخدم غير محظور.")
@@ -327,7 +323,7 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يمكن الفتح.")
 
 
-# ==================== رفع/تنزيل مشرف (حصري للمالك والمطور) ====================
+# ==================== رفع/تنزيل مشرف ====================
 async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -348,13 +344,9 @@ async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     try:
         await context.bot.promote_chat_member(
-            chat.id,
-            target_id,
-            can_change_info=True,
-            can_delete_messages=True,
-            can_restrict_members=True,
-            can_invite_users=True,
-            can_pin_messages=True,
+            chat.id, target_id,
+            can_change_info=True, can_delete_messages=True,
+            can_restrict_members=True, can_invite_users=True, can_pin_messages=True,
         )
         await update.message.reply_text(f"✅ تم رفع {target_name} مشرفاً.")
     except Exception as e:
@@ -365,7 +357,6 @@ async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
-    
     try:
         member = await chat.get_member(user.id)
         is_creator = (member.status == 'creator')
@@ -396,32 +387,18 @@ async def cmd_demote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         await context.bot.promote_chat_member(
-            chat.id,
-            target_id,
-            can_change_info=False,
-            can_delete_messages=False,
-            can_restrict_members=False,
-            can_invite_users=False,
-            can_pin_messages=False,
-            can_manage_topics=False,
-            is_anonymous=False,
-            can_manage_chat=False,
-            can_post_messages=False,
-            can_edit_messages=False,
+            chat.id, target_id,
+            can_change_info=False, can_delete_messages=False,
+            can_restrict_members=False, can_invite_users=False,
+            can_pin_messages=False, can_manage_topics=False,
+            is_anonymous=False, can_manage_chat=False,
+            can_post_messages=False, can_edit_messages=False,
         )
         await update.message.reply_text(f"⬇️ تم تنزيل {target_name} من المشرفين.")
     except Exception as e:
         logger.error(f"فشل التنزيل: {e}")
-        error_msg = str(e).lower()
-        if "not enough rights" in error_msg or "rights" in error_msg:
-            await update.message.reply_text(
-                "❌ **البوت لا يملك صلاحية كافية!**\n\n"
-                "تأكد من أن البوت مشرف ولديه صلاحية 'إضافة مشرفين جدد'.\n"
-                "اذهب إلى: إعدادات المجموعة → المشرفين → بوت شفق → الصلاحيات.",
-                parse_mode="Markdown"
-            )
-        else:
-            await update.message.reply_text(f"❌ تعذر التنزيل: {e}")
+        await update.message.reply_text(f"❌ تعذر التنزيل: {e}")
+
 
 async def cmd_list_admins(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
@@ -439,9 +416,7 @@ async def cmd_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
     context.user_data['awaiting_demote_all'] = update.effective_chat.id
-    await update.message.reply_text(
-        "⚠️ هل أنت متأكد من تنزيل جميع المشرفين؟\nاكتب 'تأكيد' للمتابعة."
-    )
+    await update.message.reply_text("⚠️ هل أنت متأكد من تنزيل جميع المشرفين؟\nاكتب 'تأكيد' للمتابعة.")
 
 
 async def confirm_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -454,12 +429,9 @@ async def confirm_demote_all(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if admin.status == 'administrator' and not admin.user.is_bot:
                 try:
                     await context.bot.promote_chat_member(
-                        update.effective_chat.id,
-                        admin.user.id,
-                        can_change_info=False,
-                        can_delete_messages=False,
-                        can_restrict_members=False,
-                        can_invite_users=False,
+                        update.effective_chat.id, admin.user.id,
+                        can_change_info=False, can_delete_messages=False,
+                        can_restrict_members=False, can_invite_users=False,
                         can_pin_messages=False,
                     )
                     count += 1
@@ -571,10 +543,10 @@ async def cmd_unpin(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_warn_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر تنبيه - تحذير مع سبب"""
     await cmd_warn(update, context)
 
-# ==================== ملف العضو (أمر ملف) ====================
+
+# ==================== ملف العضو ====================
 async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     chat = update.effective_chat
@@ -592,19 +564,20 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     is_banned = "✅ محظور" if ban_info else "❌ غير محظور"
     is_muted = "❓ غير معروف"
+    username = "لا يوجد"
     try:
         member = await context.bot.get_chat_member(chat.id, target_id)
         if member.status == 'restricted' and not member.can_send_messages:
             is_muted = "✅ مكتوم"
         else:
             is_muted = "❌ غير مكتوم"
+        username = f"@{member.user.username}" if member.user.username else "لا يوجد"
     except:
         pass
 
-    username = f"@{member.user.username}" if member.user.username else "لا يوجد"
     text = (
         f"📁 **ملف العضو**\n\n"
-        f"👤 الاسم: {member.user.full_name or member.user.first_name}\n"
+        f"👤 الاسم: {target_name}\n"
         f"🆔 المعرف: {target_id}\n"
         f"📎 اليوزر: {username}\n"
         f"📅 أول ظهور: {first_seen or 'غير معروف'}\n"
@@ -639,35 +612,19 @@ async def cmd_mutelist(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     chat = update.effective_chat
     try:
-        # نجيب من user_stats كل الأعضاء المعروفين ونتحقق من حالتهم
-        from utils.database import supabase
-        import asyncio
-        result = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: supabase.table("user_stats")
-                .select("user_id, full_name")
-                .eq("chat_id", chat.id)
-                .execute()
-        )
-        if not result.data:
+        mutes = await db.get_mute_list(chat.id)
+        if not mutes:
             await update.message.reply_text("✅ لا يوجد مكتومون حالياً.")
             return
-
         lines = []
-        for row in result.data:
-            uid = row["user_id"]
+        for m in mutes[:20]:
+            uid = m["user_id"]
             try:
                 member = await context.bot.get_chat_member(chat.id, uid)
-                if member.status == 'restricted' and not member.can_send_messages:
-                    name = member.user.full_name or member.user.first_name
-                    lines.append(f"• {name} (`{uid}`)")
+                name = member.user.full_name or member.user.first_name
             except:
-                pass
-
-        if not lines:
-            await update.message.reply_text("✅ لا يوجد مكتومون حالياً.")
-            return
-
+                name = str(uid)
+            lines.append(f"• {name} (`{uid}`)")
         await update.message.reply_text(
             f"🔇 **المكتومون ({len(lines)}):**\n" + "\n".join(lines),
             parse_mode="Markdown"
@@ -676,29 +633,19 @@ async def cmd_mutelist(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"فشل جلب المكتومين: {e}")
         await update.message.reply_text("❌ حدث خطأ.")
 
+
 # ==================== قائمة المحذّرين ====================
 async def cmd_warnlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
     chat = update.effective_chat
     try:
-        # نجيب من جدول warnings مباشرة
-        from utils.database import supabase
-        import asyncio
-        result = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: supabase.table("warnings")
-                .select("user_id, count")
-                .eq("chat_id", chat.id)
-                .gt("count", 0)
-                .order("count", desc=True)
-                .execute()
-        )
-        if not result.data:
+        warns = await db.get_warn_list(chat.id)
+        if not warns:
             await update.message.reply_text("✅ لا يوجد محذّرون حالياً.")
             return
         lines = []
-        for row in result.data[:20]:
+        for row in warns[:20]:
             uid = row["user_id"]
             count = row["count"]
             try:
@@ -714,4 +661,3 @@ async def cmd_warnlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"فشل جلب المحذّرين: {e}")
         await update.message.reply_text("❌ حدث خطأ.")
-
