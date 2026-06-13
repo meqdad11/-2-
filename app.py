@@ -39,6 +39,7 @@ from handlers.jobs import (
     cmd_report, job_expire_bans,
     job_daily_quote, job_reschedule_reminders,
     _send_daily_reminder, job_weekly_report, cmd_weekly_report_now,
+    job_expire_mutes,
 )
 from handlers.ai import (
     cmd_shafaq, cmd_choose_model, callback_choose_model,
@@ -273,6 +274,7 @@ def register_handlers(app):
 def register_jobs(app):
     jq = app.job_queue
     jq.run_repeating(job_expire_bans, interval=300, first=10)
+    jq.run_repeating(job_expire_mutes, interval=60, first=30)
     jq.run_daily(
         job_daily_quote,
         time=datetime.time(hour=9, minute=0, second=0, tzinfo=SAUDI_TZ)
