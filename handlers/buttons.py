@@ -520,6 +520,9 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🧹 مسح المحظورين", callback_data="exec_purge_bans"),
              InlineKeyboardButton("🧹 مسح المكتومين", callback_data="exec_purge_muted")],
             [InlineKeyboardButton("📊 إحصائيات المجموعة", callback_data="exec_stats")],
+            [InlineKeyboardButton("🔇 المكتومون", callback_data="exec_mutelist"),
+             InlineKeyboardButton("⚠️ المحذّرون", callback_data="exec_warnlist")],
+            [InlineKeyboardButton("📈 تقرير أسبوعي", callback_data="exec_weekly_report")],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin"),
              InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
@@ -908,6 +911,51 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
+
+    if data == "exec_mutelist":
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
+        from handlers.admin import cmd_mutelist
+        fake_update = FakeUpdate(msg)
+        context.args = []
+        await cmd_mutelist(fake_update, context)
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_manage"),
+                     InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
+        try:
+            await msg.edit_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
+        except:
+            pass
+        return
+
+    if data == "exec_warnlist":
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
+        from handlers.admin import cmd_warnlist
+        fake_update = FakeUpdate(msg)
+        context.args = []
+        await cmd_warnlist(fake_update, context)
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_manage"),
+                     InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
+        try:
+            await msg.edit_reply_markup(reply_markup=InlineKeyboardMarkup(keyboard))
+        except:
+            pass
+        return
+
+    if data == "exec_weekly_report":
+        if not await is_admin(update, context):
+            await query.answer("⛔ للمشرفين فقط", show_alert=True)
+            return
+        from handlers.jobs import cmd_weekly_report_now
+        fake_update = FakeUpdate(msg)
+        context.args = []
+        await cmd_weekly_report_now(fake_update, context)
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_manage"),
+                     InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")]]
+        await msg.edit_text("✅ تم إرسال التقرير الأسبوعي.", reply_markup=InlineKeyboardMarkup(keyboard))
+        return
 
 # ==================== دالة عرض نتيجة القفل مع زر الرجوع ====================
 async def show_lock_result(msg, text, back_callback):
