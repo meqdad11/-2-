@@ -632,38 +632,42 @@ async def cmd_userfile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except:
             pass
 
+
 # ==================== قائمة المكتومين ====================
 async def cmd_mutelist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await require_admin(update, context):
         return
     chat = update.effective_chat
     try:
-        members = await context.bot.get_chat_administrators(chat.id)
-        # نجيب من سجل الأحداث
-        events = await db.get_event_log(chat.id, 100)
-        muted_ids = set()
-        unmuted_ids = set()
-        for e in events:
-            if e.get("action") == "mute":
-                muted_ids.add(e.get("target_id"))
-            elif e.get("action") == "unmute":
-                unmuted_ids.add(e.get("target_id"))
-        active_muted = muted_ids - unmuted_ids
-        if not active_muted:
+        # نجيب من user_stats كل الأعضاء المعروفين ونتحقق من حالتهم
+        from utils.database import supabase
+        import asyncio
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("user_stats")
+                .select("user_id, full_name")
+                .eq("chat_id", chat.id)
+                .execute()
+        )
+        if not result.data:
             await update.message.reply_text("✅ لا يوجد مكتومون حالياً.")
             return
+
         lines = []
-        for uid in list(active_muted)[:20]:
+        for row in result.data:
+            uid = row["user_id"]
             try:
                 member = await context.bot.get_chat_member(chat.id, uid)
                 if member.status == 'restricted' and not member.can_send_messages:
                     name = member.user.full_name or member.user.first_name
                     lines.append(f"• {name} (`{uid}`)")
             except:
-                lines.append(f"• `{uid}`")
+                pass
+
         if not lines:
             await update.message.reply_text("✅ لا يوجد مكتومون حالياً.")
             return
+
         await update.message.reply_text(
             f"🔇 **المكتومون ({len(lines)}):**\n" + "\n".join(lines),
             parse_mode="Markdown"
@@ -710,5 +714,4 @@ async def cmd_warnlist(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"فشل جلب المحذّرين: {e}")
         await update.message.reply_text("❌ حدث خطأ.")
-
 
