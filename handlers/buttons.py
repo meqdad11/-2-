@@ -426,11 +426,13 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         keyboard = [
             [InlineKeyboardButton("👮 أوامر المشرفين", callback_data="menu_admin"),
              InlineKeyboardButton("👥 للجميع", callback_data="menu_user")],
-            [InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games"),
+            [InlineKeyboardButton("🎵 الميديا", callback_data="menu_media"),
              InlineKeyboardButton("📚 الموارد", callback_data="menu_resources")],
+            [InlineKeyboardButton("📋 الأوامر المتقدمة", callback_data="menu_commands"),
+             InlineKeyboardButton("🎮 ألعاب", callback_data="menu_games")],
             [InlineKeyboardButton("🔍 بحث جوجل", callback_data="menu_google"),
              InlineKeyboardButton("📞 تواصل", callback_data="menu_contact")],
-            [InlineKeyboardButton("🆘 طوارئ", callback_data="menu_emergency")],
+            [InlineKeyboardButton("🆘 طوارئ — أحتاج أحد", callback_data="menu_emergency")],
             [InlineKeyboardButton("📢 قناة تحديثات شفق", url="https://t.me/shafaqmeqdad")],
             [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
@@ -533,22 +535,22 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "menu_user":
         keyboard = [
             [InlineKeyboardButton("🪪 معلوماتي", callback_data="exec_id"),
-             InlineKeyboardButton("📈 إحصائياتي", callback_data="exec_member_stats"),
-             InlineKeyboardButton("💬 رسائلي", callback_data="exec_my_messages")],
-            [InlineKeyboardButton("📋 القواعد", callback_data="exec_rules"),
-             InlineKeyboardButton("📚 الموارد", callback_data="exec_resources"),
-             InlineKeyboardButton("🎁 هدية", callback_data="exec_gift")],
+             InlineKeyboardButton("📋 القواعد", callback_data="exec_rules")],
+            [InlineKeyboardButton("📚 الموارد", callback_data="exec_resources"),
+             InlineKeyboardButton("📈 إحصائياتي", callback_data="exec_member_stats")],
+            [InlineKeyboardButton("💬 رسائلي", callback_data="exec_my_messages"),
+             InlineKeyboardButton("🎁 هدية عشوائية", callback_data="exec_gift")],
             [InlineKeyboardButton("🌐 ترجمة", callback_data="exec_translate_msg"),
-             InlineKeyboardButton("⏰ تذكير", callback_data="exec_remind"),
-             InlineKeyboardButton("🔄 تذكير يومي", callback_data="exec_daily_remind")],
-            [InlineKeyboardButton("👤 المالك", callback_data="exec_owner"),
-             InlineKeyboardButton("💬 اقتباس", callback_data="exec_quote"),
+             InlineKeyboardButton("⏰ تذكير", callback_data="exec_remind")],
+            [InlineKeyboardButton("🔄 تذكير يومي", callback_data="exec_daily_remind"),
              InlineKeyboardButton("📋 تذكيراتي", callback_data="exec_my_reminders")],
-            [InlineKeyboardButton("❌ إلغاء تذكير يومي", callback_data="exec_cancel_daily_reminder")],
+            [InlineKeyboardButton("❌ إلغاء تذكير يومي", callback_data="exec_cancel_daily_reminder"),
+             InlineKeyboardButton("💬 اقتباس اليوم", callback_data="exec_quote")],
+            [InlineKeyboardButton("👤 المالك", callback_data="exec_owner")],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_main"),
              InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
-        await msg.edit_text("👥 **للمجتمع — اختر أمراً:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+        await msg.edit_text("👥 **للجميع — اختر أمراً:**", reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
         return
 
     # ==================== تنفيذ أوامر المستخدم ====================
@@ -702,7 +704,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
-        # استخدام الاسم الصحيح: get_mute_list
         mutes = await db.get_mute_list(chat_id)
         if not mutes:
             text = "✅ لا يوجد مكتومون حالياً"
@@ -718,7 +719,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
-        # استخدام الاسم الصحيح: get_warn_list
         warns = await db.get_warn_list(chat_id)
         if not warns:
             text = "✅ لا يوجد محذّرون حالياً"
@@ -734,7 +734,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
-        # استخدام الاسم الصحيح: clear_all_bans
         await db.clear_all_bans(chat_id)
         text = "✅ **تم مسح جميع المحظورين**"
         keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_manage"),
@@ -746,7 +745,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
-        # استخدام الاسم الصحيح: clear_all_mutes
         await db.clear_all_mutes(chat_id)
         text = "✅ **تم مسح جميع المكتومين**"
         keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="menu_manage"),
