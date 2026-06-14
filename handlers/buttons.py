@@ -465,9 +465,9 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
         keyboard = [
-            [InlineKeyboardButton("📋 قائمة المحظورين", callback_data="exec_banlist"),
-             InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin")],
-            [InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
+            [InlineKeyboardButton("📋 قائمة المحظورين", callback_data="exec_banlist")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin"),
+             InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
         await msg.edit_text(
             "🚫 **الحظر:**\n• حظر — رد على عضو\n• حظر 123 7d سبب — حظر مؤقت\n• رفع الحظر — رد على عضو\n• تحقق — رد على عضو\n• معلومات — رد على عضو",
@@ -481,6 +481,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
         keyboard = [
+            [InlineKeyboardButton("⚠️ قائمة المحذّرين", callback_data="exec_warnlist")],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin"),
              InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
@@ -496,6 +497,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
         keyboard = [
+            [InlineKeyboardButton("🔇 قائمة المكتومين", callback_data="exec_mutelist")],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin"),
              InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
         ]
@@ -520,8 +522,6 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🧹 مسح المحظورين", callback_data="exec_purge_bans"),
              InlineKeyboardButton("🧹 مسح المكتومين", callback_data="exec_purge_muted")],
             [InlineKeyboardButton("📊 إحصائيات المجموعة", callback_data="exec_stats")],
-            [InlineKeyboardButton("🔇 المكتومون", callback_data="exec_mutelist"),
-             InlineKeyboardButton("⚠️ المحذّرون", callback_data="exec_warnlist")],
             [InlineKeyboardButton("📈 تقرير أسبوعي", callback_data="exec_weekly_report")],
             [InlineKeyboardButton("🔙 رجوع", callback_data="menu_admin"),
              InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")],
