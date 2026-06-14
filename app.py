@@ -186,6 +186,8 @@ async def handle_private(update: Update, context):
     if await handle_private_encouragement(update, context):
         return
 
+    await handle_media_url(update, context)
+
 
 async def handle_channel_post(update: Update, context):
     msg = update.channel_post
