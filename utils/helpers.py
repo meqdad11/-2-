@@ -5,6 +5,9 @@ from typing import Optional
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from config import DEVELOPER_ID
+from utils.database import get_staff_rank
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,11 +17,9 @@ async def is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
             update.effective_chat.id,
             update.effective_user.id
         )
-        # المشرف الكامل
         if member.status in ("administrator", "creator"):
             return True
         
-        # مشرف مساعد
         from utils import database as db
         if await db.is_assistant(update.effective_chat.id, update.effective_user.id):
             return True
@@ -79,7 +80,6 @@ def parse_duration(duration_str: str) -> Optional[timedelta]:
 
 
 def parse_time(time_str: str) -> int:
-    """تحويل 1d, 2h, 30m إلى ثواني (للاستخدام مع الحظر والكتم المؤقت)"""
     if not time_str:
         return 0
     
@@ -98,7 +98,6 @@ def parse_time(time_str: str) -> int:
 
 
 async def can_restrict(update: Update, context: ContextTypes.DEFAULT_TYPE, target_id: int) -> bool:
-    """التحقق إذا كان البوت يستطيع تقييد عضو (حظر/كتم)"""
     try:
         bot_member = await update.message.chat.get_member(context.bot.id)
         if not bot_member.can_restrict_members:
@@ -193,23 +192,14 @@ def estimate_telegram_registration(user_id: int) -> str:
     return "2024 أو أحدث"
 
 
-# ==================== دوال جديدة لدعم المعرف واليوزر والرد ====================
 async def extract_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    استخراج المستخدم من الرد على رسالة، أو من المعرف الرقمي، أو من اليوزر (مع أو بدون @).
-    ترجع (user_id, user_name, user_mention_html) أو (None, None, None) إن لم يتم العثور.
-    """
-    # 1️⃣ رد على رسالة
     reply = update.message.reply_to_message
     if reply and reply.from_user:
         u = reply.from_user
         return u.id, u.first_name, u.mention_html()
     
-    # 2️⃣ معرف رقمي أو يوزر من الوسيطات
     if context.args:
         arg = context.args[0].strip()
-        
-        # معرف رقمي
         if arg.isdigit():
             uid = int(arg)
             try:
@@ -218,16 +208,44 @@ async def extract_target(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except:
                 return uid, str(uid), f'<a href="tg://user?id={uid}">{uid}</a>'
         
-        # يوزر (يبدأ بـ @ أو بدونه)
         if arg.startswith('@'):
             username = arg[1:]
         else:
             username = arg
-        
         try:
             user = await context.bot.get_chat(f"@{username}")
             return user.id, user.first_name, user.mention_html()
         except:
             pass
-    
     return None, None, None
+
+
+# ========== دالة الصلاحيات الموحدة (الجديدة) ==========
+async def check_permission(update: Update, context: ContextTypes.DEFAULT_TYPE, required_rank: int) -> bool:
+    """
+    يرجع True إذا كان المستخدم يملك الصلاحية المطلوبة (مشرف تيليجرام، أو مطور، أو رتبة كافية).
+    """
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+
+    # المطور
+    if user_id == DEVELOPER_ID:
+        return True
+
+    # مشرف تيليجرام
+    try:
+        member = await context.bot.get_chat_member(chat_id, user_id)
+        if member.status in ("administrator", "creator"):
+            return True
+    except:
+        pass
+
+    # رتبة البوت
+    rank = await get_staff_rank(user_id, chat_id)
+    if rank >= required_rank:
+        return True
+
+    await update.message.reply_text(
+        f"❌ تحتاج رتبة أعلى. (مطلوب {required_rank} أو أعلى)"
+    )
+    return False
