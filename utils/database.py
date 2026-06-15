@@ -1199,3 +1199,21 @@ async def get_staff_rank(user_id: int, group_id: int) -> int:
         return 5
     role = await get_staff_role(user_id, group_id)
     return STAFF_ROLES.get(role, 0)
+
+async def add_violation(user_id: int, chat_id: int, violation_type: str, detail: str = ""):
+    if not supabase:
+        return
+    try:
+        data = {
+            "user_id": user_id,
+            "chat_id": chat_id,
+            "violation_type": violation_type,
+            "detail": detail[:300],
+            "created_at": now_iso()
+        }
+        await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: supabase.table("violations").insert(data).execute()
+        )
+    except Exception as e:
+        print(f"خطأ في تسجيل المخالفة: {e}")
