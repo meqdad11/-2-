@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 
 # ========== التوكن والمعرفات الأساسية ==========
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+DEVELOPER_ID = 729970974
 ADMIN_CHAT_ID = 729970974
 
 # ========== إعدادات التحذيرات ==========
