@@ -1130,3 +1130,36 @@ async def get_warn_list(chat_id: int) -> list:
     except Exception as e:
         print(f"خطأ في جلب المحذّرين: {e}")
         return []
+
+# في نهاية الملف
+
+async def set_staff_role(user_id: int, group_id: int, role: str, assigned_by: int):
+    """تعيين رتبة لعضو في مجموعة"""
+    query = """
+    INSERT INTO staff_roles (user_id, group_id, role, assigned_by)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (user_id, group_id)
+    DO UPDATE SET role = $3, assigned_by = $4, assigned_at = NOW()
+    """
+    await db.execute(query, user_id, group_id, role, assigned_by)
+
+async def remove_staff_role(user_id: int, group_id: int):
+    """عزل عضو من رتبته"""
+    await db.execute("DELETE FROM staff_roles WHERE user_id = $1 AND group_id = $2", user_id, group_id)
+
+async def get_staff_role(user_id: int, group_id: int) -> str | None:
+    """جلب رتبة العضو الحالية"""
+    row = await db.fetchrow("SELECT role FROM staff_roles WHERE user_id = $1 AND group_id = $2", user_id, group_id)
+    return row["role"] if row else None
+
+async def get_group_staff(group_id: int) -> list:
+    """جلب كل طاقم المجموعة مع الرتب"""
+    rows = await db.fetch("SELECT user_id, role, assigned_by, assigned_at FROM staff_roles WHERE group_id = $1 ORDER BY assigned_at", group_id)
+    return rows
+
+async def log_staff_action(group_id: int, admin_id: int, target_id: int, action_type: str, details: str = ""):
+    """تسجيل إجراء إداري"""
+    await db.execute(
+        "INSERT INTO staff_actions (group_id, admin_id, target_id, action_type, details) VALUES ($1, $2, $3, $4, $5)",
+        group_id, admin_id, target_id, action_type, details
+    )
