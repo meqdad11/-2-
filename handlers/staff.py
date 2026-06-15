@@ -219,10 +219,11 @@ async def list_roles(update: Update, context: ContextTypes.DEFAULT_TYPE):
             name = member.user.mention_html()
         except:
             name = f"<code>{row['user_id']}</code>"
-        lines.append(f"{row['role']}: {name} (منذ {row['assigned_at'].strftime('%Y-%m-%d')})")
+        # استخراج أول 10 أحرف من التاريخ النصي (YYYY-MM-DD)
+        date_str = str(row.get("assigned_at", ""))[:10]
+        lines.append(f"{row['role']}: {name} (منذ {date_str})")
     
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
-
 
 async def my_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
