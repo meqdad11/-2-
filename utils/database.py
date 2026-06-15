@@ -1163,3 +1163,13 @@ async def log_staff_action(group_id: int, admin_id: int, target_id: int, action_
         "INSERT INTO staff_actions (group_id, admin_id, target_id, action_type, details) VALUES ($1, $2, $3, $4, $5)",
         group_id, admin_id, target_id, action_type, details
     )
+
+async def get_group_staff(group_id: int) -> list:
+    rows = await db.fetch("SELECT user_id, role, assigned_by, assigned_at FROM staff_roles WHERE group_id = $1 ORDER BY assigned_at", group_id)
+    return rows
+
+async def log_staff_action(group_id: int, admin_id: int, target_id: int, action_type: str, details: str = ""):
+    await db.execute(
+        "INSERT INTO staff_actions (group_id, admin_id, target_id, action_type, details) VALUES ($1, $2, $3, $4, $5)",
+        group_id, admin_id, target_id, action_type, details
+    )
