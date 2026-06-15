@@ -75,6 +75,8 @@ from handlers.support import (
 from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
 )
+# --- أوامر نظام الرتب الجديدة ---
+from handlers.staff import assign_role, demote as staff_demote, list_roles, my_role, my_permissions
 
 ARABIC_COMMANDS = {
     "حظر": cmd_ban, "رفع الحظر": cmd_unban, "رفع_الحظر": cmd_unban,
@@ -130,7 +132,9 @@ ARABIC_COMMANDS = {
     "المشرفين": cmd_list_admins,
     "تنزيل الكل": cmd_demote_all,
     "مسح المحظورين": cmd_purge_bans, "مسح المكتومين": cmd_purge_muted,
-    "تاك للكل": cmd_tag_all, "رتبتي": cmd_my_rank, "رتبته": cmd_his_rank,
+    "تاك للكل": cmd_tag_all,
+    # "رتبتي": cmd_my_rank,  # <-- تم إزالتها ليحل محلها الأمر الجديد من نظام الرتب
+    "رتبته": cmd_his_rank,
 
     "ملف": cmd_userfile,
 
@@ -187,4 +191,13 @@ ARABIC_COMMANDS = {
     "أرسل تشجيع": cmd_send_encouragement,
     "ارسل تشجيع": cmd_send_encouragement,
     "تشجيع": cmd_get_encouragement,
+
+    # --- أوامر نظام الرتب الجديدة ---
+    "تعيين": assign_role,
+    "ترقية": assign_role,
+    "عزل": staff_demote,
+    "تنزيل": staff_demote,
+    "الرتب": list_roles,
+    "رتبتي": my_role,
+    "صلاحياتي": my_permissions,
 }
