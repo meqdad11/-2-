@@ -948,18 +948,16 @@ async def save_group_message(chat_id: int, user_id: int, user_name: str, message
     if not supabase:
         return
     try:
-        # حفظ الرسالة
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: supabase.table("group_messages").insert({
                 "chat_id": chat_id,
                 "user_id": user_id,
                 "user_name": user_name,
-                "message_text": message_text[:500],  # حد الطول
+                "message_text": message_text[:500],
                 "created_at": now_iso()
             }).execute()
         )
-        # حذف الأقدم إذا تجاوز 500
         result = await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: supabase.table("group_messages")
@@ -1131,45 +1129,64 @@ async def get_warn_list(chat_id: int) -> list:
         print(f"خطأ في جلب المحذّرين: {e}")
         return []
 
-# في نهاية الملف
-
+# ==================== دوال نظام الرتب (مُصحّحة) ====================
 async def set_staff_role(user_id: int, group_id: int, role: str, assigned_by: int):
-    """تعيين رتبة لعضو في مجموعة"""
-    query = """
-    INSERT INTO staff_roles (user_id, group_id, role, assigned_by)
-    VALUES ($1, $2, $3, $4)
-    ON CONFLICT (user_id, group_id)
-    DO UPDATE SET role = $3, assigned_by = $4, assigned_at = NOW()
-    """
-    await db.execute(query, user_id, group_id, role, assigned_by)
-
-async def remove_staff_role(user_id: int, group_id: int):
-    """عزل عضو من رتبته"""
-    await db.execute("DELETE FROM staff_roles WHERE user_id = $1 AND group_id = $2", user_id, group_id)
-
-async def get_staff_role(user_id: int, group_id: int) -> str | None:
-    """جلب رتبة العضو الحالية"""
-    row = await db.fetchrow("SELECT role FROM staff_roles WHERE user_id = $1 AND group_id = $2", user_id, group_id)
-    return row["role"] if row else None
-
-async def get_group_staff(group_id: int) -> list:
-    """جلب كل طاقم المجموعة مع الرتب"""
-    rows = await db.fetch("SELECT user_id, role, assigned_by, assigned_at FROM staff_roles WHERE group_id = $1 ORDER BY assigned_at", group_id)
-    return rows
-
-async def log_staff_action(group_id: int, admin_id: int, target_id: int, action_type: str, details: str = ""):
-    """تسجيل إجراء إداري"""
-    await db.execute(
-        "INSERT INTO staff_actions (group_id, admin_id, target_id, action_type, details) VALUES ($1, $2, $3, $4, $5)",
-        group_id, admin_id, target_id, action_type, details
+    if not supabase:
+        return
+    data = {
+        "user_id": user_id,
+        "group_id": group_id,
+        "role": role,
+        "assigned_by": assigned_by,
+        "assigned_at": now_iso()
+    }
+    await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: supabase.table("staff_roles").upsert(data).execute()
     )
 
+async def remove_staff_role(user_id: int, group_id: int):
+    if not supabase:
+        return
+    await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: supabase.table("staff_roles").delete()
+            .eq("user_id", user_id).eq("group_id", group_id).execute()
+    )
+
+async def get_staff_role(user_id: int, group_id: int):
+    if not supabase:
+        return None
+    result = await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: supabase.table("staff_roles").select("role")
+            .eq("user_id", user_id).eq("group_id", group_id).execute()
+    )
+    return result.data[0]["role"] if result.data else None
+
 async def get_group_staff(group_id: int) -> list:
-    rows = await db.fetch("SELECT user_id, role, assigned_by, assigned_at FROM staff_roles WHERE group_id = $1 ORDER BY assigned_at", group_id)
-    return rows
+    if not supabase:
+        return []
+    result = await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: supabase.table("staff_roles").select(
+            "user_id, role, assigned_by, assigned_at"
+        ).eq("group_id", group_id).order("assigned_at").execute()
+    )
+    return result.data
 
 async def log_staff_action(group_id: int, admin_id: int, target_id: int, action_type: str, details: str = ""):
-    await db.execute(
-        "INSERT INTO staff_actions (group_id, admin_id, target_id, action_type, details) VALUES ($1, $2, $3, $4, $5)",
-        group_id, admin_id, target_id, action_type, details
+    if not supabase:
+        return
+    data = {
+        "group_id": group_id,
+        "admin_id": admin_id,
+        "target_id": target_id,
+        "action_type": action_type,
+        "details": details,
+        "created_at": now_iso()
+    }
+    await asyncio.get_event_loop().run_in_executor(
+        None,
+        lambda: supabase.table("staff_actions").insert(data).execute()
     )
