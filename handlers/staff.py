@@ -1,3 +1,4 @@
+import logging
 from telegram import Update
 from telegram.ext import ContextTypes, MessageHandler, filters
 from config import STAFF_ROLES, ROLE_NAMES
@@ -6,6 +7,7 @@ from utils.database import (
     get_group_staff, log_staff_action
 )
 
+logger = logging.getLogger(__name__)
 DEVELOPER_ID = 729970974
 
 async def get_rank(user_id: int, group_id: int) -> int:
@@ -15,11 +17,9 @@ async def get_rank(user_id: int, group_id: int) -> int:
     return STAFF_ROLES.get(role, 0)
 
 async def _get_target_id(update: Update, context, identifier: str = None):
-    """ترجع user_id للعضو المستهدف، أو None."""
     msg = update.message
     chat = update.effective_chat
 
-    # الرد على رسالة
     if msg.reply_to_message and msg.reply_to_message.from_user:
         target = msg.reply_to_message.from_user
         try:
@@ -28,7 +28,6 @@ async def _get_target_id(update: Update, context, identifier: str = None):
         except:
             return None
 
-    # لو تم تمرير معرف
     if identifier:
         identifier = identifier.lstrip("@")
         if identifier.isdigit():
@@ -87,6 +86,17 @@ async def assign_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"✅ {mention} ← {role_name}\nبواسطة {user.mention_html()}", parse_mode="HTML")
 
+    # وضع وسم للعضو حسب رتبته الجديدة
+    try:
+        tag = role_name if role_name != "مشرف أول" else "م. أول"
+        await context.bot.set_chat_member_tag(
+            chat_id=chat.id,
+            user_id=target_id,
+            tag=tag
+        )
+    except Exception as e:
+        logger.warning(f"تعذر وضع الوسم: {e}")
+
 async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -133,7 +143,6 @@ async def list_roles(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lines = ["👥 **طاقم المجموعة:**\n"]
     added_ids = set()
 
-    # مشرفو تيليجرام أولاً
     try:
         admins = await chat.get_administrators()
         for admin in admins:
@@ -146,7 +155,6 @@ async def list_roles(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 role_text = "👑 المالك"
             else:
                 role_text = "👮 مشرف"
-            # رتبة البوت إن وجدت
             if uid in staff_dict:
                 bot_role = staff_dict[uid]["role"]
                 role_text += f" • {bot_role}"
@@ -157,7 +165,6 @@ async def list_roles(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
 
-    # أعضاء لديهم رتب بوت فقط
     for row in staff:
         uid = row["user_id"]
         if uid not in added_ids:
