@@ -18,7 +18,7 @@ from telegram import Update
 from utils import database as db
 from config import TELEGRAM_BOT_TOKEN
 from commands import ARABIC_COMMANDS
-from utils.helpers import is_admin
+from utils.helpers import is_admin, check_permission  # تم إضافة check_permission
 from web_dashboard import start_dashboard
 
 from handlers.admin import (
@@ -126,9 +126,8 @@ async def handle_text(update: Update, context):
         return
 
     if msg.reply_to_message and text == "حذف":
-        if not await is_admin(update, context):
-            try: await context.bot.send_message(user.id, "⛔ هذا الأمر للمشرفين فقط.")
-            except: pass
+        # تم التعديل: استخدام نظام الرتب الجديد (مساعد = 1)
+        if not await check_permission(update, context, required_rank=1):
             try: await msg.delete()
             except: pass
             return
