@@ -200,4 +200,4 @@ ARABIC_COMMANDS = {
     "الرتب": list_roles,
     "رتبتي": my_role,
     "صلاحياتي": my_permissions,
-}
+} 
