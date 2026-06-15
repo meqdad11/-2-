@@ -82,7 +82,6 @@ from handlers.moderation import (
 from handlers.dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 from handlers.crisis import check_crisis_words
 from handlers.inline import handle_inline_query, handle_chosen_inline_result
-from handlers.staff import staff_handler   # تم تعديله: استيراد staff_handler بدلاً من staff_handlers
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -272,9 +271,6 @@ def register_handlers(app):
     app.add_handler(InlineQueryHandler(handle_inline_query))
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_whisper_message))
-
-    # --- إضافة handler نظام الرتب (MessageHandler) ---
-    app.add_handler(staff_handler)
 
 
 def register_jobs(app):
