@@ -10,14 +10,15 @@ from config import MAX_WARNINGS
 from utils.helpers import (
     is_admin, require_admin, get_reply_user,
     can_restrict, parse_ban_args, fmt_user, fmt_duration,
-    extract_target
+    extract_target, check_permission
 )
 
 logger = logging.getLogger(__name__)
 
 # ==================== الحظر ====================
 async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
+    # مشرف أول أو أعلى (3)
+    if not await check_permission(update, context, required_rank=3):
         return
     reply_user = get_reply_user(update)
     args = context.args or []
@@ -57,7 +58,8 @@ async def cmd_ban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
+    # مشرف أول أو أعلى (3)
+    if not await check_permission(update, context, required_rank=3):
         return
     target_id, target_name, _ = await extract_target(update, context)
     if not target_id:
@@ -128,7 +130,8 @@ async def cmd_unban(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== الكتم ====================
 async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
+    # مشرف أو أعلى (2)
+    if not await check_permission(update, context, required_rank=2):
         return
     target_id, target_name, _ = await extract_target(update, context)
     if not target_id:
@@ -160,7 +163,8 @@ async def cmd_mute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
+    # مشرف أو أعلى (2)
+    if not await check_permission(update, context, required_rank=2):
         return
     target_id, target_name, _ = await extract_target(update, context)
     if not target_id:
@@ -183,7 +187,8 @@ async def cmd_unmute(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== التحذيرات ====================
 async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
+    # مساعد أو أعلى (1)
+    if not await check_permission(update, context, required_rank=1):
         return
     target_id, target_name, _ = await extract_target(update, context)
     if not target_id:
@@ -210,7 +215,8 @@ async def cmd_warn(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"فشل الحظر التلقائي: {e}")
 
 async def cmd_clearwarn(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
+    # مساعد أو أعلى (1)
+    if not await check_permission(update, context, required_rank=1):
         return
     target_id, target_name, _ = await extract_target(update, context)
     if not target_id:
@@ -299,7 +305,8 @@ async def cmd_setrules(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ==================== القفل / الفتح ====================
 async def cmd_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
+    # مشرف أول أو أعلى (3)
+    if not await check_permission(update, context, required_rank=3):
         return
     try:
         await update.message.chat.set_permissions(ChatPermissions(can_send_messages=False))
@@ -310,7 +317,8 @@ async def cmd_lock(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await require_admin(update, context):
+    # مشرف أول أو أعلى (3)
+    if not await check_permission(update, context, required_rank=3):
         return
     try:
         await update.message.chat.set_permissions(ChatPermissions(
@@ -323,7 +331,7 @@ async def cmd_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ لا يمكن الفتح.")
 
 
-# ==================== رفع/تنزيل مشرف ====================
+# ==================== رفع/تنزيل مشرف (صلاحيات تيليجرام حصرية) ====================
 async def cmd_promote_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
@@ -473,8 +481,22 @@ async def cmd_tag_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("📢 تاك للكل: هذا الأمر قيد التطوير.")
 
 
-# ==================== رتبتي / رتبته ====================
+# ==================== رتبتي / رتبته (محدثة) ====================
 async def get_full_rank(user_id: int, chat_id: int, context: ContextTypes.DEFAULT_TYPE) -> str:
+    # التحقق من رتبة النظام أولاً
+    staff_rank = await db.get_staff_rank(user_id, chat_id)
+    if staff_rank == 5:
+        return "👨‍💻 مطور"
+    elif staff_rank == 4:
+        return "👑 مدير"
+    elif staff_rank == 3:
+        return "🌸 مشرف أول"
+    elif staff_rank == 2:
+        return "🌿 مشرف"
+    elif staff_rank == 1:
+        return "🌱 مساعد"
+    
+    # التحقق من صلاحيات تيليجرام
     if await db.is_developer(user_id):
         return "👨‍💻 مطور"
     try:
