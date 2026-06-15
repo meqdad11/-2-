@@ -1190,3 +1190,12 @@ async def log_staff_action(group_id: int, admin_id: int, target_id: int, action_
         None,
         lambda: supabase.table("staff_actions").insert(data).execute()
     )
+
+from config import DEVELOPER_ID, STAFF_ROLES
+
+async def get_staff_rank(user_id: int, group_id: int) -> int:
+    """ترجع الرتبة الرقمية: 5=مطور, 4=مدير, 3=مشرف أول, 2=مشرف, 1=مساعد, 0=عضو"""
+    if user_id == DEVELOPER_ID:
+        return 5
+    role = await get_staff_role(user_id, group_id)
+    return STAFF_ROLES.get(role, 0)
