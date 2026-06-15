@@ -14,7 +14,46 @@ async def get_rank(user_id: int, group_id: int) -> int:
     role = await get_staff_role(user_id, group_id)
     return STAFF_ROLES.get(role, 0)
 
-async def assign_role(update: Update, context: ContextTypes.DEFAULT_TYPE, args: list):
+async def _get_target_member(update: Update, context, args):
+    """
+    استخراج العضو المستهدف من:
+    1. الرد على رسالته
+    2. اليوزر (مع أو بدون @)
+    3. الآيدي الرقمي
+    تعيد (member, target_id) أو (None, None)
+    """
+    chat = update.effective_chat
+    msg = update.message
+
+    # الحالة 1: الرد على رسالة العضو
+    if msg.reply_to_message and msg.reply_to_message.from_user:
+        user = msg.reply_to_message.from_user
+        try:
+            member = await chat.get_member(user.id)
+            return member, user.id
+        except:
+            return None, None
+
+    # الحالة 2: تقديم معرف (يوزر أو ايدي)
+    if args and len(args) > 0:
+        identifier = args[0].lstrip("@")
+        # نحاول كـ ID رقمي
+        if identifier.isdigit():
+            try:
+                member = await chat.get_member(int(identifier))
+                return member, int(identifier)
+            except:
+                pass
+        # نحاول كـ يوزر
+        try:
+            member = await chat.get_member(f"@{identifier}")
+            return member, member.user.id
+        except:
+            pass
+
+    return None, None
+
+async def assign_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     if not chat or chat.type == "private":
@@ -26,17 +65,27 @@ async def assign_role(update: Update, context: ContextTypes.DEFAULT_TYPE, args: 
         await update.message.reply_text("❌ صلاحية تعيين الرتب محصورة في المدير والمطور.")
         return
 
-    if len(args) < 2:
-        await update.message.reply_text("❌ استخدم: تعيين @المعرف الرتبة\nالرتب: مساعد، مشرف، مشرف أول، مدير")
+    args = context.args if context.args else update.message.text.split()[1:]
+
+    # إذا كان فيه رد والمستخدم كتب "تعيين الرتبة" (بدون معرف)
+    if update.message.reply_to_message and len(args) == 1:
+        role_name = args[0]
+        member, target_id = await _get_target_member(update, context, [])
+    elif len(args) >= 2:
+        role_name = " ".join(args[1:])
+        member, target_id = await _get_target_member(update, context, [args[0]])
+    else:
+        await update.message.reply_text(
+            "❌ استخدم:\n"
+            "• `تعيين @المعرف الرتبة`\n"
+            "• `تعيين id الرتبة`\n"
+            "• بالرد على رسالة العضو: `تعيين الرتبة`",
+            parse_mode="Markdown"
+        )
         return
 
-    target_username = args[0].lstrip("@")
-    role_name = " ".join(args[1:])
-
-    try:
-        member = await chat.get_member(f"@{target_username}")
-    except:
-        await update.message.reply_text("❌ لم أجد العضو في المجموعة.")
+    if not member:
+        await update.message.reply_text("❌ لم أستطع العثور على العضو. تأكد من اليوزر أو الآيدي أو قم بالرد على رسالته.")
         return
 
     if role_name not in STAFF_ROLES:
@@ -45,15 +94,16 @@ async def assign_role(update: Update, context: ContextTypes.DEFAULT_TYPE, args: 
 
     target_rank_value = STAFF_ROLES[role_name]
 
+    # المدير لا يستطيع تعيين مدير
     if admin_rank == 4 and target_rank_value >= 4:
         await update.message.reply_text("❌ المدير لا يمكنه تعيين مدير آخر.")
         return
 
-    if admin_rank == 5:
-        pass
-    elif target_rank_value >= admin_rank:
-        await update.message.reply_text("❌ لا يمكنك تعيين عضو برتبة تساوي أو تعلو رتبتك.")
-        return
+    # المطور يستطيع كل شيء
+    if admin_rank != 5:
+        if target_rank_value >= admin_rank:
+            await update.message.reply_text("❌ لا يمكنك تعيين عضو برتبة تساوي أو تعلو رتبتك.")
+            return
 
     current_target_rank = await get_rank(member.user.id, chat.id)
     if current_target_rank >= admin_rank:
@@ -69,7 +119,7 @@ async def assign_role(update: Update, context: ContextTypes.DEFAULT_TYPE, args: 
         parse_mode="HTML"
     )
 
-async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE, args: list):
+async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     if not chat or chat.type == "private":
@@ -81,16 +131,25 @@ async def demote(update: Update, context: ContextTypes.DEFAULT_TYPE, args: list)
         await update.message.reply_text("❌ العزل محصور في المدير والمطور.")
         return
 
-    if len(args) < 1:
-        await update.message.reply_text("❌ استخدم: عزل @المعرف")
+    args = context.args if context.args else update.message.text.split()[1:]
+
+    # إذا كان فيه رد والمستخدم كتب "عزل" فقط (بدون معرف)
+    if update.message.reply_to_message and (not args or len(args) == 0):
+        member, target_id = await _get_target_member(update, context, [])
+    elif args:
+        member, target_id = await _get_target_member(update, context, [args[0]])
+    else:
+        await update.message.reply_text(
+            "❌ استخدم:\n"
+            "• `عزل @المعرف`\n"
+            "• `عزل id`\n"
+            "• بالرد على رسالة العضو: `عزل`",
+            parse_mode="Markdown"
+        )
         return
 
-    target_username = args[0].lstrip("@")
-
-    try:
-        member = await chat.get_member(f"@{target_username}")
-    except:
-        await update.message.reply_text("❌ لم أجد العضو في المجموعة.")
+    if not member:
+        await update.message.reply_text("❌ لم أستطع العثور على العضو.")
         return
 
     target_rank = await get_rank(member.user.id, chat.id)
@@ -178,9 +237,9 @@ async def staff_dispatcher(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cmd = args[0]
 
     if cmd in ["تعيين", "ترقية"]:
-        await assign_role(update, context, args[1:])
+        await assign_role(update, context)
     elif cmd in ["عزل", "تنزيل"]:
-        await demote(update, context, args[1:])
+        await demote(update, context)
     elif cmd == "الرتب":
         await list_roles(update, context)
     elif cmd == "رتبتي":
