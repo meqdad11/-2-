@@ -207,36 +207,58 @@ async def list_roles(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ هذا الأمر للمجموعات فقط.")
         return
 
+    # جلب طاقم البوت
     staff = await get_group_staff(chat.id)
-    if not staff:
+    staff_dict = {}
+    for row in staff:
+        staff_dict[row["user_id"]] = row
+
+    lines = ["👥 **طاقم المجموعة:**\n"]
+    added_ids = set()
+
+    # إضافة مشرفي تيليجرام أولاً (مالك ومشرفين)
+    try:
+        admins = await chat.get_administrators()
+        for admin in admins:
+            uid = admin.user.id
+            if uid == context.bot.id:  # تجاهل البوت نفسه
+                continue
+            added_ids.add(uid)
+            mention = admin.user.mention_html()
+            if admin.status == "creator":
+                role_text = "👑 المالك"
+            else:
+                role_text = "👮 مشرف"
+            
+            # إذا كان لديه رتبة بوت، نضيفها
+            if uid in staff_dict:
+                bot_role = staff_dict[uid]["role"]
+                role_text += f" • {bot_role}"
+                date_str = str(staff_dict[uid].get("assigned_at", ""))[:10]
+                lines.append(f"{role_text}: {mention} (منذ {date_str})")
+            else:
+                lines.append(f"{role_text}: {mention}")
+    except Exception:
+        pass
+
+    # إضافة طاقم البوت الذين ليسوا مشرفين تيليجرام
+    for row in staff:
+        uid = row["user_id"]
+        if uid not in added_ids:
+            added_ids.add(uid)
+            try:
+                member = await chat.get_member(uid)
+                name = member.user.mention_html()
+            except:
+                name = f"<code>{uid}</code>"
+            date_str = str(row.get("assigned_at", ""))[:10]
+            lines.append(f"{row['role']}: {name} (منذ {date_str})")
+
+    if len(lines) == 1:
         await update.message.reply_text("👥 لا يوجد طاقم معيّن في هذه المجموعة.")
         return
 
-    lines = ["👥 **طاقم المجموعة:**\n"]
-    for row in staff:
-        try:
-            member = await chat.get_member(row["user_id"])
-            name = member.user.mention_html()
-        except:
-            name = f"<code>{row['user_id']}</code>"
-        # استخراج أول 10 أحرف من التاريخ النصي (YYYY-MM-DD)
-        date_str = str(row.get("assigned_at", ""))[:10]
-        lines.append(f"{row['role']}: {name} (منذ {date_str})")
-    
     await update.message.reply_text("\n".join(lines), parse_mode="HTML")
-
-async def my_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    chat = update.effective_chat
-    if not chat or chat.type == "private":
-        await update.message.reply_text("هذا الأمر للمجموعات فقط.")
-        return
-
-    rank = await get_rank(user.id, chat.id)
-    role_name = ROLE_NAMES.get(rank, "عضو")
-    if rank == 5:
-        role_name = "مطور البوت"
-    await update.message.reply_text(f"🌟 رتبتك الحالية: {role_name}")
 
 
 async def my_permissions(update: Update, context: ContextTypes.DEFAULT_TYPE):
