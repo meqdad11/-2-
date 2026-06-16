@@ -536,6 +536,8 @@ async def cmd_surah(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         await update.message.reply_text("الرقم غير صالح.")
 
+import aiohttp
+
 async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("الاستخدام: قران [رقم الصفحة]\nمثال: قران 1")
@@ -546,13 +548,20 @@ async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("رقم الصفحة بين 1 و 604")
             return
         
-        # رابط صورة الصفحة من مصحف المدينة
-        img_url = f"https://cdn.alquran.cloud/images/page/{page}.png"
+        # رابط بديل ومضمون لصور المصحف
+        img_url = f"https://www.searchtruth.com/quran/images2/{page}.jpg"
+        
+        # نحمّل الصورة أولاً ثم نرسلها
+        async with aiohttp.ClientSession() as session:
+            async with session.get(img_url) as resp:
+                if resp.status != 200:
+                    await update.message.reply_text("❌ تعذر تحميل الصفحة.")
+                    return
+                image_bytes = await resp.read()
         
         await update.message.reply_photo(
-            photo=img_url,
+            photo=image_bytes,
             caption=f"📖 صفحة {page}",
-            parse_mode="Markdown"
         )
     except Exception as e:
         logger.error(f"خطأ في قران: {e}")
