@@ -545,16 +545,30 @@ async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if page < 1 or page > 604:
             await update.message.reply_text("رقم الصفحة بين 1 و 604")
             return
+        # نستخدم API مختلف ومضمون
         async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://api.alquran.cloud/v1/page/{page}") as resp:
+            async with session.get(
+                f"https://api.quran.com/api/v4/verses/by_page/{page}",
+                params={"language": "ar", "words": "true", "per_page": "all"}
+            ) as resp:
                 if resp.status != 200:
                     await update.message.reply_text("❌ خطأ في جلب الصفحة")
                     return
                 data = await resp.json()
-                verses = data["data"]["verses"]
-                lines = [f"{v['text']}" for v in verses[:5]]
-                text = "\n".join(lines)
-                await update.message.reply_text(f"📖 صفحة {page}\n\n{text}\n\n...")
+                verses = data.get("verses", [])
+                if not verses:
+                    await update.message.reply_text("❌ لا توجد بيانات.")
+                    return
+                text_parts = []
+                for v in verses[:20]:  # أول 20 آية فقط للطول
+                    uthmani = v.get("text_uthmani", "")
+                    text_parts.append(uthmani)
+                final_text = " ".join(text_parts)
+                surah = verses[0].get("verse_key", "1:1").split(":")[0]
+                await update.message.reply_text(
+                    f"📖 صفحة {page} (سورة {surah})\n\n{final_text[:4000]}",
+                    parse_mode=None
+                )
     except Exception as e:
         logger.error(f"خطأ في قران: {e}")
         await update.message.reply_text("حدث خطأ، تأكد من الرقم.")
