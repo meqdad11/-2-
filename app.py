@@ -1,4 +1,3 @@
-
 import asyncio
 import logging
 import datetime
@@ -83,7 +82,6 @@ from handlers.moderation import (
 from handlers.dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 from handlers.crisis import check_crisis_words
 from handlers.inline import handle_inline_query, handle_chosen_inline_result
-from handlers.whisper_inline import register_whisper_handlers   # <-- جديد
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -303,7 +301,6 @@ def main():
 
     register_handlers(app)
     register_jobs(app)
-    register_whisper_handlers(app)   # <-- تفعيل الهمسات الجديدة
 
     app.run_polling(
         allowed_updates=["message", "channel_post", "edited_channel_post", "chat_member", "callback_query", "inline_query", "chosen_inline_result"],
