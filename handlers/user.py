@@ -538,6 +538,8 @@ async def cmd_surah(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 import aiohttp
 
+import aiohttp
+
 async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text("الاستخدام: قران [رقم الصفحة]\nمثال: قران 1")
@@ -547,18 +549,17 @@ async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if page < 1 or page > 604:
             await update.message.reply_text("رقم الصفحة بين 1 و 604")
             return
-        
-        # رابط بديل ومضمون لصور المصحف
-        img_url = f"https://www.searchtruth.com/quran/images2/{page}.jpg"
-        
-        # نحمّل الصورة أولاً ثم نرسلها
+
+        # رابط صورة الصفحة من quranenc.com
+        img_url = f"https://quranenc.com/api/v1/images/page/{page}.jpg"
+
         async with aiohttp.ClientSession() as session:
             async with session.get(img_url) as resp:
                 if resp.status != 200:
                     await update.message.reply_text("❌ تعذر تحميل الصفحة.")
                     return
                 image_bytes = await resp.read()
-        
+
         await update.message.reply_photo(
             photo=image_bytes,
             caption=f"📖 صفحة {page}",
@@ -566,7 +567,6 @@ async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"خطأ في قران: {e}")
         await update.message.reply_text("حدث خطأ، تأكد من الرقم.")
-
 # ==================== SPEAK & VOICE ====================
 async def cmd_speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
