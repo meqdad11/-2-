@@ -1,7 +1,6 @@
 from handlers.user import (
     cmd_reminder, cmd_daily_reminder, cmd_my_reminders, cmd_cancel_daily_reminder,
-    cmd_whisper, cmd_get_invite, cmd_surah, cmd_quran_page,
-    cmd_speak, cmd_voice_to_text, cmd_kickme,
+    cmd_get_invite, cmd_speak, cmd_voice_to_text, cmd_kickme,
     cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
     cmd_create_anon_link, cmd_my_messages, cmd_active_users,
     cmd_start, cmd_id, cmd_rules, cmd_translate, cmd_avatar,
@@ -75,7 +74,7 @@ from handlers.support import (
 from music import (
     cmd_download, cmd_sc_search, cmd_yt_search,
 )
-# --- أوامر نظام الرتب الجديدة ---
+# --- أوامر نظام الرتب ---
 from handlers.staff import assign_role, demote as staff_demote, list_roles, my_role, my_permissions
 
 ARABIC_COMMANDS = {
@@ -133,13 +132,11 @@ ARABIC_COMMANDS = {
     "تنزيل الكل": cmd_demote_all,
     "مسح المحظورين": cmd_purge_bans, "مسح المكتومين": cmd_purge_muted,
     "تاك للكل": cmd_tag_all,
-    # "رتبتي": cmd_my_rank,  # <-- تم إزالتها ليحل محلها الأمر الجديد من نظام الرتب
     "رتبته": cmd_his_rank,
 
     "ملف": cmd_userfile,
 
-    "اهمس": cmd_whisper, "افتاري": cmd_avatar, "رابط": cmd_get_invite,
-    "سورة": cmd_surah, "قران": cmd_quran_page,
+    "افتاري": cmd_avatar, "رابط": cmd_get_invite,
     "انطقي": cmd_speak, "وش يقول": cmd_voice_to_text,
     "اطردني": cmd_kickme,
     "تفعيل الترحيب": cmd_enable_welcome, "تعطيل الترحيب": cmd_disable_welcome,
@@ -192,7 +189,7 @@ ARABIC_COMMANDS = {
     "ارسل تشجيع": cmd_send_encouragement,
     "تشجيع": cmd_get_encouragement,
 
-    # --- أوامر نظام الرتب الجديدة ---
+    # --- أوامر نظام الرتب ---
     "تعيين": assign_role,
     "ترقية": assign_role,
     "عزل": staff_demote,
@@ -200,4 +197,4 @@ ARABIC_COMMANDS = {
     "الرتب": list_roles,
     "رتبتي": my_role,
     "صلاحياتي": my_permissions,
-} 
+}
