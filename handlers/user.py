@@ -389,6 +389,34 @@ async def handle_whisper_reply(update: Update, context: ContextTypes.DEFAULT_TYP
         parse_mode="Markdown"
     )
 
+async def callback_show_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """يتنفذ لما أي شخص يضغط زر (💌 عرض الهمسة) بالقروب."""
+    query = update.callback_query
+    data = query.data or ""
+
+    if not data.startswith("show_whisper_"):
+        return
+
+    whisper_id = data.replace("show_whisper_", "")
+    whisper_data = context.bot_data.get(f'whisper_{whisper_id}')
+
+    if not whisper_data:
+        await query.answer("⚠️ انتهت صلاحية الهمسة أو تم عرضها مسبقًا.", show_alert=True)
+        return
+
+    clicker_id = query.from_user.id
+    if clicker_id not in (whisper_data['sender_id'], whisper_data['target_id']):
+        await query.answer("🚫 هذه الهمسة ليست لك.", show_alert=True)
+        return
+
+    await query.answer(
+        f"📤 من: {whisper_data['sender_name']}\n💬 {whisper_data['text']}",
+        show_alert=True
+    )
+
+    # حذف الهمسة بعد عرضها لأول مرة (مرة واحدة فقط لكل الطرفين)
+    context.bot_data.pop(f'whisper_{whisper_id}', None)
+
 async def delete_whisper_job(context: ContextTypes.DEFAULT_TYPE, whisper_id: str):
     storage = context.bot_data.get('whisper_storage', {})
     if whisper_id in storage:
