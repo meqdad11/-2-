@@ -81,7 +81,7 @@ from handlers.moderation import (
 )
 from handlers.dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 from handlers.crisis import check_crisis_words
-from handlers.inline import handle_inline_query, handle_chosen_inline_result
+from handlers.inline import handle_inline_query, handle_chosen_inline_result, handle_reveal_callback
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -258,6 +258,7 @@ def register_handlers(app):
     app.add_handler(CallbackQueryHandler(callback_yt_pick, pattern=r"^yt_pick\|"))
     app.add_handler(CallbackQueryHandler(callback_sc_pick, pattern=r"^sc_pick\|"))
     app.add_handler(CallbackQueryHandler(callback_choose_model, pattern=r"^model_"))
+    app.add_handler(CallbackQueryHandler(handle_reveal_callback, pattern=r"^reveal:"))
     app.add_handler(CallbackQueryHandler(callback_menu))
 
     app.add_handler(ChatMemberHandler(on_chat_member_updated, ChatMemberHandler.CHAT_MEMBER))
