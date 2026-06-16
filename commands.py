@@ -1,6 +1,7 @@
 from handlers.user import (
     cmd_reminder, cmd_daily_reminder, cmd_my_reminders, cmd_cancel_daily_reminder,
-    cmd_get_invite, cmd_speak, cmd_voice_to_text, cmd_kickme,
+    cmd_whisper, cmd_get_invite, cmd_surah, cmd_quran_page,
+    cmd_speak, cmd_voice_to_text, cmd_kickme,
     cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
     cmd_create_anon_link, cmd_my_messages, cmd_active_users,
     cmd_start, cmd_id, cmd_rules, cmd_translate, cmd_avatar,
@@ -136,7 +137,9 @@ ARABIC_COMMANDS = {
 
     "ملف": cmd_userfile,
 
+    "اهمس": cmd_whisper, "همس": cmd_whisper,  # <-- تمت الإعادة
     "افتاري": cmd_avatar, "رابط": cmd_get_invite,
+    "سورة": cmd_surah, "قران": cmd_quran_page,
     "انطقي": cmd_speak, "وش يقول": cmd_voice_to_text,
     "اطردني": cmd_kickme,
     "تفعيل الترحيب": cmd_enable_welcome, "تعطيل الترحيب": cmd_disable_welcome,
@@ -176,9 +179,6 @@ ARABIC_COMMANDS = {
     "حمل": cmd_download,
     "يوت": cmd_yt_search,
     "بحث": cmd_sc_search,
-
-    "اهمس": cmd_whisper,
-    "همس": cmd_whisper,
 
     "تقرير أسبوعي": cmd_weekly_report_now,
     "تقرير اسبوعي": cmd_weekly_report_now,
