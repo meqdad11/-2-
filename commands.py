@@ -177,6 +177,9 @@ ARABIC_COMMANDS = {
     "يوت": cmd_yt_search,
     "بحث": cmd_sc_search,
 
+    "اهمس": cmd_whisper,
+    "همس": cmd_whisper,
+
     "تقرير أسبوعي": cmd_weekly_report_now,
     "تقرير اسبوعي": cmd_weekly_report_now,
     "ضبط دعم المشرفين": cmd_setup_admin_support,
