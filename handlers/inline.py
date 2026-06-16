@@ -1,61 +1,59 @@
-import uuid
-from datetime import datetime
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultArticle, InputTextMessageContent
-from telegram.ext import ContextTypes
+import logging
+import hashlib
+from telegram import Update, InlineQueryResultArticle, InputTextMessageContent, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, InlineQueryHandler, CallbackQueryHandler
 
-async def handle_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.inline_query
+logger = logging.getLogger(__name__)
+whisper_storage = {}
+
+def generate_whisper_id(sender_id: int, target_username: str, text: str) -> str:
+    raw = f"{sender_id}_{target_username}_{text}"
+    return hashlib.md5(raw.encode()).hexdigest()[:12]
+
+async def handle_inline_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.inline_query.query.strip()
     if not query:
         return
-    # نافذة الكتابة
-    results = [
-        InlineQueryResultArticle(
-            id="whisper_input",
-            title="اكتب همستك هنا...",
-            description="اضغط إرسال بعد كتابة الهمسة",
-            input_message_content=InputTextMessageContent(
-                message_text="✍️ جاري إرسال الهمسة..."
-            )
-        )
-    ]
-    await query.answer(results, cache_time=0, is_personal=True)
-
-async def handle_chosen_inline_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    chosen = update.chosen_inline_result
-    if not chosen:
+    parts = query.split(maxsplit=1)
+    if len(parts) < 2:
         return
-    user_id = chosen.from_user.id
-    whisper_text = chosen.query.strip()
-
-    target_id = context.user_data.get('whisper_target_id')
-    target_name = context.user_data.get('whisper_target_name', 'مجهول')
-    sender_name = context.user_data.get('whisper_sender_name', chosen.from_user.first_name)
-    chat_id = context.user_data.get('whisper_chat_id')
-
-    if not target_id or not chat_id or not whisper_text:
+    target_username = parts[0].lstrip("@").lower()
+    whisper_text = parts[1]
+    if not whisper_text:
         return
-
-    context.user_data.pop('whisper_target_id', None)
-    context.user_data.pop('whisper_target_name', None)
-    context.user_data.pop('whisper_sender_name', None)
-    context.user_data.pop('whisper_chat_id', None)
-
-    whisper_id = str(uuid.uuid4())[:12]
-    context.bot_data[f'whisper_{whisper_id}'] = {
-        'sender_id': user_id,
-        'sender_name': sender_name,
-        'target_id': target_id,
-        'target_name': target_name,
-        'text': whisper_text,
-        'created_at': datetime.now().isoformat()
+    sender = update.inline_query.from_user
+    whisper_id = generate_whisper_id(sender.id, target_username, whisper_text)
+    whisper_storage[whisper_id] = {
+        "sender_id": sender.id,
+        "target_username": target_username,
+        "text": whisper_text
     }
-
-    keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("👁️ عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
-    ]])
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=f"💌 **همسة خاصة** من {sender_name} إلى {target_name}",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔒 همسة خاصة", callback_data=f"whisper_{whisper_id}")]
+    ])
+    result = InlineQueryResultArticle(
+        id=whisper_id,
+        title=f"همسة إلى @{target_username}",
+        description="اضغط على الزر لعرض الهمسة",
+        input_message_content=InputTextMessageContent(f"💌 همسة خاصة من {sender.first_name}"),
+        reply_markup=keyboard
     )
+    await update.inline_query.answer([result], cache_time=0)
+
+async def handle_whisper_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    whisper_id = query.data.replace("whisper_", "")
+    data = whisper_storage.get(whisper_id)
+    if not data:
+        await query.answer("❌ انتهت صلاحية الهمسة.", show_alert=True)
+        return
+    presser = query.from_user
+    if presser.id == data["sender_id"] or presser.username.lower() == data["target_username"]:
+        await query.answer(f"💬 الهمسة:\n\n{data['text']}", show_alert=True)
+    else:
+        await query.answer("🔒 هذه الهمسة ليست لك.", show_alert=True)
+
+def register_whisper_handlers(app):
+    app.add_handler(InlineQueryHandler(handle_inline_whisper))
+    app.add_handler(CallbackQueryHandler(handle_whisper_callback, pattern=r"^whisper_"))
