@@ -345,14 +345,15 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         pass
 
     whisper_id = str(uuid.uuid4())[:12]
-    context.bot_data[f'whisper_{whisper_id}'] = {
-        'sender_id': sender.id,
-        'sender_name': sender.first_name,
-        'target_id': target.id,
-        'target_name': target.first_name,
-        'text': whisper_text,
-        'created_at': datetime.now().isoformat()
-    }
+    await db.save_whisper_box(
+        whisper_id=whisper_id,
+        sender_id=sender.id,
+        sender_name=sender.first_name,
+        target_id=target.id,
+        target_name=target.first_name,
+        chat_id=update.effective_chat.id,
+        text=whisper_text,
+    )
 
     keyboard = InlineKeyboardMarkup([[
         InlineKeyboardButton("💌 عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
@@ -434,7 +435,7 @@ async def callback_show_whisper(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     whisper_id = data.replace("show_whisper_", "")
-    whisper_data = context.bot_data.get(f'whisper_{whisper_id}')
+    whisper_data = await db.get_whisper_box(whisper_id)
 
     if not whisper_data:
         await query.answer("⚠️ انتهت صلاحية الهمسة أو تم عرضها مسبقًا.", show_alert=True)
@@ -446,12 +447,12 @@ async def callback_show_whisper(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     await query.answer(
-        f"📤 من: {whisper_data['sender_name']}\n💬 {whisper_data['text']}",
+        f"📤 من: {whisper_data['sender_name']}\n💬 {whisper_data['whisper_text']}",
         show_alert=True
     )
 
     # حذف الهمسة بعد عرضها لأول مرة (مرة واحدة فقط لكل الطرفين)
-    context.bot_data.pop(f'whisper_{whisper_id}', None)
+    await db.delete_whisper_box(whisper_id)
 
 async def delete_whisper_job(context: ContextTypes.DEFAULT_TYPE, whisper_id: str):
     storage = context.bot_data.get('whisper_storage', {})
