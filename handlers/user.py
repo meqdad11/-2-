@@ -319,7 +319,7 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if not msg.reply_to_message:
-        await msg.reply_text("❗️ رد على رسالة الشخص ثم اكتب: همسة")
+        await msg.reply_text("❗️ رد على رسالة الشخص واكتب: اهمس نص الرسالة")
         return
 
     target = msg.reply_to_message.from_user
@@ -333,14 +333,35 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ لا يمكنك إرسال همسة لنفسك.")
         return
 
-    context.user_data['whisper_target_id'] = target.id
-    context.user_data['whisper_target_name'] = target.first_name
-    context.user_data['whisper_chat_id'] = update.effective_chat.id
+    whisper_text = " ".join(context.args) if context.args else ""
 
-    await msg.reply_text(
-        f"✍️ {sender.first_name}، أرسل همستك الآن.\n"
-        "ستكون سرية ولن يراها أحد غيره.",
-        reply_markup=ForceReply(selective=True)
+    if not whisper_text:
+        await msg.reply_text("❗️ اكتب نص الهمسة بعد الأمر مباشرة، مثال:\nاهمس وحشتني")
+        return
+
+    try:
+        await msg.delete()
+    except:
+        pass
+
+    whisper_id = str(uuid.uuid4())[:12]
+    context.bot_data[f'whisper_{whisper_id}'] = {
+        'sender_id': sender.id,
+        'sender_name': sender.first_name,
+        'target_id': target.id,
+        'target_name': target.first_name,
+        'text': whisper_text,
+        'created_at': datetime.now().isoformat()
+    }
+
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("💌 عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
+    ]])
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"💌 **همسة خاصة**\nمن {sender.first_name} إلى {target.first_name}",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
     )
 
 async def handle_whisper_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -368,6 +389,21 @@ async def handle_whisper_reply(update: Update, context: ContextTypes.DEFAULT_TYP
     except:
         pass
 
+    # المحاولة الأولى: إرسالها بالخاص مباشرة بدون أي أثر بالقروب
+    try:
+        await context.bot.send_message(
+            chat_id=target_id,
+            text=(
+                f"🔒 **همسة جديدة من {sender.first_name}**\n\n"
+                f"💬 {whisper_text}"
+            ),
+            parse_mode="Markdown"
+        )
+        return  # نجحت بالخاص، خلاص بدون أي رسالة بالقروب
+    except Exception:
+        pass  # فشلت لأن العضو ما بدأ محادثة خاصة مع البوت قبل كذا
+
+    # الطريقة الاحتياطية: رسالة بالقروب مع زر إخفاء المحتوى
     whisper_id = str(uuid.uuid4())[:12]
 
     context.bot_data[f'whisper_{whisper_id}'] = {
