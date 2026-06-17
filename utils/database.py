@@ -582,7 +582,7 @@ async def get_custom_commands(chat_id: int) -> dict:
         print(f"Error getting custom commands: {e}")
         return {}
 
-# ==================== دوال الهمسات ====================
+# ==================== دوال الهمسات (الروابط القديمة) ====================
 async def save_whisper_link(whisper_id: str, sender_id: int, sender_name: str, target_id: int, target_name: str, chat_id: int, chat_title: str) -> bool:
     if not supabase:
         return False
@@ -1217,3 +1217,51 @@ async def add_violation(user_id: int, chat_id: int, violation_type: str, detail:
         )
     except Exception as e:
         print(f"خطأ في تسجيل المخالفة: {e}")
+
+# ==================== دوال صندوق الهمسات (الزر المخفي بالقروب) ====================
+# جدول جديد "whispers" يخزن نص الهمسة نفسه، عشان تصمد لو البوت أعاد التشغيل.
+async def save_whisper_box(whisper_id: str, sender_id: int, sender_name: str, target_id: int, target_name: str, chat_id: int, text: str) -> bool:
+    if not supabase:
+        return False
+    try:
+        data = {
+            "id": whisper_id,
+            "sender_id": sender_id,
+            "sender_name": sender_name,
+            "target_id": target_id,
+            "target_name": target_name,
+            "chat_id": chat_id,
+            "whisper_text": text,
+            "created_at": now_iso()
+        }
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("whispers").insert(data).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في حفظ الهمسة: {e}")
+        return False
+
+async def get_whisper_box(whisper_id: str) -> dict:
+    if not supabase:
+        return None
+    try:
+        result = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("whispers").select("*").eq("id", whisper_id).execute()
+        )
+        return result.data[0] if result.data else None
+    except Exception as e:
+        print(f"خطأ في جلب الهمسة: {e}")
+        return None
+
+async def delete_whisper_box(whisper_id: str) -> bool:
+    if not supabase:
+        return False
+    try:
+        await asyncio.get_event_loop().run_in_executor(
+            None, lambda: supabase.table("whispers").delete().eq("id", whisper_id).execute()
+        )
+        return True
+    except Exception as e:
+        print(f"خطأ في حذف الهمسة: {e}")
+        return False
