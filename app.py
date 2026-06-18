@@ -75,6 +75,10 @@ from handlers.user import (
     cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
     cmd_create_anon_link, cmd_my_messages,
 )
+from handlers.locks import filter_new_members
+# ...
+app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, filter_new_members))
+
 from handlers.moderation import (
     cmd_add_reply, cmd_remove_reply, cmd_list_replies,
     cmd_add_command, cmd_remove_command, cmd_list_commands,
