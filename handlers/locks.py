@@ -388,4 +388,4 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
         await msg.delete()
         await db.add_violation(user.id, chat_id, "game", "لعبة")
         await msg.reply_text("🚫 الألعاب مقفلة.")
-        return
+        return 
