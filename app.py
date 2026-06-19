@@ -277,7 +277,7 @@ def register_handlers(app):
     app.add_handler(InlineQueryHandler(handle_inline_query))
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_whisper_message))
-    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, filter_new_members))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, filter_new_members), group=1)
 
 
 def register_jobs(app):
