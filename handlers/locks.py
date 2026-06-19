@@ -228,6 +228,24 @@ async def cmd_unlock_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await db.set_lock(update.effective_chat.id, "whisper", False)
     await update.message.reply_text("🔓 تم فتح الهمسة.")
 
+# ---- دوال محذوفة (موجودة للتوافق فقط — لا تفعل شيئاً) ----
+async def cmd_lock_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
+async def cmd_unlock_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
+async def cmd_lock_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
+async def cmd_unlock_notifications(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
+async def cmd_lock_iranian(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
+async def cmd_unlock_iranian(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
+async def cmd_lock_porn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
+async def cmd_unlock_porn(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
+
 # ================================================
 # قفل وفتح الكل
 # ================================================
