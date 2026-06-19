@@ -25,9 +25,9 @@ NAME_MAP = {
     "links":"الروابط", "tags":"التاك", "media":"الميديا", "files":"الملفات",
     "video":"الفيديو", "voice":"الفويسات", "gifs":"المتحركات", "edit":"التعديل",
     "editmedia":"تعديل الميديا", "repeat":"التكرار", "join":"الدخول", "forward":"التوجيه",
-    "id":"ايدي", "badwords":"السب", "spam":"السبام", "replies":"الردود",
-    "notifications":"الاشعارات", "persian":"الفارسية", "bots":"البوتات", "iranian":"دخول الايراني",
-    "longtext":"الكلام الكثير", "quran":"القرآن", "porn":"الاباحي", "ai":"الذكاء الاصطناعي",
+    "badwords":"السب", "spam":"السبام", "replies":"الردود",
+    "persian":"الفارسية", "bots":"البوتات",
+    "longtext":"الكلام الكثير", "quran":"القرآن", "ai":"الذكاء الاصطناعي",
     "autoreply":"الرد التلقائي", "games":"الألعاب", "marketnews":"اخبار السوق", "whisper":"الهمسة"
 }
 
@@ -333,7 +333,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
-        locks = ["links", "media", "files", "video", "voice", "gifs", "quran", "porn", "marketnews"]
+        locks = ["links", "media", "files", "video", "voice", "gifs", "quran", "marketnews"]
         buttons = await build_lock_buttons_for_category(chat_id, locks)
         buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="menu_lock_commands"),
                         InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")])
@@ -344,7 +344,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
-        locks = ["tags", "repeat", "join", "forward", "bots", "iranian", "whisper"]
+        locks = ["tags", "repeat", "join", "forward", "bots", "whisper"]
         buttons = await build_lock_buttons_for_category(chat_id, locks)
         buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="menu_lock_commands"),
                         InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")])
@@ -355,7 +355,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
-        locks = ["edit", "editmedia", "id", "badwords", "spam", "replies", "notifications", "persian", "longtext", "ai", "autoreply", "games"]
+        locks = ["edit", "editmedia", "badwords", "spam", "replies", "persian", "longtext", "ai", "autoreply", "games"]
         buttons = await build_lock_buttons_for_category(chat_id, locks)
         buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="menu_lock_commands"),
                         InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")])
