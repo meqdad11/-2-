@@ -75,10 +75,6 @@ from handlers.user import (
     cmd_enable_welcome, cmd_disable_welcome, cmd_bio, cmd_owner,
     cmd_create_anon_link, cmd_my_messages,
 )
-from handlers.locks import filter_new_members
-# ...
-app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, filter_new_members))
-
 from handlers.moderation import (
     cmd_add_reply, cmd_remove_reply, cmd_list_replies,
     cmd_add_command, cmd_remove_command, cmd_list_commands,
@@ -87,6 +83,7 @@ from handlers.dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_sta
 from handlers.crisis import check_crisis_words
 from handlers.inline import handle_inline_query, handle_chosen_inline_result, handle_reveal_callback
 from handlers.user import handle_whisper_reply, callback_show_whisper
+from handlers.locks import filter_new_members
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -280,6 +277,7 @@ def register_handlers(app):
     app.add_handler(InlineQueryHandler(handle_inline_query))
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_whisper_message))
+    app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, filter_new_members))
 
 
 def register_jobs(app):
