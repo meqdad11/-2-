@@ -2,7 +2,7 @@ import logging
 import re
 from telegram import Update, ChatPermissions
 from telegram.constants import ChatMemberStatus
-from telegram.ext import ContextTypes
+from telegram.ext import ContextTypes, ApplicationHandlerStop
 from utils import database as db
 from utils.helpers import check_permission
 
@@ -339,6 +339,7 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
             await context.bot.send_message(chat_id, reason)
         except:
             pass
+        raise ApplicationHandlerStop
 
     # ==================== تعديل الرسائل ====================
     if is_edit:
