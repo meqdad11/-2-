@@ -321,13 +321,14 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
     if not user or user.is_bot:
         return
 
-    # تجاهل المشرفين والمؤسسين
-    try:
-        member = await context.bot.get_chat_member(chat_id, user.id)
-        if member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
-            return
-    except:
-        pass
+    # ⚠️ وضع اختبار مؤقت: تم تعطيل استثناء المشرفين، الأقفال تطبّق على الجميع.
+    # لرجوع استثناء المشرفين، أزل علامة التعليق عن الكتلة التالية:
+    # try:
+    #     member = await context.bot.get_chat_member(chat_id, user.id)
+    #     if member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
+    #         return
+    # except:
+    #     pass
 
     async def remove(reason: str, violation_type: str, detail: str = ""):
         try:
