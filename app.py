@@ -29,7 +29,6 @@ from handlers.admin import (
 from handlers.user import (
     cmd_start, cmd_id, cmd_rules,
     auto_reply, track_message, cmd_my_reminders,
-    handle_whisper_message,
 )
 from handlers.moderation import (
     cmd_add_word, cmd_remove_word, cmd_list_words,
@@ -82,7 +81,7 @@ from handlers.moderation import (
 from handlers.dev import cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats
 from handlers.crisis import check_crisis_words
 from handlers.inline import handle_inline_query, handle_chosen_inline_result, handle_reveal_callback
-from handlers.user import handle_whisper_reply, callback_show_whisper
+from handlers.user import callback_show_whisper
 from handlers.locks import filter_new_members
 
 logging.basicConfig(
@@ -107,10 +106,6 @@ async def handle_text(update: Update, context):
     text = msg.text.strip()
     chat_id = msg.chat.id
     user = update.effective_user
-
-    if context.user_data.get('whisper_target_id'):
-        await handle_whisper_reply(update, context)
-        return
 
     if msg.reply_to_message and msg.reply_to_message.from_user and msg.reply_to_message.from_user.is_bot:
         if await handle_ai_reply(update, context):
@@ -276,7 +271,6 @@ def register_handlers(app):
     app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
     app.add_handler(InlineQueryHandler(handle_inline_query))
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
-    app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.GROUPS, handle_whisper_message))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, filter_new_members), group=1)
 
 
