@@ -48,10 +48,6 @@ LANG_MAP = {
 
 # ==================== START ====================
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if context.args and context.args[0].startswith("whisper_"):
-        await handle_whisper_start(update, context)
-        return
-
     if context.args and context.args[0].startswith("anon_"):
         link_id = context.args[0].replace("anon_", "")
         target_user_id = await db.get_user_by_link(link_id)
@@ -369,67 +365,6 @@ async def cmd_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parse_mode="Markdown"
     )
 
-async def handle_whisper_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or not msg.reply_to_message:
-        return
-
-    target_id = context.user_data.get('whisper_target_id')
-    if not target_id:
-        return
-
-    if not msg.reply_to_message.from_user.is_bot:
-        return
-
-    target_name = context.user_data.pop('whisper_target_name', 'المستلم')
-    chat_id = context.user_data.pop('whisper_chat_id', None)
-    sender = msg.from_user
-    whisper_text = msg.text
-
-    context.user_data.pop('whisper_target_id', None)
-
-    try:
-        await msg.delete()
-        await msg.reply_to_message.delete()
-    except:
-        pass
-
-    # المحاولة الأولى: إرسالها بالخاص مباشرة بدون أي أثر بالقروب
-    try:
-        await context.bot.send_message(
-            chat_id=target_id,
-            text=(
-                f"🔒 **همسة جديدة من {sender.first_name}**\n\n"
-                f"💬 {whisper_text}"
-            ),
-            parse_mode="Markdown"
-        )
-        return  # نجحت بالخاص، خلاص بدون أي رسالة بالقروب
-    except Exception:
-        pass  # فشلت لأن العضو ما بدأ محادثة خاصة مع البوت قبل كذا
-
-    # الطريقة الاحتياطية: رسالة بالقروب مع زر إخفاء المحتوى
-    whisper_id = str(uuid.uuid4())[:12]
-
-    context.bot_data[f'whisper_{whisper_id}'] = {
-        'sender_id': sender.id,
-        'sender_name': sender.first_name,
-        'target_id': target_id,
-        'target_name': target_name,
-        'text': whisper_text,
-        'created_at': datetime.now().isoformat()
-    }
-
-    keyboard = InlineKeyboardMarkup([[
-        InlineKeyboardButton("💌 عرض الهمسة", callback_data=f"show_whisper_{whisper_id}")
-    ]])
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=f"💌 **همسة خاصة**\nمن {sender.first_name} إلى {target_name}",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
-
 async def callback_show_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """يتنفذ لما أي شخص يضغط زر (💌 عرض الهمسة) بالقروب."""
     query = update.callback_query
@@ -457,94 +392,6 @@ async def callback_show_whisper(update: Update, context: ContextTypes.DEFAULT_TY
 
     # حذف الهمسة بعد عرضها لأول مرة (مرة واحدة فقط لكل الطرفين)
     await db.delete_whisper_box(whisper_id)
-
-async def delete_whisper_job(context: ContextTypes.DEFAULT_TYPE, whisper_id: str):
-    storage = context.bot_data.get('whisper_storage', {})
-    if whisper_id in storage:
-        del storage[whisper_id]
-
-async def handle_whisper_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-
-    if not context.args or not context.args[0].startswith("whisper_"):
-        return
-
-    whisper_id = context.args[0].replace("whisper_", "")
-    whisper_storage = context.bot_data.get('whisper_storage', {})
-    whisper_data = whisper_storage.get(whisper_id)
-
-    if not whisper_data:
-        await msg.reply_text("❌ انتهت صلاحية الهمسة أو الرابط غير صالح.")
-        return
-
-    if whisper_data["sender_id"] != msg.from_user.id:
-        await msg.reply_text(
-            f"❌ هذا الرابط مخصص لـ {whisper_data['sender_name']}.\n"
-            f"لا يمكنك استخدامه لأنك لست المرسل."
-        )
-        return
-
-    context.user_data["active_whisper_id"] = whisper_id
-    context.user_data["whisper_target_id"] = whisper_data["target_id"]
-    context.user_data["whisper_target_name"] = whisper_data["target_name"]
-    context.user_data["whisper_sender_name"] = whisper_data["sender_name"]
-
-    await msg.reply_text(
-        f"🔒 **همسة إلى {whisper_data['target_name']}**\n\n"
-        f"✍️ اكتب الهمسة الآن.\n"
-        f"(ستُرسل باسمك: {whisper_data['sender_name']})",
-        parse_mode="Markdown"
-    )
-
-async def handle_whisper_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-
-    if not msg or update.effective_chat.type != "private":
-        return
-
-    whisper_id = context.user_data.get("active_whisper_id")
-    if not whisper_id:
-        return
-
-    target_id = context.user_data.get("whisper_target_id")
-    target_name = context.user_data.get("whisper_target_name")
-    sender_name = context.user_data.get("whisper_sender_name")
-
-    if not target_id:
-        await msg.reply_text("❌ حدث خطأ، يرجى المحاولة مرة أخرى.")
-        context.user_data.pop("active_whisper_id", None)
-        return
-
-    try:
-        await context.bot.send_message(
-            chat_id=target_id,
-            text=(
-                f"🔒 **همسة جديدة**\n\n"
-                f"📤 من: **{sender_name}**\n"
-                f"💬 الهمسة:\n"
-                f"_{msg.text}_"
-            ),
-            parse_mode="Markdown"
-        )
-
-        await msg.reply_text(
-            f"✅ **تم إرسال الهمسة بنجاح إلى {target_name}**\n\n"
-            f"📝 نص همستك:\n_{msg.text}_",
-            parse_mode="Markdown"
-        )
-
-        storage = context.bot_data.get('whisper_storage', {})
-        if whisper_id in storage:
-            del storage[whisper_id]
-
-    except Exception as e:
-        logger.error(f"خطأ في إرسال الهمسة: {e}")
-        await msg.reply_text("❌ فشل إرسال الهمسة.")
-
-    context.user_data.pop("active_whisper_id", None)
-    context.user_data.pop("whisper_target_id", None)
-    context.user_data.pop("whisper_target_name", None)
-    context.user_data.pop("whisper_sender_name", None)
 
 # ==================== AVATAR ====================
 async def cmd_avatar(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -585,57 +432,12 @@ async def cmd_get_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except:
         await update.message.reply_text("❌ لا يمكن إنشاء رابط.")
 
-# ==================== SURAH & QURAN ====================
+# ==================== SURAH & QURAN (تم إلغاؤهما) ====================
 async def cmd_surah(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("الاستخدام: سورة [رقم السورة]\nمثال: سورة 1")
-        return
-    try:
-        surah_num = int(context.args[0])
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://api.alquran.cloud/v1/surah/{surah_num}") as resp:
-                if resp.status != 200:
-                    await update.message.reply_text("❌ سورة غير موجودة.")
-                    return
-                data = await resp.json()
-                surah = data["data"]
-                name = surah["name"]
-                english_name = surah["englishName"]
-                await update.message.reply_text(f"📖 سورة {name} ({english_name})\nعدد الآيات: {surah['numberOfAyahs']}\nالترتيب: {surah['revelationType']}")
-    except:
-        await update.message.reply_text("الرقم غير صالح.")
-
-import aiohttp
-
-import aiohttp
+    await update.message.reply_text("⚠️ هذا الأمر غير مدعوم حالياً.")
 
 async def cmd_quran_page(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not context.args:
-        await update.message.reply_text("الاستخدام: قران [رقم الصفحة]\nمثال: قران 1")
-        return
-    try:
-        page = int(context.args[0])
-        if page < 1 or page > 604:
-            await update.message.reply_text("رقم الصفحة بين 1 و 604")
-            return
-
-        # رابط صورة الصفحة من quranenc.com
-        img_url = f"https://quranenc.com/api/v1/images/page/{page}.jpg"
-
-        async with aiohttp.ClientSession() as session:
-            async with session.get(img_url) as resp:
-                if resp.status != 200:
-                    await update.message.reply_text("❌ تعذر تحميل الصفحة.")
-                    return
-                image_bytes = await resp.read()
-
-        await update.message.reply_photo(
-            photo=image_bytes,
-            caption=f"📖 صفحة {page}",
-        )
-    except Exception as e:
-        logger.error(f"خطأ في قران: {e}")
-        await update.message.reply_text("حدث خطأ، تأكد من الرقم.")
+    await update.message.reply_text("⚠️ هذا الأمر غير مدعوم حالياً.")
 # ==================== SPEAK & VOICE ====================
 async def cmd_speak(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -743,40 +545,4 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ في الترجمة: {e}")
         await msg.reply_text("❌ خدمة الترجمة غير متاحة حالياً.")
 
-# ==================== HANDLE PRIVATE MESSAGES ====================
-async def handle_private_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    msg = update.message
-    if not msg or update.effective_chat.type != "private":
-        return
 
-    target_id = context.user_data.get('whisper_target_id')
-    if target_id:
-        await handle_whisper_reply(update, context)
-        return
-
-    if context.user_data.get("active_whisper_id"):
-        await handle_whisper_message(update, context)
-        return
-
-    anon_target = context.user_data.get("anon_target")
-    if anon_target:
-        await db.save_anonymous_message("", msg.text, update.effective_user.id)
-        try:
-            await context.bot.send_message(
-                anon_target,
-                f"📨 **رسالة جديدة (صارحني):**\n\n{msg.text}\n\n"
-                f"لعرض جميع رسائلك: استخدم أمر `رسائلي`.",
-                parse_mode="Markdown"
-            )
-        except Exception as e:
-            logger.error(f"فشل إرسال إشعار الرسالة المجهولة: {e}")
-        await msg.reply_text("✅ تم إرسال رسالتك المجهولة.")
-        context.user_data.pop("anon_target", None)
-        return
-
-# ==================== REGISTER ====================
-def register_user_handlers(app):
-    from telegram.ext import MessageHandler, filters
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, handle_private_messages))
-    app.add_handler(MessageHandler(filters.REPLY & filters.TEXT & filters.ChatType.GROUPS, handle_whisper_reply))
- 
