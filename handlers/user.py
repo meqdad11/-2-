@@ -276,6 +276,10 @@ async def auto_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type not in (TGChat.GROUP, TGChat.SUPERGROUP):
         return
 
+    chat_id = update.effective_chat.id
+    if await db.is_locked(chat_id, "autoreply"):
+        return
+
     text = msg.text.strip()
     for keyword, replies in AUTO_REPLIES.items():
         if keyword in text:
