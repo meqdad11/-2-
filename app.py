@@ -268,7 +268,7 @@ def register_handlers(app):
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.GROUPS, handle_text))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.PRIVATE, handle_private))
     app.add_handler(MessageHandler(filters.TEXT & filters.ChatType.CHANNEL, handle_channel_post))
-    app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content))
+    app.add_handler(MessageHandler(filters.ALL & filters.ChatType.GROUPS, filter_locked_content), group=-1)
     app.add_handler(InlineQueryHandler(handle_inline_query))
     app.add_handler(ChosenInlineResultHandler(handle_chosen_inline_result))
     app.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, filter_new_members), group=1)
