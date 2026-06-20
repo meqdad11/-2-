@@ -175,13 +175,9 @@ async def cmd_unlock_longtext(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text("🔓 تم فتح الكلام الكثير.")
 
 async def cmd_lock_quran(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_permission(update, context, required_rank=3): return
-    await db.set_lock(update.effective_chat.id, "quran", True)
-    await update.message.reply_text("🔒 تم قفل نشر آيات القرآن.")
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
 async def cmd_unlock_quran(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_permission(update, context, required_rank=3): return
-    await db.set_lock(update.effective_chat.id, "quran", False)
-    await update.message.reply_text("🔓 تم فتح نشر آيات القرآن.")
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
 
 async def cmd_lock_ai(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_permission(update, context, required_rank=3): return
@@ -252,7 +248,7 @@ async def cmd_unlock_porn(update: Update, context: ContextTypes.DEFAULT_TYPE):
 LOCK_TYPES = [
     "links", "tags", "media", "files", "video", "voice", "gifs",
     "edit", "editmedia", "repeat", "join", "forward", "badwords",
-    "spam", "replies", "persian", "bots", "longtext", "quran",
+    "spam", "replies", "persian", "bots", "longtext",
     "ai", "autoreply", "games", "marketnews", "whisper"
 ]
 
@@ -414,11 +410,7 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
                 await remove("🚫 أخبار السوق مقفلة.", "marketnews", text)
                 return
 
-        # آيات القرآن
-        if await db.is_locked(chat_id, "quran"):
-            if QURAN_PATTERN.search(text):
-                await remove("🚫 نشر آيات القرآن مقفل في هذا القروب.", "quran", text)
-                return
+        # آيات القرآن (تم إلغاؤه)
 
         # الهمس (أمر اهمس)
         if await db.is_locked(chat_id, "whisper"):
