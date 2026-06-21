@@ -188,11 +188,13 @@ async def process_custom_replies_and_commands(update: Update, context: ContextTy
     text = msg.text.strip().lower()
     chat_id = update.effective_chat.id
 
-    replies = await db.get_custom_replies(chat_id)
-    for keyword, reply in replies.items():
-        if keyword in text:
-            await msg.reply_text(reply)
-            return
+    # الردود المضافة تخضع لقفل "الرد التلقائي" أيضاً
+    if not await db.is_locked(chat_id, "autoreply"):
+        replies = await db.get_custom_replies(chat_id)
+        for keyword, reply in replies.items():
+            if keyword in text:
+                await msg.reply_text(reply)
+                return
 
     if text.startswith('!'):
         cmd = text[1:].split()[0] if ' ' in text else text[1:]
