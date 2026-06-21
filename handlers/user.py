@@ -546,3 +546,4 @@ async def cmd_translate(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("❌ خدمة الترجمة غير متاحة حالياً.")
 
 
+ 
