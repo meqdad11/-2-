@@ -408,7 +408,7 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
         return
 
     # ==================== توجيه ====================
-    if getattr(msg, 'forward_date', None) and await db.is_locked(chat_id, "forward"):
+    if getattr(msg, 'forward_origin', None) and await db.is_locked(chat_id, "forward"):
         await remove("🚫 التوجيه مقفل.", "forward")
         return
 
