@@ -148,13 +148,9 @@ async def cmd_unlock_replies(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text("🔓 تم فتح الردود.")
 
 async def cmd_lock_persian(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_permission(update, context, required_rank=3): return
-    await db.set_lock(update.effective_chat.id, "persian", True)
-    await update.message.reply_text("🔒 تم قفل الفارسية.")
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
 async def cmd_unlock_persian(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_permission(update, context, required_rank=3): return
-    await db.set_lock(update.effective_chat.id, "persian", False)
-    await update.message.reply_text("🔓 تم فتح الفارسية.")
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
 
 async def cmd_lock_bots(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_permission(update, context, required_rank=3): return
@@ -198,22 +194,14 @@ async def cmd_unlock_autoreply(update: Update, context: ContextTypes.DEFAULT_TYP
     await update.message.reply_text("🔓 تم فتح الرد التلقائي.")
 
 async def cmd_lock_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_permission(update, context, required_rank=3): return
-    await db.set_lock(update.effective_chat.id, "games", True)
-    await update.message.reply_text("🔒 تم قفل الألعاب.")
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
 async def cmd_unlock_games(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_permission(update, context, required_rank=3): return
-    await db.set_lock(update.effective_chat.id, "games", False)
-    await update.message.reply_text("🔓 تم فتح الألعاب.")
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
 
 async def cmd_lock_marketnews(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_permission(update, context, required_rank=3): return
-    await db.set_lock(update.effective_chat.id, "marketnews", True)
-    await update.message.reply_text("🔒 تم قفل أخبار السوق.")
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
 async def cmd_unlock_marketnews(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_permission(update, context, required_rank=3): return
-    await db.set_lock(update.effective_chat.id, "marketnews", False)
-    await update.message.reply_text("🔓 تم فتح أخبار السوق.")
+    await update.message.reply_text("⚠️ هذا القفل غير مدعوم.")
 
 async def cmd_lock_whisper(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_permission(update, context, required_rank=3): return
@@ -248,8 +236,8 @@ async def cmd_unlock_porn(update: Update, context: ContextTypes.DEFAULT_TYPE):
 LOCK_TYPES = [
     "links", "tags", "media", "files", "video", "voice", "gifs",
     "edit", "editmedia", "repeat", "join", "forward", "badwords",
-    "spam", "replies", "persian", "bots", "longtext",
-    "ai", "autoreply", "games", "marketnews", "whisper"
+    "spam", "replies", "bots", "longtext",
+    "ai", "autoreply", "whisper"
 ]
 
 async def cmd_lock_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -264,20 +252,6 @@ async def cmd_unlock_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await db.set_lock(update.effective_chat.id, lt, False)
     await update.message.reply_text("🔓 تم فتح جميع الحمايات.")
 
-
-# ================================================
-# كلمات أخبار السوق والقرآن (للكشف)
-# ================================================
-MARKET_KEYWORDS = [
-    "سهم", "أسهم", "اسهم", "سوق المال", "تداول", "بورصة", "ناسداك",
-    "داو جونز", "نيكاي", "بيتكوين", "عملة رقمية", "crypto", "bitcoin",
-    "forex", "فوركس", "مؤشر", "صندوق", "etf", "ربح", "خسارة", "استثمار"
-]
-
-QURAN_PATTERN = re.compile(
-    r'(بِسْمِ اللَّهِ|قُلْ هُوَ اللَّهُ|إِنَّا أَعْطَيْنَاكَ|الْحَمْدُ لِلَّهِ رَبِّ|'
-    r'وَالْعَصْرِ|قُلْ أَعُوذُ|سورة|آية \d+|\d+:\d+)'
-)
 
 
 # ================================================
@@ -400,20 +374,6 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
             await remove("🚫 الكلام الكثير مقفل (+300 حرف).", "longtext", text[:200])
             return
 
-        # الفارسية
-        if await db.is_locked(chat_id, "persian"):
-            if any("\u0600" <= c <= "\u06FF" for c in text):
-                await remove("🚫 الكتابة بالفارسية مقفلة.", "persian", text)
-                return
-
-        # أخبار السوق
-        if await db.is_locked(chat_id, "marketnews"):
-            if any(kw in text_lower for kw in MARKET_KEYWORDS):
-                await remove("🚫 أخبار السوق مقفلة.", "marketnews", text)
-                return
-
-        # آيات القرآن (تم إلغاؤه)
-
         # الهمس (أمر اهمس)
         if await db.is_locked(chat_id, "whisper"):
             if text.strip().startswith("اهمس"):
@@ -450,11 +410,6 @@ async def filter_locked_content(update: Update, context: ContextTypes.DEFAULT_TY
     # ==================== توجيه ====================
     if getattr(msg, 'forward_date', None) and await db.is_locked(chat_id, "forward"):
         await remove("🚫 التوجيه مقفل.", "forward")
-        return
-
-    # ==================== ألعاب ====================
-    if msg.game and await db.is_locked(chat_id, "games"):
-        await remove("🚫 الألعاب مقفلة.", "game")
         return
 
 
