@@ -26,9 +26,9 @@ NAME_MAP = {
     "video":"الفيديو", "voice":"الفويسات", "gifs":"المتحركات", "edit":"التعديل",
     "editmedia":"تعديل الميديا", "repeat":"التكرار", "join":"الدخول", "forward":"التوجيه",
     "badwords":"السب", "spam":"السبام", "replies":"الردود",
-    "persian":"الفارسية", "bots":"البوتات",
+    "bots":"البوتات",
     "longtext":"الكلام الكثير", "ai":"الذكاء الاصطناعي",
-    "autoreply":"الرد التلقائي", "games":"الألعاب", "marketnews":"اخبار السوق", "whisper":"الهمسة"
+    "autoreply":"الرد التلقائي", "whisper":"الهمسة"
 }
 
 async def get_lock_status_emoji(chat_id: int, lock_type: str) -> str:
@@ -333,7 +333,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
-        locks = ["links", "media", "files", "video", "voice", "gifs", "marketnews"]
+        locks = ["links", "media", "files", "video", "voice", "gifs"]
         buttons = await build_lock_buttons_for_category(chat_id, locks)
         buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="menu_lock_commands"),
                         InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")])
@@ -355,7 +355,7 @@ async def callback_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_admin(update, context):
             await query.answer("⛔ للمشرفين فقط", show_alert=True)
             return
-        locks = ["edit", "editmedia", "badwords", "spam", "replies", "persian", "longtext", "ai", "autoreply", "games"]
+        locks = ["edit", "editmedia", "badwords", "spam", "replies", "longtext", "ai", "autoreply"]
         buttons = await build_lock_buttons_for_category(chat_id, locks)
         buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="menu_lock_commands"),
                         InlineKeyboardButton("❌ إغلاق", callback_data="menu_close")])
