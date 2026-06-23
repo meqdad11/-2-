@@ -171,15 +171,15 @@ async def cmd_group_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     messages = await db.get_group_messages(chat.id, 100)
     if not messages or len(messages) < 5:
-        await msg.reply_text("💬 ما في رسائل كافية بعد للتلخيص (أقل من 5 رسائل).")
+        await msg.reply_text("💬 لسه ما في كلام كافي أقدر ألخصه، جرّب بعد شوي.")
         return
 
     thinking = await msg.reply_text("⏳ ألخص اللي فاتك...")
     convo = "\n".join([f"{m['user_name']}: {m['message_text']}" for m in messages])
     model_key = context.user_data.get("ai_model", "llama")
     result = await _call_ai(model_key, [
-        {"role": "system", "content": "أنت ملخص محادثات ذكي. ردك مختصر ومفيد وبالعربي. لخّص أهم ما دار في المحادثة، اذكر المواضيع الرئيسية والقرارات المهمة إن وجدت. لا تذكر كل رسالة."},
-        {"role": "user", "content": f"لخّص هذه المحادثة:\n{convo[:4000]}"}
+        {"role": "system", "content": "أنت شفق، مساعد ذكي بشخصية دافئة وعفوية. لخّص المحادثة بأسلوب طبيعي وكأنك تحكي لصاحبك اللي ما كان موجود — بالعامية السعودية أو العربي البسيط، مختصر ومفيد، وأذكر أبرز اللي صار بدون تفاصيل زائدة."},
+        {"role": "user", "content": f"لخّص اللي صار في المجموعة:\n{convo[:4000]}"}
     ])
     try:
         await thinking.delete()
@@ -203,14 +203,14 @@ async def cmd_group_mood(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     messages = await db.get_group_messages(chat.id, 50)
     if not messages or len(messages) < 5:
-        await msg.reply_text("💬 ما في رسائل كافية بعد لتحليل المزاج.")
+        await msg.reply_text("💬 ما أقدر أحكم على المزاج، الكلام قليل بعد.")
         return
 
     thinking = await msg.reply_text("⏳ أحلل مزاج المجموعة...")
     convo = "\n".join([f"{m['user_name']}: {m['message_text']}" for m in messages])
     model_key = context.user_data.get("ai_model", "llama")
     result = await _call_ai(model_key, [
-        {"role": "system", "content": "أنت محلل نفسي للمحادثات. ردك جملتين مختصرتين وبالعربي. حلّل المزاج العام والموضوع السائد واستخدم إيموجي مناسب."},
+        {"role": "system", "content": "أنت شفق، مساعد ذكي بشخصية دافئة. حلّل مزاج المجموعة بأسلوب عفوي وخفيف — جملة أو جملتين بس، وكأنك تقول لصاحبك 'الناس اليوم...' مع إيموجي يعبّر عن الجو."},
         {"role": "user", "content": f"حلّل مزاج هذه المحادثة:\n{convo[:3000]}"}
     ])
     try:
@@ -236,12 +236,12 @@ async def cmd_group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     keyword = " ".join(context.args)
     results = await db.search_group_messages(chat.id, keyword, 10)
     if not results:
-        await msg.reply_text(f"🔍 ما لقيت رسائل تحتوي على: **{keyword}**", parse_mode="Markdown")
+        await msg.reply_text(f"🔍 ما لقيت شي عن '{keyword}' في المجموعة.")
         return
 
     lines = [f"• **{r['user_name']}:** {r['message_text'][:100]} _({r['created_at'][11:16]})_" for r in results]
     await msg.reply_text(
-        f"🔍 **نتائج البحث عن '{keyword}'** ({len(results)} رسالة):\n\n" + "\n".join(lines),
+        f"🔍 لقيت {len(results)} رسالة عن '{keyword}':\n\n" + "\n".join(lines),
         parse_mode="Markdown"
     )
 
@@ -327,4 +327,3 @@ async def cmd_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_limit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("الحدود غير مفعلة حاليًا.")
- 
