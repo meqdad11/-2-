@@ -26,6 +26,7 @@ from handlers.resources import (
 )
 from handlers.ai import (
     cmd_shafaq, cmd_choose_model, cmd_gemini, cmd_limit,
+    cmd_group_summary, cmd_group_mood, cmd_group_search,
 )
 from handlers.dev import (
     cmd_add_dev, cmd_remove_dev, cmd_broadcast, cmd_bot_stats, cmd_backup,
@@ -93,6 +94,12 @@ ARABIC_COMMANDS = {
     "ايدي": cmd_id, "القواعد": cmd_rules, "شفق": cmd_shafaq, "شوشو": cmd_shafaq,
     "ابدا": cmd_menu, "ابدأ": cmd_menu, "أبدا": cmd_menu,
 
+    # --- ميزات المجموعة الذكية ---
+    "وش فاتني": cmd_group_summary,
+    "لخص": cmd_group_summary,
+    "مزاج المجموعة": cmd_group_mood,
+    "دور على": cmd_group_search,
+
     "قفل الروابط": cmd_lock_links, "فتح الروابط": cmd_unlock_links,
     "قفل التاك": cmd_lock_tags, "فتح التاك": cmd_unlock_tags,
     "قفل الميديا": cmd_lock_media, "فتح الميديا": cmd_unlock_media,
@@ -137,7 +144,7 @@ ARABIC_COMMANDS = {
 
     "ملف": cmd_userfile,
 
-    "اهمس": cmd_whisper, "همس": cmd_whisper,  # <-- تمت الإعادة
+    "اهمس": cmd_whisper, "همس": cmd_whisper,
     "افتاري": cmd_avatar, "رابط": cmd_get_invite,
     "سورة": cmd_surah, "قران": cmd_quran_page,
     "انطقي": cmd_speak, "وش يقول": cmd_voice_to_text,
