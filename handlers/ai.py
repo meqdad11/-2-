@@ -16,50 +16,17 @@ SYSTEM_PROMPT = "أنت 'شفق'، مساعد ذكي مفيد ومهذب. مهم
 INTENT_SYSTEM_PROMPT = """أنت محلل نوايا لبوت تيليجرام. مهمتك تحليل رسالة المستخدم وإرجاع JSON فقط بدون أي نص إضافي.
 
 الـ intents المتاحة:
-- reminder: تذكير لمرة واحدة
-- daily_reminder: تذكير يومي
-- cancel_reminder: إلغاء التذكير اليومي
-- my_reminders: عرض التذكيرات
-- ban: حظر عضو
-- unban: رفع الحظر
-- mute: كتم عضو
-- unmute: رفع الكتم
-- warn: تحذير عضو
-- report: تقرير عن عضو
-- deep_report: تقرير متقدم عن عضو
-- pin: تثبيت رسالة
-- unpin: إلغاء تثبيت
-- list_admins: عرض المشرفين
-- my_rank: رتبتي
-- rules: عرض القواعد
-- id: معرفي أو معرف شخص
-- stats: إحصائيات المجموعة
-- need_someone: طلب مساعدة / طوارئ نفسية
-- event_log: آخر أحداث المجموعة
-- user_warnings: تحذيرات عضو
-- banned_words: الكلمات المحظورة
-- crisis_toggle: تفعيل أو تعطيل نظام الأزمات
-- group_mood: مزاج المجموعة
-- group_summary: ملخص اللي فاتني
-- group_search: بحث في رسائل المجموعة
-- none: محادثة عادية أو سؤال
+- reminder, daily_reminder, cancel_reminder, my_reminders
+- ban, unban, mute, unmute, warn, report, deep_report
+- pin, unpin, list_admins, my_rank, rules, id, stats
+- need_someone, event_log, user_warnings, banned_words, crisis_toggle
+- group_mood, group_summary, group_search
+- none
 
 صيغة الرد JSON:
-{
-  "intent": "اسم النية",
-  "minutes": رقم أو null,
-  "time": "HH:MM" أو null,
-  "text": "نص التذكير أو السبب" أو null,
-  "target": "يوزر أو معرف الشخص المستهدف" أو null,
-  "duration": "مدة الحظر مثل 1d أو 2h" أو null,
-  "enabled": true أو false أو null
-}
+{"intent": "...", "minutes": null, "time": null, "text": null, "target": null, "duration": null, "enabled": null}
 
-قواعد مهمة:
-- أرجع JSON فقط، بدون أي كلام قبله أو بعده
-- إذا لم تكن متأكداً من النية أرجع intent: none
-- الأوامر التي تحتاج reply أرجعها كـ none إذا لم يكن هناك target واضح
-- crisis_toggle: إذا كانت الرسالة تفعيل/شغّل/افتح أرجع enabled: true، إذا تعطيل/أوقف/أغلق أرجع enabled: false"""
+قواعد: أرجع JSON فقط بدون أي كلام. إذا لم تكن متأكداً أرجع intent: none."""
 
 MODELS = {
     "llama": {"name": "LLaMA 3 (Groq)", "url": "https://api.groq.com/openai/v1/chat/completions", "key_env": "GROQ_API_KEY", "model_name": "llama-3.3-70b-versatile"},
@@ -86,7 +53,7 @@ async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ النموذج غير معروف.")
             return
         if choice not in available:
-            await update.message.reply_text(f"❌ النموذج {MODELS[choice]['name']} غير مفعّل (لا يوجد مفتاح API).")
+            await update.message.reply_text(f"❌ النموذج {MODELS[choice]['name']} غير مفعّل.")
             return
         context.user_data["ai_model"] = choice
         await update.message.reply_text(f"✅ تم اختيار نموذج {MODELS[choice]['name']}")
@@ -94,9 +61,7 @@ async def cmd_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not available:
         await update.message.reply_text("❌ لا توجد نماذج ذكاء اصطناعي مفعّلة حالياً.")
         return
-    keyboard = []
-    for key, model in available.items():
-        keyboard.append([InlineKeyboardButton(model["name"], callback_data=f"model_{key}")])
+    keyboard = [[InlineKeyboardButton(model["name"], callback_data=f"model_{key}")] for key, model in available.items()]
     await update.message.reply_text("🧠 اختر نموذج الذكاء الاصطناعي:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def callback_choose_model(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -158,22 +123,20 @@ def _check_rate_limit(user_id: int, max_commands: int = 10, window_seconds: int 
     return False
 
 def _parse_arabic_time(text: str):
-    text = text.strip()
     patterns = [
         (r"ربع ساعة", 15), (r"نص ساعة|نصف ساعة", 30),
-        (r"ثلاثة أرباع ساعة|٣ أرباع ساعة", 45), (r"ساعة ونص|ساعة ونصف", 90),
-        (r"ساعتين", 120), (r"(\d+)\s*ساعة", None), (r"(\d+)\s*دقيقة", None),
-        (r"(\d+)\s*دقائق", None), (r"بعد شوي|بعد قليل", 5),
+        (r"ثلاثة أرباع ساعة", 45), (r"ساعة ونص|ساعة ونصف", 90),
+        (r"ساعتين", 120), (r"(\d+)\s*ساعة", None),
+        (r"(\d+)\s*دقيقة|(\d+)\s*دقائق", None),
+        (r"بعد شوي|بعد قليل", 5),
     ]
     for pattern, value in patterns:
-        match = re.search(pattern, text)
+        match = re.search(pattern, text.strip())
         if match:
             if value is not None:
                 return value
-            num = int(match.group(1))
-            if "ساعة" in pattern:
-                return num * 60
-            return num
+            num = int(next(g for g in match.groups() if g))
+            return num * 60 if "ساعة" in pattern else num
     return None
 
 async def _detect_intent(user_input: str, model_key: str) -> dict:
@@ -191,6 +154,96 @@ async def _detect_intent(user_input: str, model_key: str) -> dict:
     except Exception as e:
         logger.error(f"Intent detection error: {e}")
         return {"intent": "none"}
+
+
+# ========== ملخص المجموعة (وش فاتني) ==========
+async def cmd_group_summary(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    chat = update.effective_chat
+
+    if chat.type not in ("group", "supergroup"):
+        await msg.reply_text("⚠️ هذا الأمر للمجموعات فقط.")
+        return
+
+    if await db.is_locked(chat.id, "ai"):
+        await msg.reply_text("🚫 الذكاء الاصطناعي مقفل في هذه المجموعة.")
+        return
+
+    messages = await db.get_group_messages(chat.id, 100)
+    if not messages or len(messages) < 5:
+        await msg.reply_text("💬 ما في رسائل كافية بعد للتلخيص (أقل من 5 رسائل).")
+        return
+
+    thinking = await msg.reply_text("⏳ ألخص اللي فاتك...")
+    convo = "\n".join([f"{m['user_name']}: {m['message_text']}" for m in messages])
+    model_key = context.user_data.get("ai_model", "llama")
+    result = await _call_ai(model_key, [
+        {"role": "system", "content": "أنت ملخص محادثات ذكي. ردك مختصر ومفيد وبالعربي. لخّص أهم ما دار في المحادثة، اذكر المواضيع الرئيسية والقرارات المهمة إن وجدت. لا تذكر كل رسالة."},
+        {"role": "user", "content": f"لخّص هذه المحادثة:\n{convo[:4000]}"}
+    ])
+    try:
+        await thinking.delete()
+    except:
+        pass
+    await msg.reply_text(f"📋 **ملخص المحادثة:**\n\n{result}", parse_mode="Markdown")
+
+
+# ========== مزاج المجموعة ==========
+async def cmd_group_mood(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    chat = update.effective_chat
+
+    if chat.type not in ("group", "supergroup"):
+        await msg.reply_text("⚠️ هذا الأمر للمجموعات فقط.")
+        return
+
+    if await db.is_locked(chat.id, "ai"):
+        await msg.reply_text("🚫 الذكاء الاصطناعي مقفل في هذه المجموعة.")
+        return
+
+    messages = await db.get_group_messages(chat.id, 50)
+    if not messages or len(messages) < 5:
+        await msg.reply_text("💬 ما في رسائل كافية بعد لتحليل المزاج.")
+        return
+
+    thinking = await msg.reply_text("⏳ أحلل مزاج المجموعة...")
+    convo = "\n".join([f"{m['user_name']}: {m['message_text']}" for m in messages])
+    model_key = context.user_data.get("ai_model", "llama")
+    result = await _call_ai(model_key, [
+        {"role": "system", "content": "أنت محلل نفسي للمحادثات. ردك جملتين مختصرتين وبالعربي. حلّل المزاج العام والموضوع السائد واستخدم إيموجي مناسب."},
+        {"role": "user", "content": f"حلّل مزاج هذه المحادثة:\n{convo[:3000]}"}
+    ])
+    try:
+        await thinking.delete()
+    except:
+        pass
+    await msg.reply_text(f"🌡️ **مزاج المجموعة:**\n\n{result}", parse_mode="Markdown")
+
+
+# ========== بحث في رسائل المجموعة ==========
+async def cmd_group_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    msg = update.message
+    chat = update.effective_chat
+
+    if chat.type not in ("group", "supergroup"):
+        await msg.reply_text("⚠️ هذا الأمر للمجموعات فقط.")
+        return
+
+    if not context.args:
+        await msg.reply_text("الاستخدام: `دور على [كلمة]`\nمثال: دور على اجتماع", parse_mode="Markdown")
+        return
+
+    keyword = " ".join(context.args)
+    results = await db.search_group_messages(chat.id, keyword, 10)
+    if not results:
+        await msg.reply_text(f"🔍 ما لقيت رسائل تحتوي على: **{keyword}**", parse_mode="Markdown")
+        return
+
+    lines = [f"• **{r['user_name']}:** {r['message_text'][:100]} _({r['created_at'][11:16]})_" for r in results]
+    await msg.reply_text(
+        f"🔍 **نتائج البحث عن '{keyword}'** ({len(results)} رسالة):\n\n" + "\n".join(lines),
+        parse_mode="Markdown"
+    )
 
 
 # ========== أمر شفق (نقطة الدخول الرئيسية) ==========
@@ -215,7 +268,6 @@ async def cmd_shafaq(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.reply_text("⚠️ اكتب شيئًا بعد 'شفق'.")
         return
 
-    # ===== قفل الذكاء الاصطناعي =====
     if chat.type in ("group", "supergroup") and await db.is_locked(chat.id, "ai"):
         await msg.reply_text("🚫 الذكاء الاصطناعي مقفل في هذه المجموعة.")
         return
@@ -247,23 +299,18 @@ async def handle_ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = update.message
     if not msg or not msg.reply_to_message:
         return False
-
     replied_msg = msg.reply_to_message
     if not replied_msg.from_user or not replied_msg.from_user.is_bot:
         return False
-
     chat = update.effective_chat
     if chat.type in ("group", "supergroup") and await db.is_locked(chat.id, "ai"):
         return False
-
     history = await db.get_conversation(msg.from_user.id, msg.chat.id)
     if not history:
         return False
-
     user_input = msg.text
     if not user_input:
         return False
-
     model_key = context.user_data.get("ai_model", "llama")
     history.append({"role": "user", "content": user_input})
     await msg.reply_chat_action("typing")
