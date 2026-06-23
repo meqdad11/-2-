@@ -327,3 +327,4 @@ async def cmd_gemini(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def cmd_limit(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("الحدود غير مفعلة حاليًا.")
+ 
